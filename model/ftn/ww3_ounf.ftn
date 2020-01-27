@@ -4602,8 +4602,6 @@
                     ' for ',CURDATE(1),':',CURDATE(2),':',CURDATE(3),'T',CURDATE(5),&
                     ':',CURDATE(6),':',CURDATE(7),' in file ',TRIM(FNAMENC)
 
-
-
             ! Defines starting point and size of arrays to be written
             START(1)=1
             START(2)=1
