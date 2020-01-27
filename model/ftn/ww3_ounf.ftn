@@ -3756,7 +3756,7 @@
             ! separate netCDF file (similar to FLFRQ=.TRUE. when DIM3NAME=='f').
             ! If you choose FLSEP=.FALSE., the field can go to a common
             ! netCDF if mode TOGETHER is chosen by the user.
-            !  
+            !
 
             ! FLSEP: Default is .FALSE. unless it has a frequency 'f' dimension
             FLSEP = .FALSE.
@@ -4605,8 +4605,6 @@
                     'Writing new record ', TRIM(ENAME(2:)) ,' number ',NTIM,        &
                     ' for ',CURDATE(1),':',CURDATE(2),':',CURDATE(3),'T',CURDATE(5),&
                     ':',CURDATE(6),':',CURDATE(7),' in file ',TRIM(FNAMENC)
-
-
 
             ! Defines starting point and size of arrays to be written
             START(1)=1
