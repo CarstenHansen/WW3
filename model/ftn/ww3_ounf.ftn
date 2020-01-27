@@ -504,62 +504,35 @@
 
 
 ! 5.2 Closes the netCDF file
-      IF (TOGETHER .AND. NCIDS(1,1,1).NE.0) THEN
-        IRET = NF90_REDEF(NCIDS(1,1,1))
-        CALL CHECK_ERR(IRET)
-        IRET=NF90_PUT_ATT(NCIDS(1,1,1),NF90_GLOBAL,'stop_date',STRSTOPDATE)
-        CALL CHECK_ERR(IRET)
-        IRET=NF90_CLOSE(NCIDS(1,1,1))
-        CALL CHECK_ERR(IRET)
-      END IF
-!
       DO IFI=1, NOGRP
         DO IFJ=1, NGRPP
-          IF ( FLG2D(IFI,IFJ) ) THEN
-            IF ( FLOGRD(IFI,IFJ) ) THEN
-              IF (.NOT. TOGETHER) THEN
-                IF (NCIDS(IFI,IFJ,1).NE.0) THEN
-                  IRET = NF90_REDEF(NCIDS(IFI,IFJ,1))
-                  CALL CHECK_ERR(IRET)
-                  IRET=NF90_PUT_ATT(NCIDS(IFI,IFJ,1),NF90_GLOBAL,'stop_date',STRSTOPDATE)
-                  CALL CHECK_ERR(IRET)
-                  IRET=NF90_CLOSE(NCIDS(IFI,IFJ,1))
-                  CALL CHECK_ERR(IRET)
-                END IF ! NCIDS
-                ! close partition files (except part 0 which is already closed by (IFI,IFJ,1)
-                IF ((IFI.EQ.4).AND.(IFJ.LE.NOGE(IFI))) THEN
-                  DO IPART=1,NOSWLL
-                    IF (NCIDS(IFI,IFJ,IPART+1).NE.0) THEN
-                      IRET = NF90_REDEF(NCIDS(IFI,IFJ,IPART+1))
-                      CALL CHECK_ERR(IRET)
-                      IRET=NF90_PUT_ATT(NCIDS(IFI,IFJ,IPART+1),NF90_GLOBAL,'stop_date',STRSTOPDATE)
-                      CALL CHECK_ERR(IRET)
-
-                      IRET=NF90_CLOSE(NCIDS(IFI,IFJ,IPART+1))
-                      CALL CHECK_ERR(IRET)
-                    END IF ! NCIDS
-                  END DO ! IPART
-                END IF ! partition
-              ! else if together
-              ELSE
-                ! close frequency file
-                IF ( ((IFI.EQ.6).AND.(IFJ.EQ.8)) .OR.                 &
-                     ((IFI.EQ.6).AND.(IFJ.EQ.9)) .OR.                 &
-                     (IFI.EQ.3) ) THEN
-                  IF (NCIDS(IFI,IFJ,1).NE.0) THEN
-                    IRET = NF90_REDEF(NCIDS(IFI,IFJ,1))
-                    CALL CHECK_ERR(IRET)
-                    IRET=NF90_PUT_ATT(NCIDS(IFI,IFJ,1),NF90_GLOBAL,'stop_date',STRSTOPDATE)
-                    CALL CHECK_ERR(IRET)
-                    IRET=NF90_CLOSE(NCIDS(IFI,IFJ,1))
-                    CALL CHECK_ERR(IRET)
-                  END IF ! NCIDS
-                END IF ! IFI
-              END IF ! TOGETHER
-            END IF ! FLOGRD
-          END IF ! FLG2D
+          IF (NCIDS(IFI,IFJ,1).NE.0) THEN
+            IRET = NF90_REDEF(NCIDS(IFI,IFJ,1))
+            CALL CHECK_ERR(IRET)
+            IRET=NF90_PUT_ATT(NCIDS(IFI,IFJ,1),NF90_GLOBAL,'stop_date',STRSTOPDATE)
+            CALL CHECK_ERR(IRET)
+            IRET=NF90_CLOSE(NCIDS(IFI,IFJ,1))
+            CALL CHECK_ERR(IRET)
+          END IF ! NCIDS
         END DO ! IFJ
       END DO ! IFI
+!
+      ! close partition files (except part 0 which is already closed by (IFI,IFJ,1)
+      IF (NOGE(4).GE.1 .AND. .NOT.TOGETHER) THEN
+        IFI = 4
+        DO IFJ=1, NOGE(IFI)
+          DO IPART=1,NOSWLL
+            IF (NCIDS(IFI,IFJ,IPART+1).NE.0) THEN
+              IRET = NF90_REDEF(NCIDS(IFI,IFJ,IPART+1))
+              CALL CHECK_ERR(IRET)
+              IRET=NF90_PUT_ATT(NCIDS(IFI,IFJ,IPART+1),NF90_GLOBAL,'stop_date',STRSTOPDATE)
+              CALL CHECK_ERR(IRET)
+              IRET=NF90_CLOSE(NCIDS(IFI,IFJ,IPART+1))
+              CALL CHECK_ERR(IRET)
+            END IF ! NCIDS
+          END DO ! IPART
+        END DO ! IFJ
+      END IF ! NOGE(4).GE.1 .AND. .NOT.TOGETHER
 
 !
       GOTO 888
@@ -775,6 +748,7 @@
                                  MAPSTAOUT, NDSDAT, VMIN, VMAX,        &
                                  NFIELD, N, IRET, IK, EXTRADIM, IVAR,  &
                                  IVAR1, IDVAROUT, NCVARTYPE
+      INTEGER                 :: NCJID, IFP, NFP
       INTEGER                 :: DIMID(6), VARID(300), START(4),       &
                                  COUNT(4), DIMLN(6),START1D(2),        &
                                  COUNT1D(2), DIMFIELD(3),              &
@@ -815,6 +789,7 @@
       CHARACTER, SAVE         :: TIMEID*16 = '0000000000000000'
 !
       LOGICAL                 :: FLFRQ, FLDIR, FEXIST, FREMOVE
+      LOGICAL                 :: FLSEP, FIRST_TOGETHER
       LOGICAL                 :: CUSTOMFRQ=.FALSE.
 !/T      LOGICAL                 :: LTEMP(NGRPP)
 !/RTD ! RTDL == False for a standard lat-lon grid. Will be set to True if the
@@ -940,6 +915,15 @@
         WRITE(PARTCOM, '("PTM_",I1,"_Unknown")') PTMETH
       ENDIF
 
+      ! Set a flag when a new time stamp in files
+      IF ( INDEX(TIMEID,OLDTIMEID) .EQ. 0 ) THEN
+         ! The first field in a file TOGETHER. Will be set FALSE for
+         ! following fields in the file
+         FIRST_TOGETHER = .TRUE.
+      ELSE
+         FIRST_TOGETHER = .FALSE.
+      END IF
+
 !/SMC!
 !/SMC!---  Update MAPSMC for SMC type 2 output. This needs to be
 !/SMC!     done at each timestep as MAPSTA could change if there
@@ -957,30 +941,54 @@
 !
       DO IFI=1, NOGRP
         DO IFJ=1, NGRPP
+
+          IF ( .NOT. FLG2D(IFI,IFJ) ) CYCLE
+          ! Here, the flag for the variable IFI of the group IFJ is .TRUE.
           ENAME='      '
-          ! If the flag for the variable IFI of the group IFJ is .TRUE.
-          IF ( FLG2D(IFI,IFJ) ) THEN
-            ! Instanciates the partition array
-            INDEXIPART=1
-            IPART=TABIPART(INDEXIPART)
-            VARNS(:)=''
+          ! Instanciates the partition array
+          INDEXIPART=1
+          IPART=TABIPART(INDEXIPART)
+          VARNS(:)=''
 
+          ! NFP: Number of partitions or sub-fields under each fields flag.
+          ! Is to be incremented by one for each partition or extra subfield
+          NFP = 1 
+          IFP = 0
+          DO WHILE ( IFP .LT. NFP )
+            IFP = IFP + 1
 
-!  Loop over IPART for partition variables
-555         CONTINUE
+            ! Increment NFP by one if a following partition is requested
+            ! (Loops over IPART for partition variables)
+            ! ChrisBunney: Don't loop IPART for last two entries in section 4
+            ! (16: total wind sea fraction, 17: number of parts) as these fields
+            ! do not have partitions.
+            IF (IFI .EQ. 4 .AND. IFJ .LE. NOGE(IFI) - 2) THEN
+              IPART=TABIPART(INDEXIPART)
+              DO WHILE (INDEXIPART.LT.NBIPART)
+                INDEXIPART=INDEXIPART+1
+                IF (TABIPART(INDEXIPART).EQ.-1) CYCLE
+                NFP = NFP + 1
+                EXIT
+              END DO
+             END IF
 
-            ! Initializes the index of field and group at the first flag FLG2D at .TRUE.
-            IF (I1.EQ.0) I1=IFI
-            IF (J1.EQ.0) J1=IFJ
-            FORMF  = '(1X,32I5)'
-!/T            WRITE (NDST,9020) IDOUT(IFI,IFJ)
+            ! C Hansen: Comment out FORMF not used anywhere
+            ! FORMF  = '(1X,32I5)'
+!/T            IF ( INDEXIPART .GT. 0 ) THEN
+!/T              WRITE (NDST,9021) IDOUT(IFI,IFJ), IPART
+!/T            ELSE IF ( IFP .GT. 1 ) THEN
+!/T              WRITE (NDST,9021) IDOUT(IFI,IFJ), IFP
+!/T            ELSE
+!/T              WRITE (NDST,9020) IDOUT(IFI,IFJ)
+!/T            END IF
 !
 ! 2.1 Set output arrays and parameters
 !
             ! Initializes the flags for freq and direction dimensions
             FLFRQ = .FALSE.
             FLDIR = .FALSE.
-            UNITS2='SAME'
+            ! C Hansen: Comment out obsolete UNITS2
+            ! UNITS2='SAME'
             IF (NCVARTYPEI.EQ.3) NCVARTYPE=2
 !
             IF ( IFI .EQ. 1 .AND. IFJ .EQ. 1 ) THEN
@@ -2739,34 +2747,51 @@
               VMAX =  9900
 !
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 7 ) THEN
-              NFIELD=2
-              FSC    = 0.01
-              ENAME  = '.p2s'
-              UNITS  = 'm4'
-              UNITS2 = 's-1'
-              VARNM(1)='fp2s'
-              VARNM(2)='pp2s'
-              VARNL(1)='power spectral density of equivalent surface pressure'
-              VARNL(2)='peak period of power spectral density of equivalent surface pressure'
-              VARNS(1)='power_spectral_density_of_equivalent_surface_pressure'
-              VARNS(2)='peak_period_of_power_spectral_density_of_equivalent_surface_pressure'
-              VARNG(1)='power_spectral_density_of_equivalent_surface_pressure'
-              VARNG(2)='peak_period_of_power_spectral_density_of_equivalent_surface_pressure'
-              VARNC(1)=''
-              VARNC(2)=''
-              VARND(1)=''
-              VARND(2)=''
-              VMIN = -15000 
-              VMAX = 32000
-              IF( SMCGRD ) THEN
-!/SMC                CALL W3S2XY_SMC( PRMS(1:NSEA), XX )
-!/SMC                CALL W3S2XY_SMC( TPMS(1:NSEA), XY )
-              ELSE
-                CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PRMS(1:NSEA)      &
-                                                        , MAPSF, XX )
-                CALL W3S2XY ( NSEA, NSEA, NX+1, NY, TPMS(1:NSEA)      &
-                                                        , MAPSF, XY )
-              ENDIF ! SMCGRD
+              ! C Hansen: Here is an example of placing more than one field in
+              ! the same file even if TOGETHER is set as .FALSE. This is
+              ! managed after the loop over IFP, IFI AND IFJ by setting
+              ! NCJID = NCIDS(IFI, IFJ, 1) for any field with IFP >= 2.
+              NFP = 2 ! Number of subfields loop over IFP=1,NFP
+!
+              IF ( IFP .EQ. 1 ) THEN
+                NFIELD = 1
+                ENAME  = '.p2s'
+                UNITS  = 'm4'
+                FSC    = 0.01
+                VARNM(1)='fp2s'
+                VARNL(1)='power spectral density of equivalent surface pressure'
+                VARNG(1)='power_spectral_density_of_equivalent_surface_pressure'
+                VARNS(1)='power_spectral_density_of_equivalent_surface_pressure'
+                VARNC(1)=''
+                VARND(1)=''
+                VMIN = -15000 
+                VMAX = 32000
+                IF( SMCGRD ) THEN
+!/SMC                  CALL W3S2XY_SMC( PRMS(1:NSEA), X1 )
+                ELSE
+                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PRMS(1:NSEA), MAPSF, X1 )
+                ENDIF ! SMCGRD
+!
+              ELSE ! IFP==2
+                NFIELD = 1
+                ENAME  = '.pp2s'
+                UNITS  = 's-1'
+                FSC    = 0.01
+                VARNM(1)='pp2s'
+                VARNL(1)='peak period of power spectral density of equivalent surface pressure'
+                VARNG(1)='peak_period_of_power_spectral_density_of_equivalent_surface_pressure'
+                VARNS(1)='peak_period_of_power_spectral_density_of_equivalent_surface_pressure'
+                VARNC(1)=''
+                VARND(1)=''
+                VMIN = -15000 
+                VMAX = 32000
+                IF( SMCGRD ) THEN
+!/SMC                  CALL W3S2XY_SMC( TPMS(1:NSEA), X1 )
+                ELSE
+                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, TPMS(1:NSEA), MAPSF, X1 )
+                ENDIF ! SMCGRD
+!
+              END IF ! IFP
 !
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 8 ) THEN
               ! Information for spectral distribution of surface Stokes drift (2nd file)
@@ -3368,7 +3393,7 @@
 
             ! Defines a differents for the second variable if specified
             UNITVAR(:)=UNITS
-            IF (UNITS2.NE.'SAME') UNITVAR(2)=UNITS2
+            ! IF (UNITS2.NE.'SAME') UNITVAR(2)=UNITS2 ! C Hansen: obsolete
 
 
 ! 2.2 Make map
@@ -3401,6 +3426,57 @@
 
 ! 2.3 Setups the output type 4 ( NetCDF file )
 
+      ! Subsections:
+      ! 2.3.1 Set flag for the variable to be together or in a separate netCDF
+      ! 2.3.2 Set variable name substring (ENAME in FNAMENC)
+      ! 2.3.3 Initialize dimensions etc.
+
+! 2.3.1 Set flag for the variable to be together or in a separate netCDF file
+
+            ! FLSEP and NCJID: Options to overrule output to a separate file
+            ! 
+            ! FLSEP is a logical flag indicating that a field should be put
+            ! in a separate netCDF file. This represents the use of a flag FLFRQ
+            ! for spectral fields with a 'fourth' dimension frequency ('f').
+            !  
+            ! NCJID (a 'Joint netCDF ID') may be applied for a field that
+            ! contains two or more subfields with different units or scales.
+            ! 
+            ! To manage this, the loop over partition variables is rewritten
+            ! to loop over such subfields as well. A loop counter IFP equals
+            ! IPART+1 when the loop is over partitions. Any such subfield
+            ! with IFP >= 2, which is NOT a swell partition, is put in the
+            ! same file as the field with IFP == 1, even if TOGETHER is .FALSE.
+            ! 
+            ! An example of this is applied for the two subfields of
+            ! the field P2S (IFI,IFJ = 6,7). As these fields already go
+            ! to the same netCDF file even when TOGETHER is .FALSE., this
+            ! change doesn't affect the output except that the standard output
+            ! messages 'Writing new record ...' reports each subfield as a
+            ! separate records.
+
+            ! FLSEP: Default is .FALSE. unless it has a frequency 'f' dimension
+            FLSEP = .FALSE.
+            FLSEP = (FLSEP .OR. FLFRQ)
+
+            ! The field goes to a separate file if TOGETHER is .FALSE.
+            FLSEP = (FLSEP .OR. .NOT.TOGETHER)
+
+            ! The negation (.NOT. FLSEP) is equivalent to
+            ! (TOGETHER .AND. .NOT.FLFRQ)
+
+            ! The index of field and group at the first
+            ! write to a file in mode together
+            IF (I1.EQ.0 .AND. .NOT. FLSEP) I1=IFI
+            IF (J1.EQ.0 .AND. .NOT. FLSEP) J1=IFJ
+
+            ! NCJID: ID of a requested joint netCDF file
+            NCJID = 0
+            IF ( IFP .GT. 1 .AND. FLSEP .AND. IPART .EQ. 0 ) &
+              NCJID = NCIDS(IFI, IFJ, 1) ! is already open
+
+! 2.3.2 Set variable name substring in the name of a new file (ENAME in FNAMENC)
+
             S2=LEN_TRIM(ENAME)
             S1=LEN_TRIM(FILEPREFIX)+S4
             FNAMENC(S1+1:50)='       '
@@ -3408,7 +3484,7 @@
 
             ! If flag TOGETHER and not variable with freq dim &
             ! (ef, p2l, ...), no variable name in file name
-            IF (TOGETHER.AND.(.NOT.FLFRQ)) THEN 
+            IF (.NOT. FLSEP) THEN 
               S2=0
             ! If NOT flag TOGETHER or variable with freq dim &
             ! (ef, p2l, ...), add variable name in file name
@@ -3418,6 +3494,17 @@
             ! Defines the netcdf extension
             FNAMENC(S1+S2+1:S1+S2+3) = '.nc'
             FNAMENC(S1+S2+4:S1+S2+6) = '   '
+
+            ! If the field goes to another open file (and not actually
+            ! to a separate file),
+            IF ( NCJID .NE. 0 ) FLSEP = .FALSE.
+
+            ! Note: From here FLSEP == .TRUE. implies that NCJID == 0,
+            ! If NCJID == 0, then FLSEP indicates if the field goes to
+            ! a separate netCDF file
+            
+! 2.3.3 Initialize dimensions etc.
+
             ! If the flag frequency is .TRUE., defines the fourth dimension
             IF (FLFRQ) THEN 
               UNITVAR(:)=UNITS
@@ -3457,10 +3544,15 @@
 
 ! 2.4.1 Save the id of the previous file
 
-            IF (TOGETHER.AND.(.NOT.FLFRQ)) THEN
+            IF ( NCJID .NE. 0 ) THEN
+              ! the variable in the same file as another variable
+              OLDNCID = NCJID
+            ELSE IF (.NOT. FLSEP) THEN
+              ! all variables in the same file
               OLDNCID = NCIDS(1,1,1)
             ELSE
-              OLDNCID = NCIDS(IFI,IFJ,IPART+1)
+              ! the variable in a separate file
+              OLDNCID = NCIDS(IFI,IFJ,IFP) ! When a partition, IFP is IPART+1
             END IF
 
 
@@ -3471,21 +3563,30 @@
               FREMOVE = .FALSE.
               ! time splitted condition
               IF (INDEX(TIMEID,OLDTIMEID).EQ.0) THEN
-                ! all variables in the samefile
-                IF (TOGETHER.AND.(.NOT.FLFRQ).AND.NCID.EQ.0) FREMOVE = .TRUE.
+                ! all variables in the samefile, and the variable is the first
+                ! in a new file
+                IF ( .NOT. FLSEP .AND. FIRST_TOGETHER ) FREMOVE = .TRUE.
                 ! a file per variable
-                IF (.NOT.TOGETHER.OR.FLFRQ) FREMOVE = .TRUE.
+                IF ( FLSEP ) FREMOVE = .TRUE.
               END IF
 
               IF (FREMOVE) THEN
                 OPEN(UNIT=1234, IOSTAT=IRET, FILE=FNAMENC, STATUS='old')
                 IF (IRET == 0) CLOSE(1234, STATUS='delete')
                 FEXIST=.FALSE.
-              ELSE
-                NCID = OLDNCID
               END IF
-            END IF
+            END IF            
 
+            ! Set FIRST_TOGETHER FALSE for following fields in the file
+            IF ( .NOT. FLSEP .AND. FIRST_TOGETHER ) FIRST_TOGETHER = .FALSE.
+            
+            ! If directed to another file, that file actually exists
+            IF (NCJID .NE. 0) FEXIST = .TRUE.
+            
+            ! From here, FEXIST == .FALSE. means a new file will be created.
+            ! If FEXIST is .TRUE., then the file is open with OLDNCID > 0.
+            IF (FEXIST) NCID = OLDNCID
+            
 ! 2.4.3 Finalize the previous file (if a new one will be created)
 
             IF (.NOT.FEXIST) THEN 
@@ -3504,7 +3605,7 @@
 
             IF (.NOT.FEXIST) THEN 
 
-              ! Initializes the time dimension length
+              ! Set the size of the 'level' dim
               DIMLN(1)=1
 
               ! If NOT unstructure mesh (i.e. regular grid)
@@ -3533,10 +3634,10 @@
 
               ! Saves the NCID to keep the file opened to write all the variables
               ! and open/close at each time step
-              IF (TOGETHER.AND.(.NOT.FLFRQ)) THEN
+              IF (.NOT. FLSEP) THEN
                 NCIDS(1,1,1)=NCID
               ELSE
-                NCIDS(IFI,IFJ,IPART+1)=NCID
+                NCIDS(IFI,IFJ,IFP)=NCID
               END IF
 
               ! If curvilinear grid, instanciates lat / lon
@@ -4014,9 +4115,9 @@
               ! If it is the first field of the file in mode together
               ! or NOT together or variable with freq dim (ef or p2l)
               ! ChrisBunney: Also - check IPART=TABIPART in case first
-              ! requested output is a partitioned field.
-              IF((TOGETHER .AND. IFI.EQ.I1 .AND. IFJ.EQ.J1 .AND. IPART.EQ.TABIPART(1))  &
-                 .OR.(.NOT.TOGETHER).OR.FLFRQ) n=n+1
+              ! requested output is a partitioned field (C Hansen: IFP.EQ.1).
+              IF((IFI.EQ.I1 .AND. IFJ.EQ.J1 .AND. IFP.EQ.1)  &
+                 .OR.FLSEP) n=n+1
 
 ! 2.6.3 Defines or gets the variables identifiers
 
@@ -4134,17 +4235,16 @@
                 CALL CHECK_ERR(IRET)            
               END IF !   N.EQ.1
             END IF  ! IERR.EQ.0
-              
+
 ! 2.6.4 Defines the current time step and index
      
             CALL T2D(TIME,CURDATE,IERR)
             OUTJULDAY=TSUB(REFDATE,CURDATE)
+            IF ( NCJID .NE. 0 ) FNAMENC(:)='(id.)'
             WRITE(NDSO,'(3A,I6,A,I4,A,I2.2,A,I2.2,A,I2.2,A,I2.2,A,I2.2,2A)')        &
                     'Writing new record ', ENAME(2:) ,'number ',N,                  & 
                     ' for ',CURDATE(1),':',CURDATE(2),':',CURDATE(3),'T',CURDATE(5),&
                     ':',CURDATE(6),':',CURDATE(7),' in file ',TRIM(FNAMENC)
-
-
 
             ! Defines starting point and size of arrays to be written
             START(1)=1
@@ -4164,8 +4264,7 @@
             COUNT1D(2)=1
 
             ! Puts time in NetCDF file
-            IF((IFI.EQ.I1.AND.IFJ.EQ.J1.AND.TOGETHER)  &
-               .OR.(.NOT.TOGETHER).OR.FLFRQ) THEN
+            IF ( (IFI.EQ.I1 .AND. IFJ.EQ.J1 .AND. IFP.EQ.1) .OR. FLSEP ) THEN
               IVAR1=3+EXTRADIM+(COORDTYPE-1)+MAPSTAOUT
               IRET=NF90_PUT_VAR(NCID,VARID(3+EXTRADIM),OUTJULDAY,(/N/))
               CALL CHECK_ERR(IRET)
@@ -4679,24 +4778,10 @@
             ! updates the variable index
             IVAR1=IVAR1+NFIELD
 
-
-            ! Loops over IPART for partition variables
-            ! ChrisBunney: Don't loop IPART for last two entries in section 4
-            ! (16: total wind sea fraction, 17: number of parts) as these fields
-            ! do not have partitions.
-            IF (IFI .EQ. 4 .AND. IFJ .LE. NOGE(IFI) - 2) THEN
-560           CONTINUE
-              IF (INDEXIPART.LT.NBIPART) THEN
-                INDEXIPART=INDEXIPART+1
-                IF (TABIPART(INDEXIPART).EQ.-1) GOTO 560      
-                IPART=TABIPART(INDEXIPART)   
-                GOTO 555
-              END IF
-            ELSE
-              INDEXIPART=1
-            END IF
+          ! Repeat if there are extra partitions or subfields for the
+          ! group (IFI,IFJ)
+          END DO ! WHILE IFP .LE. NFP
 !      
-          END IF  ! FLG2D(IFI,IFJ)
         END DO  ! IFI=1, NOGRP
       END DO  ! IFJ=1, NGRPP
 !
