@@ -39,6 +39,7 @@
 !/                  profile parametric fit              ( version 7.?? )
 !/    07-Oct-2019 : RTD option with standard lat-lon
 !/                  grid when nesting to rotated grid   ( version ?.?? )
+!/    15-Jan-2020 : Extend handling of 3'rd dimension   ( version 7.?? )
 !/
 !/    Copyright 2009-2013 National Weather Service (NWS),
 !/       National Oceanic and Atmospheric Administration.  All rights
@@ -4605,6 +4606,8 @@
                     'Writing new record ', TRIM(ENAME(2:)) ,' number ',NTIM,        &
                     ' for ',CURDATE(1),':',CURDATE(2),':',CURDATE(3),'T',CURDATE(5),&
                     ':',CURDATE(6),':',CURDATE(7),' in file ',TRIM(FNAMENC)
+
+
 
             ! Defines starting point and size of arrays to be written
             START(1)=1
