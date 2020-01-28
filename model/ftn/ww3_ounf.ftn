@@ -42,6 +42,8 @@
 !/    15-Jan-2020 : Extend handling of 3'rd dimension   ( version 7.?? )
 !/    28-Jan-2020 : XSTO option: Stokes drift profile
 !/                  for extended spectral tail          ( version 7.?? )
+!/    28-Jan-2019 : MFIT+XSTO options: Stokes drift
+!/                  profile parametric fit              ( version 7.?? )
 !/
 !/    Copyright 2009-2013 National Weather Service (NWS),
 !/       National Oceanic and Atmospheric Administration.  All rights
@@ -3979,6 +3981,7 @@
                 DEALLOCATE(DIM3VAR)
               END IF
             END IF
+
 
 ! 2.4 Manage netCDF file id
 
