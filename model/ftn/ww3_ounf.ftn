@@ -829,6 +829,8 @@
 !/RTD ! RTDL == False for a standard lat-lon grid. Will be set to True if the
 !/RTD ! grid is rotated
 !/RTD      LOGICAL                 :: RTDL = .FALSE.
+
+!/MFIT      REAL, ALLOCATABLE       :: M2K(:)
 !/
 !/ ------------------------------------------------------------------- /
 !/
@@ -3974,6 +3976,7 @@
                 DEALLOCATE(DIM3VAR)
               END IF
             END IF
+
 
 ! 2.4 Manage netCDF file id
 
