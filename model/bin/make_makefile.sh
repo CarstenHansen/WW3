@@ -948,7 +948,11 @@
              source="$pdlibcode $setupcode w3triamd w3srcemd $dsx $flx $ln $st $nl $bt $ic"
              source="$source $is $db $tr $bs $xx $refcode $igcode w3parall $uostmd"
                  IO="w3iogrmd w3iogomd w3iopomd w3iotrmd w3iorsmd w3iobcmd $oasismd $agcmmd $ogcmmd $igcmmd"
+<<<<<<< HEAD
                  IO="$IO w3iosfmd w3partmd w3xstomd w3xsmfmd"
+=======
+                 IO="$IO w3iosfmd w3partmd w3xstomd"
+>>>>>>> Switch XSTO in make_makefile.sh, w3_new and switch_fb_xsto
                 aux="constants w3servmd w3timemd $tidecode w3arrymd w3dispmd w3cspcmd w3gsrumd $cplcode"
                 aux="$aux w3nmlshelmd $pdlibyow" ;;
     ww3_multi|ww3_multi_esmf)
@@ -967,7 +971,11 @@
              source="$pdlibcode $pdlibyow $setupcode w3parall w3triamd w3srcemd $dsx $flx $ln $st $nl $bt $ic $is $db $tr $bs $xx $refcode $igcode $uostmd"
                  IO='w3iogrmd w3iogomd w3iopomd wmiopomd'
                  IO="$IO w3iotrmd w3iorsmd w3iobcmd w3iosfmd w3partmd"
+<<<<<<< HEAD
                  IO="$IO $oasismd $agcmmd $ogcmmd $igcmmd w3xstomd w3xsmfmd"
+=======
+                 IO="$IO $oasismd $agcmmd $ogcmmd $igcmmd w3xstomd"
+>>>>>>> Switch XSTO in make_makefile.sh, w3_new and switch_fb_xsto
                 aux="constants $tidecode w3servmd w3timemd w3arrymd w3dispmd w3cspcmd w3gsrumd $mprfaux"
                 aux="$aux  wmunitmd w3nmlmultimd" 
                 if [ "$scrip" = 'SCRIP' ]
@@ -1013,7 +1021,11 @@
                data="wmmdatmd $memcode w3gdatmd w3wdatmd w3adatmd w3idatmd w3odatmd"
                prop=
              source="$pdlibcode $pdlibyow $db $bt $setupcode w3parall w3triamd $stx $nlx $btx  $is $uostmd"
+<<<<<<< HEAD
                  IO='w3iogrmd w3iogomd w3iorsmd w3iopomd w3xstomd w3xsmfmd'
+=======
+                 IO='w3iogrmd w3iogomd w3iorsmd w3iopomd w3xstomd'
+>>>>>>> Switch XSTO in make_makefile.sh, w3_new and switch_fb_xsto
                 aux="constants w3servmd w3timemd w3arrymd w3dispmd w3gsrumd"
                 aux="$aux w3nmlounfmd $smco" ;;
      ww3_outp) IDstring='Point output'
@@ -1401,8 +1413,11 @@
          'W3PARALL'     ) modtest=w3parall.o ;;
          'W3SMCOMD'     ) modtest=w3smcomd.o ;;
          'W3XSTOMD'     ) modtest=w3xstomd.o ;;
+<<<<<<< HEAD
          'W3XSMFMD'     ) modtest=w3xsmfmd.o ;;
 
+=======
+>>>>>>> Switch XSTO in make_makefile.sh, w3_new and switch_fb_xsto
          *              ) modfound=no ;; 
       esac
 
