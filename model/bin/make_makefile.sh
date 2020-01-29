@@ -1389,7 +1389,6 @@
          'W3SMCOMD'     ) modtest=w3smcomd.o ;;
          'W3XSTOMD'     ) modtest=w3xstomd.o ;;
          'W3XSMFMD'     ) modtest=w3xsmfmd.o ;;
-
          *              ) modfound=no ;; 
       esac
 
