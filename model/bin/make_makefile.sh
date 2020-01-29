@@ -99,7 +99,8 @@
               dstress s_ice s_is reflection s_xx \
               wind windx wcor rwind curr currx mgwind mgprop mggse \
               subsec tdyn dss0 pdif tide refrx ig rotag arctic nnt mprf \
-              cou oasis agcm ogcm igcm trknc setup pdlib memck uost rstwind
+              cou oasis agcm ogcm igcm trknc setup pdlib memck uost rstwind \
+              xsto
   do
     case $type in
 #sort:mach:
@@ -392,6 +393,11 @@
                ID='unresolved obstacles source term'
                TS='UOST'
                OK='UOST' ;;
+#sort:xsto:
+      xsto   ) TY='upto1'
+               ID='Extended tail Stokes drift'
+               TS='XSTO'
+               OK='XSTO' ;;
    esac
 
     n_found='0'
@@ -924,7 +930,7 @@
              source="$pdlibcode $setupcode w3triamd w3srcemd $dsx $flx $ln $st $nl $bt $ic"
              source="$source $is $db $tr $bs $xx $refcode $igcode w3parall $uostmd"
                  IO="w3iogrmd w3iogomd w3iopomd w3iotrmd w3iorsmd w3iobcmd $oasismd $agcmmd $ogcmmd $igcmmd"
-                 IO="$IO w3iosfmd w3partmd"
+                 IO="$IO w3iosfmd w3partmd w3xstomd"
                 aux="constants w3servmd w3timemd $tidecode w3arrymd w3dispmd w3cspcmd w3gsrumd $cplcode"
                 aux="$aux w3nmlshelmd $pdlibyow" ;;
     ww3_multi|ww3_multi_esmf)
@@ -942,7 +948,8 @@
                prop="$pr"
              source="$pdlibcode $pdlibyow $setupcode w3parall w3triamd w3srcemd $dsx $flx $ln $st $nl $bt $ic $is $db $tr $bs $xx $refcode $igcode $uostmd"
                  IO='w3iogrmd w3iogomd w3iopomd wmiopomd'
-                 IO="$IO w3iotrmd w3iorsmd w3iobcmd w3iosfmd w3partmd $oasismd $agcmmd $ogcmmd $igcmmd"
+                 IO="$IO w3iotrmd w3iorsmd w3iobcmd w3iosfmd w3partmd"
+                 IO="$IO $oasismd $agcmmd $ogcmmd $igcmmd w3xstomd"
                 aux="constants $tidecode w3servmd w3timemd w3arrymd w3dispmd w3cspcmd w3gsrumd $mprfaux"
                 aux="$aux  wmunitmd w3nmlmultimd" 
                 if [ "$scrip" = 'SCRIP' ]
@@ -988,7 +995,7 @@
                data="wmmdatmd $memcode w3gdatmd w3wdatmd w3adatmd w3idatmd w3odatmd"
                prop=
              source="$pdlibcode $pdlibyow $db $bt $setupcode w3parall w3triamd $stx $nlx $btx  $is $uostmd"
-                 IO='w3iogrmd w3iogomd w3iorsmd w3iopomd'
+                 IO='w3iogrmd w3iogomd w3iorsmd w3iopomd w3xstomd'
                 aux="constants w3servmd w3timemd w3arrymd w3dispmd w3gsrumd"
                 aux="$aux w3nmlounfmd $smco" ;;
      ww3_outp) IDstring='Point output'
@@ -1375,6 +1382,7 @@
          'PDLIB_W3PROFSMD'   ) modtest=w3profsmd_pdlib.o ;;
          'W3PARALL'     ) modtest=w3parall.o ;;
          'W3SMCOMD'     ) modtest=w3smcomd.o ;;
+         'W3XSTOMD'     ) modtest=w3xstomd.o ;;
          *              ) modfound=no ;; 
       esac
 
