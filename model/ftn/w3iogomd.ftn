@@ -435,7 +435,7 @@
              IF ( OUT_NAMES(IFJ) .EQ. 'T' )                            &
                                FLG2D(IFI,IFJ)=.TRUE.
           ENDDO
-          IF ( IAPROC .EQ. NAPOUT .AND. IFJ .LT. NOGE(IFI) ) WRITE(NDSEN,1007) IFI
+          IF ( IAPROC .EQ. NAPOUT .AND. IFJ .LT. NOGE(IFI)) WRITE(NDSEN,1007) IFI
          ENDIF
         END DO
 !
@@ -2628,7 +2628,6 @@
 !
 !/T      WRITE (NDST,9000) IPASS, INXOUT, WRITE, NDSOG, IGRD, FILEXT
 !
-!
 ! open file ---------------------------------------------------------- *
 ! ( IPASS = 1 )
 !
@@ -3895,6 +3894,7 @@
                   ENDIF
                ENDDO
                !Put spectral energey into whichever band central wavenumber fits in
+               NB=NK!allocated to size2*NK! STKBND_IN(NK)
                USSP(JSEA,Spc2Bnd(IK))    =  USSP(JSEA,Spc2Bnd(IK)) + ABX(JSEA)*USSCO
                USSP(JSEA,NK+Spc2BND(IK)) =  USSP(JSEA,NK+Spc2Bnd(IK)) + ABY(JSEA)*USSCO
             ENDIF
