@@ -103,6 +103,8 @@
 !/    20-Jun-2018 : Update of ST6  (Q. Liu)             ( version 6.06 )
 !/    26-Aug-2018 : UOST (Mentaschi et al. 2015, 2018)  ( version 6.06 )
 !/    27-Aug-2018 : Add WBT parameter                   ( version 6.06 )
+!/    09-Mar-2020 : Namelist group for extended tail    ( version 7.?? ) 
+!/                  Stokes profile of GEOMETOC Support Denmark
 !/
 !/    Copyright 2009-2013 National Weather Service (NWS),
 !/       National Oceanic and Atmospheric Administration.  All rights
@@ -492,6 +494,8 @@
 !     !/O2b   Print obstruction data.
 !     !/O2c   Print extended status map.
 !
+!     !/XSTO  Extended tail Stokes drift of GEOMETOC Support Denmark
+!
 ! 10. Source code :
 !
 !/ ------------------------------------------------------------------- /
@@ -797,6 +801,11 @@
 
 !/RTD      REAL                    :: PLAT, PLON
 !/RTD      LOGICAL                 :: UNROT
+!/XSTO
+!/XSTO! Extended tail Stokes drift profile
+!/XSTO      INTEGER                 :: NDP
+!/XSTO      REAL                    :: DSC
+!/XSTO      CHARACTER(LEN=4)        :: TYP
 !
 !/FLD1      NAMELIST /FLD1/ TAILTYPE, TAILLEV, TAILT1, TAILT2
 !/FLD2      NAMELIST /FLD2/ TAILTYPE, TAILLEV, TAILT1, TAILT2
@@ -908,6 +917,9 @@
 !/REF1                          REFFREQPOW, REFUNSTSOURCE
 !/
 !/RTD      NAMELIST /ROTD/ PLAT, PLON, UNROT
+!/XSTO!
+!/XSTO! Extended tail Stokes drift profile
+!/XSTO     NAMELIST /XSTO/ NDP, DSC, TYP
 !/
 !/ ------------------------------------------------------------------- /
 !/
@@ -2547,6 +2559,19 @@
       WRITE (NDSO,967) FHMAX, FHMAX/SQRT(2.), YESXNO(J)
       IF ( FHMAX.LT.0.50 .AND. J.EQ.1 ) WRITE (NDST,968)
       WRITE (NDSO,*)
+!/XSTO!
+!/XSTO! Extended spectral tail Stokes drift of Joint GeoMETOC Denmark
+!/XSTO! XSND: Number of depths for Stokes profile
+!/XSTO! XSDS: Depth scale specifying the largest depth for the profile,
+!/XSTO!       XSDS = Kz * Z(XSND)
+!/XSTO! XSTY: Tail type (C*4); 'DoEw': Donelan-Ewans, or 'None': Truncated spectrum
+!/XSTO     NDP = 5
+!/XSTO     DSC = 1.0
+!/XSTO     TYP = 'DoEw'
+!/XSTO     CALL READNL ( NDSS, 'XSTO', STATUS )
+!/XSTO     XSND = NDP
+!/XSTO     XSDS = DSC
+!/XSTO     XSTY = TYP
 !
 ! 6.x Read values for FLD stress calculation
 !
@@ -2739,6 +2764,8 @@
 !
 !/FLD1         WRITE(NDSO,2987) TAIL_ID, TAIL_LEV, TAIL_TRAN1, TAIL_TRAN2
 !/FLD2         WRITE(NDSO,2987) TAIL_ID, TAIL_LEV, TAIL_TRAN1, TAIL_TRAN2
+!/XSTO!
+!/XSTO         WRITE(NDSO,2988) XSND, XSDS, XSTY
 !
         WRITE (NDSO,918)
         END IF
@@ -5757,6 +5784,8 @@
 !
  2987 FORMAT ( '  &FLD TAIL_ID =',I1,' TAIL_LEV =',F5.4,' TAILT1 =',F5.3,&
                ' TAILT2 =',F5.3,' /')
+!/XSTO
+!/XSTO 2988 FORMAT ( '  &XSTO XSND =',I1,' XSDS =',F5.2,' XSTY ="',A,'" /')
 
  3000 FORMAT (/'  The spatial grid: '/                                &
                ' --------------------------------------------------'/ &
@@ -6227,6 +6256,8 @@
 !/IC4                         READ (NDS,NML=SIC4,END=801,ERR=802,IOSTAT=J)
 !/IC5                        CASE('SIC5 ') 
 !/IC5                         READ (NDS,NML=SIC5,END=801,ERR=802,IOSTAT=J)
+!/XSTO                       CASE('XSTO') 
+!/XSTO                        READ (NDS,NML=XSTO,END=801,ERR=802,IOSTAT=J) 
                         CASE('UNST')
                           READ (NDS,NML=UNST,END=801,ERR=802,IOSTAT=J)
                         CASE('OUTS')

@@ -121,7 +121,6 @@
                           , FLGRD,                               &
                            FLGR2, FLGD, FLG2, NPT, XPT, YPT, PNAMES,   &
                           IPRT, PRTFRM, MPI_COMM, FLAGSTIDEIN)
-
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -424,6 +423,7 @@
       REAL                    :: WLVeff
 !/T       REAL, ALLOCATABLE      :: XOUT(:,:)
       LOGICAL                 :: OPENED
+      LOGICAL                 :: TSTOUD
       CHARACTER(LEN=8)        :: STTIME
       CHARACTER(LEN=10)       :: STDATE
       INTEGER                 :: ISPROC
@@ -431,6 +431,8 @@
       CHARACTER(LEN=23)       :: DTME21
       CHARACTER(LEN=30)       :: LFILE, TFILE
 !/PDLIB      INTEGER                 :: IScal(1), IPROC
+! TODO: !/XSTO USE  W3ODATMD, ONLY : XSVB: Verboseness level [0..4] of output
+!/XSTO      INTEGER                 :: XSVB = 1
 !/
 !/ ------------------------------------------------------------------- /
 !
@@ -578,11 +580,19 @@
 !/DEBUGINIT       WRITE(*,*) '1: w3initmd f=', TRIM(FNMPRE(:J)//LFILE(:IFL))
           OPEN (MDS(1),FILE=FNMPRE(:J)//LFILE(:IFL),ERR=888,IOSTAT=IERR)
 !
-      IF ( MDS(3).NE.MDS(1) .AND. MDS(3).NE.MDS(4) .AND. TSTOUT ) THEN
+      TSTOUD = TSTOUT
+!/XSTO ! Unless /SHRD, let Stokes verbose output to testNNN.FEXT
+!/XSTO      IF ( XSVB .GT. 0 ) THEN
+!/XSTO        TSTOUD = .TRUE.
+!/SHRD        TSTOUD = TSTOUT     
+!/XSTO      END IF 
+!/XSTO!
+      IF ( MDS(3).NE.MDS(1) .AND. MDS(3).NE.MDS(4) .AND. TSTOUD ) THEN
           INQUIRE (MDS(3),OPENED=OPENED)
 !/DEBUGINIT       WRITE(*,*) '2: w3initmd f=', TRIM(FNMPRE(:J)//TFILE(:IFT))
-          IF ( .NOT. OPENED ) OPEN                                    &
-               (MDS(3),FILE=FNMPRE(:J)//TFILE(:IFT),ERR=889,IOSTAT=IERR)
+!/DIST          IF ( OPENED ) CLOSE (MDS(3))
+!/SHRD          IF ( .NOT. OPENED )                                   &
+            OPEN (MDS(3),FILE=FNMPRE(:J)//TFILE(:IFT),ERR=889,IOSTAT=IERR)
         END IF
 !
 ! 1.d Dataset unit numbers
@@ -855,7 +865,7 @@
 !/DEBUGINIT     WRITE(740+IAPROC,*) ' After ALL_VA_INTEGRAL_PRINT'
 !/DEBUGINIT     FLUSH(740+IAPROC)
 !/TIMINGS       CALL PRINT_MY_TIME("Before W3IORS")
-      CALL W3IORS ( 'READ', NDS(6), SIG(NK), IMOD)
+      CALL W3IORS ( 'READ', NDS(6), SIG(NK), IMOD )
 !/TIMINGS       CALL PRINT_MY_TIME("After W3IORS")
 !/MEMCHECK      WRITE(740+IAPROC,*) 'memcheck_____:', 'WW3_INIT SECTION 3a'
 !/MEMCHECK      call getMallocInfo(mallinfos)
@@ -1953,6 +1963,8 @@
 !/S      USE W3SERVMD, ONLY: STRACE
 !/
       USE W3GDATMD, ONLY: NSEA
+!/XSTO      USE W3GDATMD, ONLY: XSND
+!/XSTO      USE W3ODATMD, ONLY: NZO
       USE W3ADATMD, ONLY: NSEALM
 !/MPI      USE W3GDATMD, ONLY: NX, NSPEC, MAPFS, E3DF, P2MSF, US3DF, USSPF
 !/MPI      USE W3WDATMD, ONLY: VA, UST, USTDIR, ASF, FPIS, ICEF
@@ -1975,6 +1987,8 @@
 !/MPI                          STMAXE, STMAXD, HMAXE, HCMAXE, HMAXD,  &
 !/MPI                          HCMAXD, QP, PTHP0, PQP, PPE, PGW, PSW, &
 !/MPI                          PTM1, PT1, PT2, PEP, WBT
+!/XSTO ! UXSP(1,1) exists
+!/MPI      USE W3ADATMD, ONLY: UXSP
 
 !/MPI      USE W3GDATMD, ONLY: NK
 !/MPI      USE W3ODATMD, ONLY: NDST, IAPROC, NAPROC, NTPROC, FLOUT,   &
@@ -2010,6 +2024,7 @@
 !/MPI                                 IP(4), I, J, JSEA, ITARG, IB,   &
 !/MPI                                 JSEA0, JSEAN, NSEAB, IBOFF,     &
 !/MPI                                 ISEA, ISPROC, K, NRQMAX
+      INTEGER                 :: NZ2
 !/S      INTEGER, SAVE           :: IENT
 !/MPI      LOGICAL                 :: FLGRDALL(NOGRP,NGRPP)
 !/MPIT      CHARACTER(LEN=5)      :: STRING
@@ -2031,6 +2046,14 @@
 !/MPI      IT0    = NSPEC
 !/MPI      IROOT  = NAPFLD - 1
 !
+!/MPI      NZ2=0
+!/XSTO      IF ( NZO .GT. 0 ) NZ2=3+2*NZO
+              IF ( .FALSE. ) THEN
+!/MFIT              ELSE
+             ! Code here if output of USERO(1:6)
+!/MPI             IF ( FLGRDALL(10, 2) ) FLGRDALL(10, 7) = .TRUE.
+!/MPI             IF ( FLGRDALL(10, 1) ) FLGRDALL(10, 1:6) = .TRUE.
+                END IF
 !
 !/MPI      IF ((FLOUT(1) .OR. FLOUT(7)).and.(.not. LPDLIB .or.       &
 !/MPI          (GTYPE .ne. UNGTYPE).or. .TRUE.)) THEN
@@ -2048,6 +2071,8 @@
 !/MPI                                          P2MSF(3) - P2MSF(2) + 1
 !/MPI          IF ( FLGRDALL( 6, 8) ) NRQMAX = NRQMAX + 2*NK
 !/MPI          IF ( FLGRDALL( 6,12) ) NRQMAX = NRQMAX + 2*NK
+!
+!/MPI          IF ( NZ2 .GT. 0 ) NRQMAX = NRQMAX + NZ2
 !
 !/MPI          IF ( NRQMAX .GT. 0 ) THEN 
 !/MPI              ALLOCATE ( OUTPTS(IMOD)%OUT1%IRQGO(NRQMAX) )
@@ -2670,6 +2695,16 @@
 !/MPI                    END DO
 !/MPI                END IF 
 !
+!/MPI !              IF ( FLGRDALL( 6, 13) ) THEN
+!/MPI                  DO K=1,NZ2
+!/MPI                    IH     = IH + 1
+!/MPI                    IT     = IT + 1
+!/MPI      CALL MPI_SEND_INIT (UXSP(1,K),NSEALM , MPI_REAL, IROOT,  &
+!/MPI                                IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+!/MPIT      WRITE (NDST,9011) IH, 'UXSP ', IROOT, IT, IRQGO(IH), IERR
+!/MPI                    END DO
+!/MPI !                END IF
+!      
 !/MPI              IF ( FLGRDALL( 7, 1) ) THEN
 !/MPI                  IH     = IH + 1
 !/MPI                  IT     = IT + 1
@@ -3469,6 +3504,16 @@
 !/MPI                      END DO
 !/MPI                  END IF  
 !
+!/MPI !                IF ( FLGRDALL( 6, 13) ) THEN
+!/MPI                    DO K=1, NZ2
+!/MPI                      IH     = IH + 1
+!/MPI                      IT     = IT + 1
+!/MPI      CALL MPI_RECV_INIT (UXSP(I0,K),1,WW3_FIELD_VEC, IFROM, IT, &
+!/MPI                               MPI_COMM_WAVE, IRQGO2(IH), IERR )
+!/MPIT      WRITE (NDST,9011) IH, 'UXSP ', IFROM, IT, IRQGO2(IH), IERR
+!/MPI                      END DO
+!/MPI !                  END IF
+!
 !/MPI                IF ( FLGRDALL( 7, 1) ) THEN
 !/MPI                    IH     = IH + 1
 !/MPI                    IT     = IT + 1
@@ -3625,7 +3670,6 @@
 !/MPI                  END IF
 !
 !/MPI                DO I=1, NOEXTR
-!/MPI                  !WRITE(740+IAPROC,*) 'SECOND : I=', I, ' / ', NOEXTR, ' val=', FLGRDALL(10, I)
 !/MPI                  IF ( FLGRDALL(10, I) ) THEN
 !/MPI                      IH     = IH + 1
 !/MPI                      IT     = IT + 1
