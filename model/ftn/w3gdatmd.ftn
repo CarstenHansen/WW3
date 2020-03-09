@@ -573,6 +573,8 @@
 !
 !     !/S    Enable subroutine tracing.
 !
+!     !/XSTO Extended tail Stokes drift of Joint GeoMETOC Denmark   
+!
 !  7. Source code :
 !
 !/ ------------------------------------------------------------------- /
@@ -640,6 +642,16 @@
 !/RTD        REAL, POINTER         :: AnglD(:)       ! Angle in degree
 !/RTD        LOGICAL               :: FLAGUNR
 
+!/XSTO ! Namelist parameters for extended tail Stokes drift of Joint GeoMETOC DK
+!/XSTO ! XSND: Number of depths for Stokes profile U_S(1:XSND), V_S(1:XSND)
+!/XSTO ! XSDS: Depth scale specifying the largest depth Z(XSND) for the profile,
+!/XSTO !       Z(XSND) = XSDS / K , where K = ( 2 * PI / Tm02)**2 / GRAV   
+!/XSTO ! XSTY: Tail par. type. 'DoEw': Donelan-Ewans, 'None': Truncated spectrum
+!/XSTO
+!/XSTO        INTEGER               :: XSND
+!/XSTO        REAL                  :: XSDS       
+!/XSTO        CHARACTER(LEN=4)      :: XSTY
+!/XSTO !
         REAL   , POINTER :: ZB(:)     ! BOTTOM GRID, DEFINED ON ISEA
         REAL   , POINTER :: CLATS(:)  ! COS(LAT), DEFINED ON SEA POINTS
         REAL   , POINTER :: CLATIS(:) ! INVERSE OF COS(LAT) DEFINED ON ISEA
@@ -1005,6 +1017,12 @@
 !/RTD        REAL, POINTER         :: PoLat, PoLon
 !/RTD        REAL, POINTER         :: AnglD(:)
 !/RTD        LOGICAL, POINTER      :: FLAGUNR
+!/XSTO    
+!/XSTO ! Namelist parameters for extended tail Stokes drift of Joint GeoMETOC DK
+!/XSTO      INTEGER, POINTER           :: XSND
+!/XSTO      REAL, POINTER              :: XSDS
+!/XSTO      CHARACTER(LEN=4), POINTER  :: XSTY
+!/XSTO      
       REAL, POINTER           :: ZB(:), CLATS(:)
       REAL   , POINTER :: CLATIS(:) ! INVERSE OF COS(LAT) DEFINED ON ISEA
       REAL   , POINTER :: CTHG0S(:) ! TAN(Y)/R, DEFINED ON ISEA
@@ -1986,6 +2004,11 @@
 !/RTD      PoLat  => GRIDS(IMOD)%PoLat
 !/RTD      PoLon  => GRIDS(IMOD)%PoLon
 !/RTD      FLAGUNR  => GRIDS(IMOD)%FLAGUNR
+!/XSTO      
+!/XSTO      XSND  => GRIDS(IMOD)%XSND
+!/XSTO      XSDS  => GRIDS(IMOD)%XSDS
+!/XSTO      XSTY  => GRIDS(IMOD)%XSTY
+!/XSTO      
       FICEN  => GRIDS(IMOD)%FICEN
       FICEL  => GRIDS(IMOD)%FICEL
       IICEHMIN  => GRIDS(IMOD)%IICEHMIN
