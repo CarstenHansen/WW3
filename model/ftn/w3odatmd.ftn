@@ -45,6 +45,7 @@
 !/                  (C. Bunney, UKMO)
 !/    09-Mar-2020 : Stokes drift profile for extended   ( version 7.?? )
 !/                  spectral tail (C. Hansen, GEOMETOC Denmark)
+!/    09-Mar-2020 : Stokes drift profile parametric fit ( version 7.?? )
 !/
 !/    Copyright 2009-2012 National Weather Service (NWS),
 !/       National Oceanic and Atmospheric Administration.  All rights
@@ -297,6 +298,7 @@
 !     !/MPI    MPI specific calls.
 !     !/S      Enable subroutine tracing.
 !     !/T      Enable test output
+!     !/MFIT   Extended tail Stokes drift (XSTO) with parameter fit  
 !
 !  7. Source code :
 !
@@ -317,7 +319,8 @@
       INTEGER, PARAMETER      :: DIMP = 15
       INTEGER                 :: NOGE(NOGRP)
       INTEGER                 :: NOTYPE
-      INTEGER, PARAMETER      :: NOEXTR=  2
+! For the switch XSMF: No PARAMETER attribute in this declaration:
+      INTEGER                 :: NOEXTR=  2
       CHARACTER(LEN=20)       :: IDOUT(NOGRP,NGRPP)
       CHARACTER(LEN=80)       :: FNMPRE = './'
       !Moved UNDEF to constants and included above
@@ -562,6 +565,7 @@
 !
 !     !/S    Enable subroutine tracing.
 !     !/T    Enable test output
+!     !/MFIT Extended tail Stokes drift (XSTO) with parameter fit  
 !
 ! 10. Source code :
 !
@@ -583,6 +587,7 @@
       INTEGER                 :: I, NLOW, J
 !/S      INTEGER, SAVE           :: IENT = 0
       CHARACTER(LEN=20)       :: STRING
+!/MFIT      INTEGER                 :: NOEXSTK = 7
 !/
 !/S      CALL STRACE (IENT, 'W3NOUT')
 !
@@ -831,10 +836,17 @@
 !
       NOGE(10) = NOEXTR
 !
+!/MFIT      IDOUT(10, 1)  = 'Stokes profile fit  '
+!/MFIT!     'Deep Stokes drift E., N., Mfit parameters AM, PM, AMd, QC
+!/MFIT!      parameter ITSIC'
       DO I=1, MIN ( 20 , NOEXTR )
+!/MFIT        EXIT
+!/MFIT        END DO
+!/MFIT      DO I=2, MIN ( 20 , NOEXTR )
         WRITE (STRING,'(A14,I2.2,A4)') 'User defined #', I, '    '
         IDOUT(10, I) = STRING
         END DO
+!/MFIT      NOEXTR = NOEXSTK
 !
 !/T      WRITE (NDSTST,9000) NGRIDS
 !

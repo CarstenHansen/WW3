@@ -1,0 +1,1974 @@
+#include "w3macros.h"
+!/ ------------------------------------------------------------------- /
+      MODULE W3XSMFMD
+!/
+!/                  +---------------------------------------------+
+!/                  |   Mattsson fit to Stokes drift profile      |
+!/                  |          Carsten Hansen                     |
+!/                  | Joint GeoMETOC Support Center Denmark       |
+!/                  |                          FORTRAN 90         |
+!/                  | Last update :           09-OCT-2019         |
+!/                  +---------------------------------------------+
+!      TODO:
+!       X) USERO should be exchanged with an array completely similar to US3D
+!       X) Test if AM_tune adds value in practice. Thus subroutine IP_calc may
+!          be a function call IPp = IP_calc( KsD, AM, PM)
+!       X) MKignore might follow the prognostic fcut
+!       X) Test if it has practical significance to swap if 1. - IPp/IPd < 0
+!       X) Test if PM limiter is relevant: PMAX = 1
+!       X) Consider a look-up table and function calls IPd=IPds(KsD,K_S)
+!          and IPp=IPps(KsD,K_S)
+!       X) In Mfit_init, Pds = exp ( - AMds * ZK_S ** PMds )
+!          Then in each Stokes_Mfit(): initial guess Pd = Pds
+!
+!/
+!/    02-May-2011 : Origination. Development program w3stokes.ftn converted
+!/                  from tested Python code
+!/    27-Jun-2011 : First module version w3dstkmd.ftn. Output tested with
+!/                  a stand-alone program w3stokes.ftn.Implementation plan.
+!/    18-Aug-2011 : Calculate fit to J. Mattsson parametric profile (ver.0.12)
+!/    10-Oct-2011 : Interface subroutine w3dstk() to ww3_shel (version 0.22)
+!/    21-Oct-2011 : Detailed description of implementation into WW3 v.3.14
+!/                  First compilation of ww3_shel in parallel mode
+!/                  Test-scripts run_ww3test.sh,
+!/                     $PERL5LIB/bin/ww3job_preproc (version 0.32)
+!/    08-Nov-2011 : Full functioning module. Checked against patches from
+!/                  the WW3 errata page, applied: DEPTH=max(DW,DMIN).
+!/                  Un-physical spatial discontinuities identified: May
+!/                  need to match the Stokes profiles to integral wave
+!/                  pseudo-momentum/depth-integrated Stokes drift (ver. 0.32).
+!/    23-Nov-2011 : Ajust the deep profile to match the depth-integrated
+!/                  Stokes drift. Function AJUST_FIT() (version 0.33).
+!/    07-Dec-2011 : Refined ajustment of Mattsson profiles to integral
+!/                  pseudo-momentum (version 0.41).
+!/    20-Feb-2012 : The integrated normalized pseudo momentum of the JM-profiles
+!/                  is now (ver. 0.48) calculated from the surface to the
+!/                  actual depth, and based on a mathematical expression for
+!/                  the integral (not a numerical integral).
+!/    02-Aug-2012 : Fitting of deep parameter PMd skipped (ver. 0.52)
+!/
+!/    06-Aug-2012 : (Ver. 0.55). Introduced a new procedure in profile fitting,
+!/                  subroutine fit_parts(), which fully replaces the former
+!/                  two-layers fit procedure.
+!/                  fit_parts() performs, in a few iterative steps, a
+!/                  parametric fit alternating with ajustment to the
+!/                  integrated pseudo-momentum.
+!/
+!/    22-Dec-2017 : Adoption to WW3 version 5.16
+!/                  + Call XSTOKES() from W3OUTG(), outside the loop over JSEA
+!/
+!/    ??-Aug-2019 : Adoption to WW3 version 6.??
+!/                  + Mattsson fitting is separated to module 'W3XSMFMD'
+!/                  + Namelist group &XSTO
+!/                  + Clearifying the in-code documentation
+!/                  + Dimensionless parameters in calculations, e.g. M -> Kz M
+!/                  + Replace Gradshteyn and Ryzhik with Numerical Recipes
+!/                    in function gi()
+!/                  + Quality count output field
+!/                  +
+!/
+!  1. Purpose, and output data
+!
+!  A parametric representation of the Stokes drift profile vector U_S(Z) is
+!  provided as a sum of two expressions ( suggested by Johan Mattsson ),
+!        U_S(Z) = Up exp( -AM (Z Kz)^PM ) + Ud exp( -AMd (Z Kz)^PMd ) ,
+!  where Up + Ud = U0 is the Stokes drift vector at the surface (Z=0) and
+!  Z is pointing downwards.
+!  A wave number Kz is related to the zero-upcrossing frequency by the
+!  linear-wave dispersion relation, (2pi/Tz)^2 = g Kz tanh( Kz D). The
+!  local depth D should also be provided in the output field for the bathymetry.
+! 
+!  The vertical integral of U_S(Z) equals the integral wave (pseudo) momentum
+!  vector M. Further details on the Mfit parameters AM, PM, AMd, PMd are
+!  found in Sect, 3, 'More on Mfit and suggestions for postprocessing'
+!
+!  U_S(Z) is determined as a best fit to the total model profile U_mod(Z)
+!  constructed as a sum of a prognostic and a diagonostic (tail) contribution.
+!  These profiles have been derived from the model spectra + spectral tail
+!  using the module XSTOMD and subroutine CALL_XSTOKES(). NDEPTH discrete depths
+!  have been given in an array Z_S(1:NDEPTH).
+!
+!  Also calculated are a scatter index of the profile fit, and a measure of
+!  the convergence of the iteration procedure.
+!
+!  All calculations are performed in parallel and the results are gathered
+!  to the process that writes the output using the user-slot variable 'USERO'.
+! 
+!  For this purpose, the length NOEXTR of the array USERO(JSEA,1:NOEXTR) is
+!  extended to the required number of fitting parameters (6) plus one.
+!
+!  From the array UXSP (see w3xstomd.ftn) at least the following 5 values are
+!  stored to out_grd.ww3 to be used in conversion to NetCDF (ww3_ounf) .
+!
+!    UXSP(JSEA,1)      = Kz        ! g Kz tanh( Kz D) = (2pi/T02)^2 [ 1/m ]
+!
+!    UXSP(JSEA,2)      = M_X       ! (M_X, M_Y) is the integral pseudo-momentum
+!    UXSP(JSEA,3)      = M_Y       ! per unit surface area, divided by density.
+!                                  ! [ m^2/s ]        
+!    UXSP(JSEA,4)      = U0_X      ! Surface Stokes drift [ m/s ]
+!    UXSP(JSEA,4+XSND) = U0_Y      !
+!
+!  In the array USERO we store other six fitting parameters
+!
+!    USERO(JSEA,1)   = Ud_X/M2K  ! Normalized surface drift of 'deep' partition
+!    USERO(JSEA,2)   = Ud_Y/M2K  ! Primary partition drift is Up = U0 - Ud
+!                                ! M2K = 2*Kz*sqrt(M_X^2+M_Y^2)
+!    USERO(JSEA,3)   = AM        ! Fit parameter, primary partition
+!    USERO(JSEA,4)   = PM        ! Fit parameter, primary partition
+!
+!    USERO(JSEA,5)   = AMd       ! Fit parameter, deep partition
+!                                ! PMd is a global constant (PMd = 0.4)
+!
+!    USERO(JSEA,6)   = ITSIC     ! Quality count, see Stokes_Mfit()
+!    !    I   : Number of iterations in fit_parts
+!    !    T   : Number of iterations in AM_Tune
+!    !    SI  : Scatter index  std(|U_S - U_mod| * dz)/|M|
+!    !    C   : Convergence of iteration
+!        
+!    ! USERO(JSEA,7) is free to use for other purpose        
+!
+!  2. Usage
+!
+!  a) In ww3_shel.inp/ww3_shel.nml, you may modify four namelist variables:
+!     $ NDP: Number of depths (->NDEPTH)
+!     $ DSC: Depth scale specifying the largest depth Z(NDP)
+!     $ TYP: Tail type (C*4); 'DoEw': Donelan-Ewans,
+!     $      or 'None': Truncated spectrum
+!     &XSTO NDP = 32, DSC = 3.0, TYP = 'DoEw' /
+!
+!  b) In w3initmd.ftn: Call XSTOKES_INIT() (module W3XSTOMD):
+!     Allocation of StkProg(1:NDEPTH,I), StkDiag(1:NDEPTH,I), Z_Stk(1:NDEPTH)
+!
+!  c) In w3iogomd.ftn: Call the subroutine XSTOKES() (module W3XSTOMD): At each
+!     WW3 output time step, calculation of the Stokes drift profile
+!
+!  d) Call the subroutine Stokes_Mfit () (present module W3XSMFMD):
+!     Approximation of the profile with a parametric expression
+!        U_S(Z) = Up exp( -AM (Z Kz)^PM ) + Ud exp( -AMd (Z Kz)^PMd ), 
+!     where Kz is a characteristic wavenumber corresponding to T02, and the sum
+!     of vectors Up + Ud is the Stokes drift at the surface.
+!     Further details on the Mfit parameters Up, Ud, AM, PM, AMd, PMd are found
+!     in Sect. 3.
+!
+!  3. More on Stokes_Mfit and suggestions for postprocessing
+!
+!  In the fitting procedure it is assured that the vertical integral of the
+!  parametric drift profile equals the pseudo-momentum (or total Stokes
+!  transport vector). Two dimensionless profile shape parameters are calculated,
+!     IPp = int_0_D Kz exp( -AM (Z Kz)^PM ) d Z
+!     IPd = int_0_D Kz exp( -AMd (Z Kz)^PMd ) d Z
+!  where D is the water depth, and Kz a scaling wavenumber related to the
+!  zero-crossing period T02 by the dispersion relation for low amplitude waves,
+!  (2*pi/Tz)**2 = GRAV * Kz * tanh( D * Kz). (GRAV = 9.81).
+!  A subroutine IP_calc is applied to calculate both IP and the differential
+!  d(IP*Kz)/dAM.
+!
+!  Inclusion of the pseudo-momentum vector in the output allows for a possible
+!  post-processing with temporal-spatial smoothing of the Mfit parameters
+!  AM, PM, AMd, PMd. After smooting, the surface drift should be partioned
+!  into a sum of a 'primary' partition and a 'deep' partition, U0 = Up + Ud,
+!  following the operations below (Eqs. 1-7). After smoothing it must be
+!  assured that the 'deep' profile decays slower than the 'primary' profile,
+!  so that the difference of integrated profile shapes IPd - IPp is
+!  significantly positive. This can be achieved by ajusting AM towards
+!  a value of IPd - IPp which differ only slightly from an original, smoothed
+!  value.
+!        
+!  Output data to use for reconstruction of the Stokes profile are:
+!  Seafloor depth, Kz, M = (MX,MY), U0 = U_S(0) = (U0X,U0Y), Ud = (UdX,UdY),
+!  AM, PM, AMd, together with a fixed parameters PMd (PMd = 0.4).
+!
+!  The pseudo-momentum vector, normalized by its depth scale, is
+!        
+!  (1)     MK = (MX,MY) * Kz
+!        
+!  The 2-dimensional surface Stokes drift vector
+!        
+!  (2)     U0 = (U0X, U0Y)
+!
+!  Factorize the normalized pseudo-momentum vector MK in an 'primary part' and
+!  a 'deep part' as
+!          MK = Up * IPp + Ud * IPd
+!  where the surface Stokes drift is
+!          U0 = Up + Ud
+!
+!  Here, IPp and IPd are dimensionless integrated profiles calculated by the
+!  numerical function IP_calc():
+!
+!  (3)     IPp = IP_calc(Kz*D, AM, PM)
+!  (4)     IPd = IP_calc(Kz*D, AMd, PMd)
+!
+!  Substitution yields a vector expression in the 'primary part' of
+!  the surface drift Up, MK = (U0-Up)* IPd + Up * IPp, or
+!        
+!  (5)     Up = ( U0 * IPd - MK ) / (IPd - IPp)
+!        
+!  The 'deep part' of the surface drift is the remainder
+!
+!  (6)     Ud = U0 - Up
+!
+!  In case IPd ≃ IPp we have MK ≃ U0 * IPp and the values of Up, Ud become
+!  ambigous. In any case, a new estimate of the parameter pair (AM, PM) will
+!  be calculated by a best-fit method. Let proj_p(Ud) and proj_p(U_mod(z)) be
+!  projections on the direction of Up. A 1-dimensional residual profile
+!
+!  (7)     Ur(Z) = proj_p( U_mod(Z) ) - proj_p(Ud) * exp ( -AMd (Z Kz)^PMd )
+!        
+!  will be fitted by an shape Up exp( -AM (Z Kz)^PM ). Here the surface 
+!  value Ur(Z=0) is the known value of Up. Thus we can  fit the values of
+!  log( log( Ur(Z)/Up ) ) (taking the log twice) with a linear expression
+!  log(-AM) + PM log(Z Kz). Thereby the values of AM, PM, have been altered.
+!
+!  An iterative procedure is constructed as follows:
+!
+!  Calculate the new value of IPp using equation (3), and repeat calculation
+!  corresponding to equations (5,6,7), but with the 'primary' and 'deep' parts
+!  reverted. Thereby a new value of AMd is obtained by fitting a shape
+!  Ud exp( -AMd (Z Kz)^PMd ).
+!  Then calculate the new value of IPd using equation (4), and repeat so on.
+!  Convergence at iteration step it is measured as
+!  C =  | 1 - ( Up * IPp(it-1) + Ud * IPd(it-1) ) | / | MK |.
+!
+!  4. Implementation in WW3:
+!
+!  Code lines are added to WW3 under the two compile switches '!/XSTO' and
+!  '!/MFIT'. First, follow the implementations as described in w3xstomd.ftn.
+!
+!  a) w3odatmd.ftn
+!
+!     Real arrays UXSP(JSEA,1:4), UXSP(JSEA,4+XSND) and USERO(JSEA,1:6) (a
+!     "user_slot") contain the 11 Stokes fitting parameters for the sea point
+!     JSEA. UXSP and USERO are structures for later communication to the job
+!     that performs field output and belong to the module w3adatmd.ftn.
+!
+!     In w3odatmd.ftn, set the integer NOEXTR to 1 + the number of parameters
+!     (6) used in USERO. Remove the 'parameter' type from it's
+!     module declaration
+!     ! change this line      INTEGER, PARAMETER      :: NOEXTR=  2
+!            INTEGER                 :: NOEXTR=  2
+!     In subroutine W3NOUT(), set NOEXTR = NOEXSTK and specify the Mfit
+!     parameter names
+!     !/MFIT      INTEGER, PRIVATE        :: NOEXSTK = 7
+!     (...)
+!     !/MFIT      NOEXTR = 0
+!           DO I=1, MIN ( 20 , NOEXTR )
+!             WRITE (STRING,'(A14,I2.2,A4)') 'User defined #', I, '    '
+!             IDOUT(10, I) = STRING
+!             END DO
+!     !/MFIT      NOEXTR = NOEXSTK
+!           NOGE(10) = NOEXTR
+!     !/MFIT
+!     !/MFIT      IDOUT(10, 1)  = 'Deep Stokes drift E.'
+!     !/MFIT      IDOUT(10, 2)  = 'Deep Stokes drift N.'
+!     !/MFIT      IDOUT(10, 3)  = 'Mfit parameter AM   '
+!     !/MFIT      IDOUT(10, 4)  = 'Mfit parameter PM   '
+!     !/MFIT      IDOUT(10, 5)  = 'Mfit parameter AMd  '
+!     !/MFIT      IDOUT(10, 6)  = 'Quality count ITSIC '
+!     !/MFIT      IDOUT(10, 7)  = 'User defined #1     '
+!     (...)
+!
+!  b) w3iogomd.ftn
+!
+!     b1) SUBROUTINE W3READFLGRD, and also in W3FLGRDFLAG:
+!     !/MFIT      USE W3ODATMD, ONLY: NOEXTR
+!        (...)
+!     ! Group 10
+!     !
+!                CASE('U1')
+!                  FLG2D(10,1)=.TRUE.
+!     !/MFIT            FLG2D(10,min(7,NOEXTR))=.TRUE.
+!                CASE('U2')
+!                  FLG2D(10,2)=.TRUE.
+!     !/MFIT           CASE('MFIT')
+!     !/MFIT             FLG2D(10,1:NOEXTR-1)=.TRUE.
+!        
+!     b2) In subroutine W3FLGRDUPDT
+!     !/XSTO      ! Set NZO for use in W3DIMA, W3DIMX
+!     !/XSTO      NZO = 0
+!     !/XSTO      IF ( FLGRD(6,13) ) NZO = XSND
+!     !/MFIT      ! For FLGRD(10,1), if FLGRD( 6, 13) is False, only the
+!     !/MFIT      ! surface and integral variables are in UXSP(1:NSEA,1:5)
+!     !/MFIT      IF ( FLGRD(10,1) .AND. .NOT. FLGRD(6,13) ) NZO = 1
+!        
+!     b3) In subroutine W3OUTG:
+!     Declare use of CALC_MFIT()
+!     !/MFIT      USE W3XSMFMD, ONLY: CALC_MFIT
+!     (...)
+!       (...)
+!       !  Add here USERO(JSEA,1) ...
+!       !
+!       !/XSTO! UXSP(JSEA,1:3+2*XSND) is set by CALC_XSTOKES(A). Thereafter,
+!       !/MFIT! USERO(JSEA,1:6) is determined by CALC_MFIT(A)
+!       !/MFIT! The combined CALC_XSTOKES(A); CALC_MFIT() are called
+!       !/MFIT! outside and after the present loop
+!
+!     b4) Later in  W3OUTG() just following CALL CALC_XSTOKES():
+!     !/XSTO ! Stokes drift with extended tail
+!     !/XSTO       IF ( FLOLOC(6,13)        &
+!     !/MFIT            .OR.  FLOLOC(10,1)  &
+!     !/XSTO                         ) THEN
+!     !/XSTO           CALL CALC_XSTOKES(A)
+!     !/XSTO         END IF
+!     !/MFIT       IF ( FLOLOC(10,1) ) CALL CALC_MFIT()
+!     !/XSTO!
+!        
+!  c) In ww3_ounf.ftn:
+!     Define the relevant NetCDF variable names etc.
+!
+!  d) Modify the makefile scripts (make_makefile.sh, w3_new) as
+!     described in the WW3 manual chpt. 5.5
+!
+!     d1) make_makefile.sh:
+!       for type in ...  xsto xsmf; do
+!       (...)        
+!       case $type in ...
+!         (...)        
+!     #sort:xsto:
+!         xsto ) TY='upto1'
+!                ID='Extended tail Stokes drift'
+!                TS='XSTO'
+!                OK='XSTO' ;;
+!     #sort:xsmf:
+!         xsmf ) TY='upto1'
+!                ID='Stokes drift Mfit'
+!                TS='MFIT'
+!                OK='MFIT' ;;
+!
+!       (...)
+!       case $prog in
+!         (...)
+!         ww3_shel) (...)
+!                  IO="$IO w3xstomd w3xsmfmd"
+!         (...)
+!         ww3_multi|ww3_multi_esmf)
+!                   (...)
+!                   IO="$IO w3xstomd w3xsmfmd"
+!       (...)        
+!       case $mod in
+!          (...)
+!          'W3XSTOMD'     ) modtest=w3xstomd.o ;;
+!          'W3XSMFMD'     ) modtest=w3xsmfmd.o ;;
+!
+!     d2) w3_new:
+!
+!       for key in $keys
+!       do
+!         case $key in
+!           (...)
+!           'xsto' ) cd $main_dir/ftn ; touch w3xstomd.ftn
+!                                       touch w3initmd.ftn
+!                                       touch w3odatmd.ftn
+!                                       touch w3gdatmd.ftn
+!                                       touch w3iogomd.ftn
+!                                       touch w3iogrmd.ftn
+!                                       touch ww3_grid.ftn ;;
+!           'mfit' ) cd $main_dir/ftn ; touch w3xstomd.ftn
+!                                       touch w3xsmfmd.ftn
+!                                       touch w3odatmd.ftn
+!                                       touch w3gdatmd.ftn
+!                                       touch w3iogomd.ftn
+!                                       touch w3iogrmd.ftn
+!                                       touch ww3_ounf.ftn ;;
+!
+!  5. Variables and types :
+!
+!      Name      Type  Scope    Description
+!     ----------------------------------------------------------------
+!                C*10  Private
+!
+!     ----------------------------------------------------------------
+!
+!  6. Subroutines and functions :
+!
+!      Name      Type  Scope    Description
+!     ----------------------------------------------------------------
+!
+!     ----------------------------------------------------------------
+!
+!  7. Subroutines and functions used :
+!
+!      Name      Type  Module   Description
+!     ----------------------------------------------------------------
+!
+!     ----------------------------------------------------------------
+!
+!  8. Remarks :
+!
+!
+!  9. Switches :
+!
+!       !/SHRD  Switch for shared / distributed memory architecture.
+!       !/DIST  Id.
+!
+!       !/ST2   Source term set 2 (Tolman and Chalikov)
+!               ST2 is required for consistent similarity.
+!
+!/NL1
+
+!  10. Source code :
+!
+      USE W3SERVMD, ONLY: EXTCDE
+      USE W3ADATMD, ONLY: USERO
+      USE W3ODATMD, ONLY: NDSO, NDST, IAPROC, NAPROC, NAPOUT
+      USE W3GDATMD, ONLY: XSND, XSDS, XSTY, NSEAL, NK, NTH, SIG, DMIN
+      ! Stokes drift profile data      
+      USE W3ADATMD, ONLY: DW, UXSP, ZK_S
+      ! XSVB: Verboseness level [0..4] of XSTO output to NDST or NDSO 
+      USE W3ODATMD, ONLY: XSVB, NZO
+
+      PRIVATE
+!/
+!/ ------------------------------------------------------------------- /
+!/ Local parameters
+!/
+
+      ! Common Stokes drift depth distribution parameters to be set
+      ! in Mfit_init()      
+      real                        :: M_X, M_Y, K_S
+      real, pointer               :: U_S(:), V_S(:)
+      
+      real                        :: AMs, PMs, AMds, PMds, AMAX, Ul
+      real                        :: KsD, PMIN, PMAX, AMIN
+
+      ! Look-up parameters to determine profile coefficients AM, PM
+
+      real, allocatable           :: IPApq(:,:)
+      real, allocatable           :: DZK_S(:)
+      integer                     :: NA = 0, Nq = 0
+      real                        :: delAMlu, dqlu
+      
+     ! Verboseness of test output
+      integer                     :: xsmf_verbose
+      ! Test output file id.:
+      integer                     :: NDSV
+
+      PUBLIC :: CALC_MFIT
+!/
+      
+      CONTAINS
+
+      SUBROUTINE CALC_MFIT ()      
+!/
+!/                  +-------------------------------------+
+!/                  | FCOO Stokes profile parametric fit  |
+!/                  |           Carsten Hansen            |
+!/                  |                        FORTRAN 90   |
+!/                  | Last update :         03-Oct-2019   |
+!/                  +-------------------------------------+
+!/
+!/      
+!/    Remarks: This subroutine can be called after CALC_XSTOKES
+!/             Call CALC_MFIT only under switch /MFIT
+!/
+      USE W3GDATMD, ONLY: MAPSF, MAPSTA ! module scope:,NSEAL
+!/
+      IMPLICIT NONE
+
+!/
+!/ ------------------------------------------------------------------- /
+!/ Local parameters
+!/
+      INTEGER                 :: ISEA, JSEA, IX, IY
+
+! Initialization
+! Generate common look-up table to determine profile coefficients
+! AM, PM that reproduce a given normalized profile IP0
+
+      if ( NA .EQ. 0 ) call Mfit_init()
+     
+      IF ( xsmf_verbose .GT. 0 ) WRITE (NDSV, 912), 'Stokes profile fit ..'
+!
+! -------------------------------------------------------------------- /
+! 1.  Loop over sea points
+!     
+      DO JSEA=1, NSEAL
+!
+! -------------------------------------------------------------------- /
+! 2.  Proces only for water points
+!
+!/DIST        ISEA       = IAPROC + (JSEA-1)*NAPROC
+!/SHRD        ISEA       = JSEA
+        IX     = MAPSF(ISEA,1)
+        IY     = MAPSF(ISEA,2)
+!
+        IF ( MAPSTA(IY,IX) .GT. 0 ) &
+          call Stokes_Mfit(JSEA)
+          ! If under MPI only UXSP(JSEA,1:5) is communicated to XUXSP for output
+          if ( NZO < XSND ) &
+               UXSP(JSEA,4+NZO:3+2*NZO) = UXSP(JSEA,4+XSND:3+XSND+NZO)
+         END DO
+      
+  912 FORMAT ('  ',A)
+
+      END SUBROUTINE CALC_MFIT    
+      
+      
+      SUBROUTINE Stokes_Mfit(JSEA)
+
+      IMPLICIT NONE
+      INTEGER, INTENT(IN)         :: JSEA
+      
+! Parametric profile fitting
+      integer                     :: ISEA, lenSt, IZ
+      real                        :: M2K, UsD, VsD, AM, PM, AMd, PMd
+      real                        :: ITSIC
+      real                        :: rel_ms, UN, fac
+
+!/ ------------------------------------------------------------------- /
+
+!  Calculate fit to J. Mattsson parametric profile
+!--------------------
+!
+!     Mfit profile fit. Find the surface vectors Up, Ud and
+!     the parameters AM, PM, AMd, PMd so that with a minimum e(:),
+!     (U_S(i),V_S(i)) = e(i) + Up*exp(-AM*ZK(i)**PM) + Ud*exp(-AMd*ZK(i)**PMd)
+!     where
+!     ZK(i) = Z(i) * Kz, Kz  = ( TPI / Tz)**2 / GRAV
+!     J. Mattsson first suggestion for the parameters:
+!     AM=2.5, PM=0.45, Ud=0
+
+      if ( xsmf_verbose > 1 .and. JSEA == 1 ) &
+           WRITE (NDSV, *), JSEA, '  Evaluate integral parameters'
+
+      K_S = UXSP(JSEA,1)
+      M_X = UXSP(JSEA,2)
+      M_Y = UXSP(JSEA,3)
+      U_S => UXSP(JSEA,4:3+XSND)
+      V_S => UXSP(JSEA,4+XSND:3+XSND*2)
+      
+      ! Normalizing factor M2K. The drift (U0X,U0Y)/M2K is of order unity:
+      M2K = sqrt(M_X**2+ M_Y**2) * K_S * 2
+
+      ! Feed with (max) number of iterations
+      ITSIC = 3.
+      
+      if ( xsmf_verbose > 1 .and. JSEA == 1 ) &
+           WRITE (NDSV, *), JSEA, '  Fit the Mfit profile'
+      
+      call fit_parts(JSEA, AM, PM, AMd, PMd, UsD, VsD, ITSIC)
+
+      if ( AM > AMAX .and. xsmf_verbose > 0 ) &
+        WRITE (NDSV, *), JSEA, &
+          '  WARNING: AM large in Stokes_Mfit. ', &
+          'AM, PM, AMd, UsD, VsD =', AM, PM, AMd, UsD, VsD      
+      
+      if ( xsmf_verbose > 1 .and. JSEA == 1 ) &
+           WRITE (NDSV, *), JSEA, '  Test data'
+
+      ! Warning about abnormal normalized dimensionless Stokes drift
+      UN = sqrt(U_S(1)**2 + V_S(1)**2)/M2K
+
+      if ( UN > Ul ) then
+        if ( xsmf_verbose > 0 ) &
+          WRITE (NDSV, *), JSEA, &
+            '  WARNING: Stokes drift is strong in Stokes_Mfit. ', &
+            'UN/Ul, AM, PM, AMd, UsD, VsD, ITSIC =', &
+            UN/Ul, AM, PM, AMd, UsD, VsD, ITSIC
+        end if
+!       If output contains more than aa few 'WARNING: Stokes drift is strong',
+!       you may re-implement a limiter like the following 
+!       if ( UN > Ul ) then 
+!         ! Apply a limiter (Ul) to the normalized dimensionless Stokes drift
+!         fac = UN / ( Ul * ( 1. + tanh(UN/Ul-1.) ) )
+!         ! If the drift is small, we can reduce that, else we will reduce M
+!         if ( UN * M2K < 0.03 ) then
+!           fac = min( fac, 0.03/(UN * M2K) )
+!           M2K = M2K * fac
+!           UN = UN / fac
+!           if ( UN > Ul) then
+!             fac = UN / ( Ul * ( 1. + tanh(UN/Ul-1.) ) )
+!           else
+!             fac = 1.
+!             end if
+!           end if
+!         if ( fac > 1. ) then
+!           M_X = M_X * fac
+!           M_Y = M_Y * fac
+!           M2K = M2K * fac
+!           end if
+!         end if
+
+      USERO(JSEA,1)  = UsD /M2K     ! Normalized surface drift of 'deep' part.
+      USERO(JSEA,2)  = VsD /M2K     ! Primary part drift is UsP=U_S-UsD.
+
+      USERO(JSEA,3)  = AM          ! Mfit parameter, primary part
+      USERO(JSEA,4)  = PM          ! Mfit parameter, primary part
+
+      USERO(JSEA,5)  = AMd        ! Deep part Mfit parameter. PMd is fixed 0.4
+
+      USERO(JSEA,6) = ITSIC       ! Quality integer
+      ! I  : Number of iterations in fit_parts
+      ! T  : Number of iterations in AM_Tune
+      ! SI : Scatter index % std(|U_S - U_mod| * dz)/|M|
+      ! C  : Convergence of iteration
+      !
+      ! ITSIC = min( ( min(niter,3)*10+min(ntune,9) ) * 1000. &
+      !              + min( 990., int(max(1., 100*si))*10. ), 32000. ) &
+      !              + min( 9., 10.*cit )
+      ! Reconstruction:
+      !
+      ! ITSI  = int(0.1*ITSIC)
+      ! C     = ITSIC - ITSI*10
+      ! IT    = int(0.001*ITSIC)
+      ! SI    = ITSI - IT*100
+      ! I     = int(0.0001*ITSIC)
+      ! T     = IT - I*10
+
+      if ( xsmf_verbose > 1  .and. JSEA == NSEAL )  &
+         WRITE (NDSV, *), JSEA, '  Mfit done. ITSIC =', ITSIC
+
+      END SUBROUTINE Stokes_Mfit
+
+      
+      subroutine Mfit_init()
+
+      IMPLICIT NONE
+      integer                     :: iq, Iz, iret, iA
+      real                        :: qq, PM, AM, IP, xca_lim, XKZ
+      logical                     :: OPENED
+
+      allocate (U_S(XSND), stat=iret)
+      allocate (V_S(XSND), stat=iret)
+
+      ! Set verboseness and file id. of output messages
+      NDSV = NDST
+      if ( XSVB .gt. 0 ) then
+        INQUIRE (NDSV,OPENED=OPENED)
+        IF ( .NOT. OPENED ) THEN
+          XSVB = 0
+          if ( IAPROC == NAPOUT) then
+            NDSV = NDSO
+            XSVB = 1
+            end if
+          end if
+        end if
+      xsmf_verbose = XSVB            
+
+!/T      xsmf_verbose = xsmf_verbose+1
+      
+      AMs = 2.4; PMs = 0.56   ! 'Standard' values of AM, PM.
+      AMds = 1.2; PMds = 0.4  ! 'Standard' values of secondary ('deep') 
+        ! profile AMd, PMd. The values derive from tests with overall best 
+        ! fit of two profiles in version 0.40 . Note, we have experienced that
+        ! most values of AMd that differ from AMds are actually derived from a
+        ! primary fit to a layer separated from the surface by a thin 
+        ! inversion layer. The transfer to secondary profile is done in
+        ! AJUST_CONST_SFC()
+      PMIN = 0.2 ! Overall minimum value of PM in JM_FIT
+      PMAX = 1.0 ! Overall maximum value of PM in JM_FIT
+        ! TODO: Test if PM, AM limiters are relevant.
+      AMIN=0.6 ! Overall minimum value of AM, AMd  in JM_FIT
+      
+      AMAX = 10.0  ! Overall max value of AM
+      Ul = 7.5     ! Warning threshold of normalized dimensionless Stokes drift
+
+      ! Generate common look-up table for AM, given integrated momentum
+      ! normalized by surface speed
+
+      delAMlu = 0.3
+      NA = int((AMAX - AMIN)/delAMlu) + 1
+      
+      dqlu = 0.2
+      Nq = int((1./PMIN - 1./PMAX)/dqlu) + 1
+      
+      if ( .not. allocated(IPApq) ) allocate( IPApq(Nq, NA), stat=iret )
+      
+      ! AM = AMIN + (iA-1) * delAMlu
+      ! qq = q0 + iq * dqlu ! q0=1./PMAX-dqlu
+      
+      ! Look-up indices for IPApq(iq,iA)
+      ! iA = min( max( int((AM-AMIN)/delAMlu + 1.5), 1), NA )
+      ! iq = min( max( int((qq-1./PMAX)/dqlu+1.5), 1), Nq )
+        !  = (qq-q0)/dqlu = (qq-1./PMAX+dqlu)/dqlu
+      
+      AM = AMIN
+      
+      do iA = 1,NA
+        qq = 1./PMAX-dqlu
+        do iq = 1,Nq
+          qq = qq + dqlu
+          PM=1./qq
+          ! ZK_S(XSND) == XSDS
+          call IP_calc(IP, ZK_S(XSND), AM, PM)
+          IPApq(iq,iA) = IP * AM**qq
+          end do
+        AM = AM + delAMlu
+        end do
+
+      if ( .not. allocated(DZK_S) ) allocate( DZK_S(XSND), stat=iret )
+
+      ! DZK_S = K_S * approximate thicknesses (m) of each layer
+      ! In w3xstomd, the dimensionless profile depths have been defined as
+      ! ZK_S(IZ)  = XKZ**(IZ-1) - 1., where
+      XKZ = (1. + XSDS)**(1./(XSND-1.))       
+
+      ! The uppermost layer at the surface has approximately half thickness.
+      DZK_S(1) = (XKZ - 1.) * 0.5
+      DZK_S(2:XSND) = (ZK_S(2:XSND) + 1.) * (XKZ - 1./XKZ) * 0.5
+      ! DZK_S(IZ) = (XKZ**IZ - XKZ**(IZ-2)) * (XKZ - 1./XKZ) * 0.5
+      
+
+      end subroutine Mfit_init
+
+      
+      subroutine fit_parts(JSEA, AM, PM, AMd, PMd, UdX, UdY, ITSIC)
+        
+      implicit none
+
+!     J. Mattsson profile fit. Find the surface vectors Up, Ud and
+!     the parameters AM, PM, AMd, PMd so that with a minimum rms |e(:)|,
+!     (U_S(i),V_S(i)) = e(i) + Up*exp(-AM*ZK(i)**PM) + Ud*exp(-AMd*ZK(i)**PMd)
+!     where
+!     ZK(i) = Z(i) * Kz, Kz  = ( TPI / Tz)**2 / GRAV
+!     J. Mattsson first suggestion was to use fixed parameters:
+!     PM=0.45, Ud = 0
+
+
+      integer, intent(in)      :: JSEA
+      real, intent(out)        :: AM, PM, AMd, PMd, UdX, UdY
+      real, intent(inout)      :: ITSIC
+      
+      complex                  :: MK, Ud, U0, Up, unit, Ups, tmc
+      real                     :: IPp, IPd, tmp, Udl, Upr, Mpr, MKignore
+      real, allocatable, save  :: Pd(:), Pp(:), Umr(:), log_KZ(:)
+      integer                  :: lenSt, ncycl, iter, numPos, ii, im, nneg,  &
+                                  itune, ntune, ISEA, IZ
+      complex                  :: Upi(4),Udi(4)
+      real                     :: IPpi(4),AMi(4),PMi(4), AMdi(4),IPdi(4)
+      real                     :: qci(4), msi(4)
+      real                     :: fi, fiU, Umr_min, Umd_min, dIP, dIP_min
+      real                     :: si, cit, sm, qcr, qcd
+      logical                  :: warning_issued
+
+      integer                  :: niter
+      
+      ntune = 0
+
+      niter = min(int( ITSIC ),3)
+
+      dIP_min = 0.1
+      ! IPdlim = 0.5
+
+      ! When to skip fitting AM, PM more precisely
+      MKignore = 0.1 ! 10 cm/s TODO: MKignore might follow the prognostic fcut
+
+!/      Initially, assume standard parameters of the profiles
+      AMd = AMds; PMd = PMds; AM = AMs; PM = PMs
+      
+      ! Convert input vectors to complex numbers, and normalize M
+      MK = cmplx( M_X, M_Y ) * K_S
+      U0 = cmplx( U_S(1), V_S(1) )
+
+      if ( abs(MK) < 0.005 .and. abs(U0) < 0.005 ) then
+        ! Neglect the details of very weak Stokes drift
+        UdX = 0.
+        UdY = 0.
+        ITSIC = 9999.
+        return
+      end if
+      
+!/DIST      ISEA       = IAPROC + (JSEA-1)*NAPROC
+!/SHRD      ISEA       = JSEA
+      KsD  = K_S * MAX ( DMIN, DW(ISEA) )
+
+      ! lenSt: Number of depths of the discrete profile above the bottom
+      lenSt = XSND ! Configured value if all above the bottom     
+      do IZ = XSND,1,-1
+        if ( ZK_S(IZ) > KsD ) cycle
+        lenSt = IZ
+        exit
+        end do
+
+!/      Factorize the normalized M*K in an 'primary part' and a 'deep part' as
+!/      MK = Ud * IPd + Up * IPp, where
+!/      U0 = Ud + Up, and where IPd, IPp are normalized profile shapes
+      ! TODO: Consider a look-up table and function calls IPd=IPds(KsD,K_S)
+      !       and IPp=IPps(KsD,K_S)
+      call IP_calc(IPd, AMd, PMd)
+      call IP_calc(IPp, AM, PM)
+
+!/      Substitution yields a vector expression in one unknown part Up,
+!/      MK = (U0-Up)* IPd + Up * IPp,  or
+      Up = ( U0 * IPd - MK ) / (IPd - IPp)
+!/      The 'deep part' of the surface drift is the remainder
+      Ud = U0 - Up
+
+      ! Criteria, hardcoded for iterative convergence
+      ! Upcrit = 0.1*abs(U0) + 0.03 ! > 3 cm/s
+      ! IPcrit = 0.05 * IPp
+      ! PMcrit = 0.1 * PMs
+      ! AMcrit = 0.05 * AMs
+
+      ! Max number of iterations in fine-tuning the profile parameters
+      ! The vertical structure is not precise for small momentum (when
+      ! diagnostic spectrum dominates)
+
+      if ( niter == 0 ) niter = min( int(abs(MK)/MKignore) , 3 )
+      
+      niter = niter + 1
+      
+      ! It is presumed that lenSt <= XSND
+      
+      if ( .not. allocated(Umr) )  allocate( Umr(XSND), stat=ii )
+      if ( .not. allocated(Pd) )   allocate( Pd(XSND), stat=ii )
+      if ( .not. allocated(Pp) )   allocate( Pp(XSND), stat=ii )
+      if ( .not. allocated(log_KZ) ) then
+         allocate( log_KZ(XSND), stat=ii )
+         log_KZ(2:XSND) = log(ZK_S(2:XSND))
+         ! Dummy value at surface
+         log_KZ(1) = 0.
+      end if
+      
+
+      ! TODO In initialization, Pds = exp ( - AMds * ZK_S ** PMds )
+      !      Then in each call Stokes_Mfit initial guess is Pd = Pds
+      Pd = exp ( - AMd * ZK_S ** PMd )
+        
+      ! Smallest drift values allowed in the improved estimates
+      ! of (AM, PM, AMd) in the iteration steps below
+
+      Umr_min = abs(Up) * exp( - AMs * ZK_S(lenSt)**(PMs*2) )
+      Umd_min = abs(Ud) * exp( - AMd * ZK_S(lenSt)**(PMds*2) )
+
+      iter = 1
+!  Register the primary profile parameters
+      
+      AMi(iter) = AM
+      PMi(iter)  = PM
+      AMdi(iter) = AMd
+      Upi(iter)  = Up
+      Udi(iter)  = Ud
+      IPpi(iter) = IPp
+      IPdi(iter) = IPd
+      qci(iter) = 0.
+
+      Pp = exp ( - AM * ZK_S ** PM )
+      Pd = exp ( - AMd * ZK_S ** PMd )
+        
+      msi(iter) = calc_msd( Up, Ud, Pp, Pd, lenSt)
+        
+      do ncycl=1,niter-1
+
+        warning_issued = .false.
+
+!/ Iterative steps 1 - niter:
+
+!/
+!/  step 1: Apply the model profile Um(z ) to yield improved estimates
+!/          of (AM, PM) determined as the best fit to the residual
+!/          Umr(z) =  proj(Um(z)) - proj(Ud)*Pd(z),
+!/          where proj is the projection on the direction of Up given from
+!/          the previous iteration, and Pd(z) = exp ( - AMd * zK ** PMd ) is
+!/          given from the parametric deep parameters of the previous iteration.
+!/          Note that Pd(z=0) = 1 and Umr(z=0) = Up
+
+        unit=Up/abs(Up)
+
+        tmp = real(Ud) * real(unit) + aimag(Ud) * aimag(unit)
+        
+        Umr = U_S * real(unit) + V_S * aimag(unit) - tmp * Pd
+
+!/      Determine the upper range of depths where Umr has positive values.
+!/      There must be no more than 0.2 * lenSt negative or near zero values counted from above
+        nneg = int(0.2 * lenSt)
+        do ii = 1,lenSt
+          if  (Umr(ii) < Umr_min ) then
+            nneg = nneg - 1
+            if ( nneg == 0 ) then
+              exit
+              end if
+            else
+            numPos = ii
+            end if
+          end do
+        if ( numPos < lenSt .and. xsmf_verbose > 1 ) &
+             write (NDSV,*), '  numPos =', numPos
+
+        if ( numPos < int(0.3 * lenSt) ) then
+          if ( xsmf_verbose > 0 ) &
+            write (NDSV,*), JSEA,'  numPos <', int(0.2 * lenSt), ' ncycl:',ncycl
+          AM=AMs; PM=PMs
+        else 
+!/      Determine AM, PM as the best fit of the profile, given the surface
+!/      drift Up. Although Umr(1) is always positive, any of Umr(2:numPos)
+!/      might be negative. JM_FIT will first exchange negative or
+!/      near zero values with the previous (input) profile. The number of these
+!/      is returned in the argument qcr. The input value of qcr is the minimum
+!/      threshold value
+          qcr = Umr_min
+          call JM_FIT(numPos,log_KZ,Umr,AM,PM,qcr)
+          ! Fraction of depths that do not go into the fitting:
+          qcr = ( qcr + (lenSt - numPos) ) / lenSt
+          end if
+        ! Limiters to the changes
+        fi = (1.-0.7*iter/niter)
+        if ( abs(AM-AMi(iter)) > fi * AMi(iter) ) &
+          AM = AMi(iter) + fi * sign( AMi(iter), AM-AMi(iter))
+        if ( abs(PM-PMi(iter)) > fi * PMi(iter) ) &
+          PM = PMi(iter) + fi * sign( PMi(iter), PM-PMi(iter))
+        
+        if ( .not. ( AM > AMIN) ) then
+           AM = AMIN
+           warning_issued = .true.
+          end if
+
+!/  step 2: Update the profile partitions, given the old IPd and new IPp
+
+        if (xsmf_verbose > 2 ) write (NDSV,*), '  IP_calc( ', AM, PM,')'
+        call IP_calc( IPp, AM, PM)
+
+        dIP = IPd/IPp - 1. 
+        if ( dIP < 0. .AND. dIP < -dIP_min*IPd/IPp ) then
+           ! TODO: Test if it has practical significance to swap here and below
+           ! Swap the profiles, and dIP = -dIP
+           if ( xsmf_verbose > 1 ) write (NDSV,*),  &
+             '  Swap the profiles AM, PM, AMd, IPp, IPd =', AM, PM, AMd, IPp,IPd
+           dIP = -dIP*IPp/IPd ! IPp/IPd - 1.
+           call swap_r(AMd,AM)
+           tmp=AMdi(iter); AMdi(iter)=AMi(iter); AMi(iter)=tmp
+           call swap_r(PMd,PM)
+           PM=PMd; PMd=PMds
+           IPp=IPd
+           call IP_calc( IPd, AMd, PMd)
+           call swap_c(Up,Ud)
+           dIP = IPp/IPd - 1. 
+           if ( xsmf_verbose > 1 ) write (NDSV,*), &
+             '         to Up, Ud, PM, IPd =', Up, Ud, PM, IPd
+        end if
+        
+!       Update the deep- and primary-profile parts of the surface drift
+        if ( dIP > dIP_min ) then
+           Ud = ( MK/IPp - U0 ) / dIP
+           Up = U0 - Ud
+          else
+            if ( xsmf_verbose > 1 ) write (NDSV,*), &
+             '   No correction to Up, Ud as IPp, IPd  =', IPp, IPd 
+          end if
+          
+!/  step 3: Determine AMd as the best fit of the secondary, 'deep',
+!/          profile given the surface drift partition Ud
+
+        if (xsmf_verbose > 2 ) write (NDSV,*), '  Fit AMd'
+
+        ! Find  Umr(z)= proj_d(Um) - proj_d(Up)*Pp
+        ! projected on the direction of Ud
+        
+        Udl = abs(Ud)
+        unit = Ud /  Udl
+        tmp = real(Up) * real(unit) + aimag(Up) * aimag(unit)
+        
+        Pp = exp ( - AM * ZK_S ** PM )
+        
+        Umr = U_S * real(unit) + V_S * aimag(unit) - tmp * Pp
+        qcd = Umd_min        
+        call JM_FIT(lenSt,log_KZ,Umr,AMd,PMd,qcd,PMds)
+
+        ! Limiters to the changes
+        AMd = 0.5 * AMd + 0.5 * AMdi(iter)
+
+        if ( abs(AMd-AMdi(iter)) > 0.3 * AMdi(iter) ) &
+          AMd = AMdi(iter) + 0.2 * sign( AMdi(iter), AMd-AMdi(iter))
+
+        if ( .not. ( AMd > 0.5 * AMIN) ) then
+           AMd = 0.5 * AMIN
+           warning_issued = .true.
+          end if
+
+!/  step 4: Update the profile partitions based on the old IPp and a new IPd
+        if (xsmf_verbose > 2 ) write (NDSV,*), '  IP_calc(KsD', AMd, PMd,')'
+        
+        call IP_calc( IPd, AMd, PMd)
+
+        dIP = 1. - IPp/IPd
+        if ( iter < niter .and. dIP < 0. .AND. dIP*IPd  < -dIP_min*IPp ) then
+           ! TODO: Test if it has practical significance to swap here and above
+           ! Swap the profiles, and dIP = -dIP
+           if ( xsmf_verbose > 1 ) write (NDSV,*),  &
+             'Swap the profiles AMd, AM, PM, IPd, IPp =', AMd, AM, PM, IPd, IPp
+           dIP = -dIP*IPd/IPp ! 1. - IPd/IPp
+           call swap_r(AMd,AM)
+           tmp=AMdi(iter); AMdi(iter)=AMi(iter); AMi(iter)=tmp
+           PM=PMd; PMd=PMds
+           IPp=IPd
+           call IP_calc( IPd, AMd, PMd)
+           dIP = 1. - IPp/IPd 
+           Pp = exp ( - AM * ZK_S ** PM )
+           if ( xsmf_verbose > 1 ) write (NDSV,*), &
+             '     to Ud, Up, PM, IPd =', Ud, Up, PM, IPd
+           call swap_c(Up,Ud)
+           tmc = Udi(iter); Udi(iter)=Upi(iter); Upi(iter)=tmc
+        end if
+        
+!       Update the primary- and deep-profile parts of the surface drift
+        if ( dIP > dIP_min ) then
+           Up = ( U0 - MK/IPd ) / dIP
+           Ud = U0 - Up
+          else
+            if ( xsmf_verbose > 1 ) write (NDSV,*), &
+             '   No correction to Ud, Up as IPd, IPp  =', IPd, IPp 
+        end if
+                
+
+!--------------------
+!
+!          ! Even the change of this value of Ud is limited,
+           Ups = Ud - Udi(iter)
+           fiU = fi * abs(U0) 
+           if ( abs(Ups) > fiU ) then
+              Ud = Udi(iter) + fiU * Ups/abs(Ups)
+              Udl = abs(Ud)
+              if ( Udl < 0.1 * fiU) then
+                 Ud = Ud - 0.1 * fiU * Ups/abs(Ups)
+                 Udl = abs(Ud)
+              end if
+              unit = Ud /  Udl
+              Up = U0 - Ud
+              tmc = MK - Up * IPp
+              Mpr = real(tmc) * real(unit) + aimag(tmc) * aimag(unit)
+              if ( Mpr/abs(tmc) < fi ) then
+                 !                ! Allow the change of Ud anyway
+                 Ud = Ups + Udi(iter)
+                 Up = U0 - Ud
+              else
+                 IPd = Mpr / Udl
+                 itune=0
+
+                 call AM_tune( JSEA, AMd, IPd, PMd, ZK_S(lenSt), itune)
+                 ntune = ntune+itune
+                 ! if ( ncycl < 8 ) cycle
+                 call IP_calc(IPd, AMd, PMd)
+                 ! if ( iter == niter ) then
+                   if ( 1. - IPp/IPd > dIP_min ) then
+                     Up = ( U0 * IPd - MK ) / ( IPd - IPp )
+                   else
+                     Up = U0
+                   end if
+                   Ud = U0 - Up
+                 ! end if
+              end if
+              ! if ( ncycl < 8 ) cycle
+            end if
+!
+!-------------------
+        ! Mean of squared deviation of the fit; msi = sum( |U_S - U_mod|**2 )
+        ! Pp = exp ( - AM * ZK_S ** PM )
+
+        Pd = exp ( - AMd * ZK_S ** PMd )
+        
+        msi(iter+1) = calc_msd( Up, Ud, Pp, Pd, lenSt)
+        
+        ! Test convergence. In that case, exit the loop
+        ! if ( msi(iter+1) < msi_crit       .or.     &
+        !     ( abs(Up - Upi(iter))/abs(U0) < Upcrit &
+        !       .and. abs(AM - AMi(iter))   < AMcrit &
+        !       .and. abs(AMd - AMdi(iter)) < AMcrit &
+        !       .and. abs(PM - PMi(iter))   < PMcrit &
+        !     ) ) &
+        !  niter = iter
+       
+        iter = iter + 1
+        
+!  Register the primary profile parameters
+        AMi(iter) = AM
+        PMi(iter)  = PM
+        AMdi(iter) = AMd
+        Upi(iter)  = Up
+        Udi(iter)  = Ud
+        IPpi(iter) = IPp
+        IPdi(iter) = IPd
+        qci(iter) = qcr
+        
+        if ( iter >= niter ) exit
+
+!     Repeat steps 1-5 with the new values of AM, PM, AMd
+
+        end do ! ncycl = 1,niter-1
+      
+      niter=iter
+      
+      im = niter
+      sm = msi(im)      
+      do ii=2,niter-1
+         if ( msi(ii) > sm ) cycle
+         im = ii
+         sm = msi(ii)
+         end do
+
+      if ( msi(1) < 0.9*sm ) then
+        if (xsmf_verbose > 0 .and. msi(1) < (0.5+0.1*xsmf_verbose)*sm ) then
+          write (NDSV,*), JSEA, '  WARNING in w3xsmfmd: msi(1)/msi(',im,')=',&
+               msi(1)/sm
+          end if
+        im = 1
+        end if
+      
+      if ( im < niter .and. msi(im) < 0.9*msi(niter) ) then
+        niter = im
+        end if
+      
+      AM  = AMi(niter)
+      PM  = PMi(niter)
+      AMd = AMdi(niter)
+      Up  = Upi(niter)
+      Ud  = Udi(niter)
+      qcr = qci(niter)
+      
+      ! Reduce if sharp deep part profile
+      if ( .not. AMd < max(AM,AMs) .AND. abs(Ud) > 0. ) then
+        if (xsmf_verbose > 0 ) then
+!/DIST          ISEA       = IAPROC + (JSEA-1)*NAPROC
+!/SHRD          ISEA       = JSEA
+          write (NDSV,*), JSEA, '  WARNING in w3xsmfmd: AMd > max(AM,AMs), ISEA =',ISEA
+          end if
+        call IP_calc(tmp, AMd, PMd)
+        AMd = max(AM,AMs)
+        call IP_calc(IPd, AMd, PMd)
+        Ud = Ud * tmp/IPd
+        end if
+      
+      UdX = real(Ud)
+      UdY = aimag(Ud)
+
+      ! Convergence of iteration:
+      cit = abs ( 1. - ( Up * IPpi(niter) + Ud * IPdi(niter) ) / abs ( MK) )
+      
+      ! Scatter index of the fit; si = mean(|(U_S - U_mod)^2|)/|2MK|
+      si = sqrt( msi(niter) ) / abs(MK) * 0.5
+
+      niter = max(niter - 2,1)* 10 + min(ntune,9)
+      si = min(si, 0.49)
+      if ( qcr > 0.5 ) si = si + 0.5
+      ! 'IT': I=int(0.1*niter); T=niter-I*10; I=I-5
+      ITSIC = niter * 1000. &
+                   + min(990., int(max(0., 100*si))*10.) &
+                   + min(9., 10.*cit)
+
+      if ( xsmf_verbose == 0 .and. .not. warning_issued ) return
+      
+      if ( .not. ( AM > AMIN .and. PM > 0.2*PMs .and. AMd > 0.5*AMIN) ) then
+          write (NDSV,*), JSEA, &
+          '  WARNING in w3xsmfmd: very small AM or PM or AMd'
+          write (NDSV,*), 'AM, PM, AMd = ', AM,  PM, AMd
+        warning_issued = .true.
+        end if
+
+      if ( .not. abs(Ud) < 2. * abs(U0) ) then
+        write (NDSV,*), JSEA, &
+         '  WARNING in w3xsmfmd: Strong secondary Stokes drift'
+        write (NDSV,*), &
+         '  abs(Ud) > 2. * abs(U0), Ud = ', Ud, ', U0 = ', U0
+        warning_issued = .true.
+        end if
+
+      if ( xsmf_verbose > 1 .or. warning_issued ) then
+!/DIST        ISEA       = IAPROC + (JSEA-1)*NAPROC
+!/SHRD        ISEA       = JSEA
+        write (NDSV,*), &
+          '  KsD, niter, U0, IPd, IPp, ISEA =', \
+          KsD, niter, abs(U0), IPd, IPp, ISEA
+        end if
+      ! Print log of the iterative convergence
+
+      if ( xsmf_verbose > 2 &
+           .or. ( xsmf_verbose  > 1 .and. warning_issued ) ) then
+        write (NDSV,*), '  U0,     Ud,     AM,  PM,  IPp,  AMd,  IPd, si = '
+        write (NDSV,*), U0, Ud, AM, PM, IPp, AMd, IPd, si
+
+        write (NDSV,*), '  ntune = ', ntune
+        write (NDSV,*), '    MK =  ', MK
+        write (NDSV,*), '    Upi = ', Upi(1:niter)
+        write (NDSV,*), '   IPpi = ', IPpi(1:niter)
+        write (NDSV,*), '    AMi = ', AMi(1:niter)
+        write (NDSV,*), '    PMi = ', PMi(1:niter)
+        write (NDSV,*), '   AMdi = ', AMdi(1:niter)
+        write (NDSV,*), '    si = ', sqrt( msi(1:niter) ) / abs(MK) * 0.5
+        end if
+
+      end subroutine fit_parts
+
+
+      real function calc_msd( Up, Ud, Pp, Pd,  lenSt)
+
+      ! Mean of squares of modulus deviation between a profile U_S, V_S
+      ! and a parametric fit Up * Pp + Ud * Pd
+      implicit none
+      complex, intent(in)               :: Up, Ud
+      real, dimension(:), intent(in)    :: Pp, Pd
+      integer, intent(in)               :: lenSt
+      real, allocatable, save           :: Um(:)
+      real                              :: tmp
+      integer                           :: ii
+      
+      if ( .not. allocated(Um) )  allocate( Um(XSND), stat=ii )
+ 
+      Um(2:lenSt) = ( U_S(2:lenSt) - real(Up) * Pp(2:lenSt)     &
+                       - real(Ud) * Pd(2:lenSt) )
+      tmp = sum( Um(2:lenSt) * Um(2:lenSt) * DZK_S(2:lenSt) )
+      Um(2:lenSt) = ( V_S(2:lenSt) - aimag(Up) * Pp(2:lenSt)    &
+                       - aimag(Ud) * Pd(2:lenSt) )     
+      
+      calc_msd = ( tmp + sum( Um(2:lenSt) * Um(2:lenSt) * DZK_S(2:lenSt) ) ) &
+                 / ZK_S(lenSt)
+      
+      end function calc_msd
+      
+        
+      subroutine swap_r(xr,yr)
+      implicit none
+      real, intent(inout)         :: xr, yr
+      real                        :: tmp
+
+      tmp = xr; xr = yr; yr = tmp
+
+      end subroutine swap_r
+      
+      subroutine swap_c(xc,yc)
+      implicit none
+      complex, intent(inout)      :: xc, yc
+      complex                     :: tmp
+
+      tmp = xc; xc = yc; yc = tmp
+
+      end subroutine swap_c
+
+
+      subroutine JM_FIT(numD,log_KZ,Um,AM,PM,Um_min,P0)
+
+      !  Determine AM, PM as a best fit of the profile Um. At the surface
+      !  the best fit must equal Um(1)
+      implicit none
+
+      integer, intent(in)         :: numD
+      real, intent(in)            :: log_KZ(:)
+      real, intent(inout)         :: Um(:)
+      real, intent(inout)         :: AM, PM, Um_min
+      real, intent(in), optional  :: P0
+
+      real, allocatable, save     :: loglog_ref(:), log_Um(:)
+      integer, allocatable, save  :: fqc(:)
+      real                        :: log_Up, log_AM, log_Um_min, logAM0
+      integer                     :: ii
+
+      if ( .not. allocated(loglog_ref) ) allocate( loglog_ref(XSND), stat=ii )
+      if ( .not. allocated(log_Um) )     allocate( log_Um(XSND), stat=ii )      
+      if ( .not. allocated(fqc) )     allocate( fqc(XSND), stat=ii )
+
+      ! Quality counter = 1 for the depths that are ignored in the fit
+      fqc = 0
+      
+      ! Profile model:
+      ! Um = Um(1) * exp (-AM * KZ**PM)
+
+      ! Regression shape valid for KZ > 0:
+      ! log_Um = -log( Um/Um(1) ) ~ AM * KZ**PM
+
+      ! Reference shape:
+      ! log_ref(2:numD) = AM * KZ(2:numD)**PM
+      ! The log of log_Um is linear in log_KZ:
+      logAM0 = log(AM)
+      loglog_ref(2:XSND) = logAM0 + PM * log_KZ(2:XSND)
+      
+      ! Avoid depths of near negative speed:      
+      where ( Um < Um_min )
+        Um = Um_min
+        ! Register the depths that are ignored
+        fqc = 1
+        end where
+      
+      log_Um(2:numD) = -log( Um(2:numD)/Um(1) )
+
+      ! Set dummy values at the surface and below the sea floor (numD+1:XSND)
+      ! (not to be used in lin_reg)
+      loglog_ref(1) = loglog_ref(2) - 1.
+      log_Um(1) = exp(loglog_ref(1))
+      log_Um(numD+1:XSND) = exp(loglog_ref(numD))
+      
+      ! First, avoid the smallest (possibly negative) values of log_Um: 
+      where ( log_Um < log_Um(1) )
+        log_Um = log_Um(1)
+        fqc = 1
+        end where
+
+      ! Take the logaritm again to fit a linear profile
+      log_Um(2:numD) = log( log_Um(2:numD) )
+      ! Dummy values at the surface and below the sea floor
+      log_Um(1) = loglog_ref(1)
+      log_Um(numD+1:XSND) = loglog_ref(numD+1:XSND)
+      
+      ! Avoid depths where Um is not decreasing like 'in the vicinity of'
+      ! the reference shape Um(1) * exp(-AM * KZ**PM)
+
+      where ( log_Um < loglog_ref - 1. )
+        log_Um = loglog_ref - 1.
+        fqc = 1
+        end where      
+      ! where ( log_Um < 1/e*log_ref )
+        
+      where ( log_Um > loglog_ref + 1. )
+        log_Um = loglog_ref + 1.
+        fqc = 1
+        end where
+      ! where ( log_Um > e*log_ref )
+        
+      ! Linear regression fit
+      if (xsmf_verbose > 2 ) write (NDSV,*), '  lin_reg () ... '
+      if ( present(P0) ) then
+         PM = P0
+         call lin_reg0( log_Um(2:numD), log_KZ(2:numD), P0, log_AM)
+      else
+         call lin_reg( log_Um(2:numD), log_KZ(2:numD), PM, log_AM)
+       end if
+
+      ! Number of depths that do not go into the fitting. Returned in Um_min
+      Um_min = real(sum(fqc(2:numD)))
+      
+      AM = exp(log_AM)
+
+      end subroutine JM_FIT
+
+      
+      subroutine lin_reg0( yy, xx, a0, bb)
+      ! Find the y-intercept (bb) of
+      ! yf = a0 * xx + bb, where ||yy - yf|| is a minimum
+      IMPLICIT NONE
+      real, intent(in)            :: yy(:), xx(:)
+      real, intent(in)            :: a0
+      real, intent(out)           :: bb
+     
+      integer :: lenArr
+
+      lenArr =  float(size(yy))
+
+      bb = sum(xx) / lenArr - a0 * ( sum(yy) / lenArr )
+
+      end subroutine lin_reg0
+
+
+      subroutine lin_reg( yy, xx, aa, bb )
+      ! Find the slope (aa) and y-intercept (bb) of
+      ! yf = aa * xx + bb, where ||yy - yf|| is a minimum
+
+      IMPLICIT NONE
+      real, intent(in)            :: yy(:), xx(:)
+      real, intent(out)           :: aa, bb
+      real :: sumx, sumy, xave, yave, ad, ax, amx, amn
+
+      integer :: KD_num, ii, lenArr
+      
+      amx = PMAX
+      amn = PMIN
+      
+      lenArr =  float(size(yy))
+
+      sumx = sum(xx)
+      sumy = sum(yy)
+      xave = sumx / lenArr
+      yave = sumy / lenArr
+
+      ! Find the slope (aa)
+      aa = (dot_product(xx,yy) - sumx*yave)
+      ad = (dot_product(xx,xx) - sumx*xave)
+      ax = amx * ad
+      if ( ax > aa .and. amn * ad < aa ) then
+        ! aa is between min and max
+        aa = aa / ad
+      else if ( ax > aa ) then
+        aa = amn 
+      else
+        aa = amx
+        end if
+      
+      ! y-intercept (bb)
+      bb = yave - aa*xave
+
+      end subroutine lin_reg
+
+      
+      subroutine AM_tune( JSEA, AM, IP, PM, ZK_S_low, ntune, resol)
+      IMPLICIT NONE
+      integer, intent(in)         :: JSEA
+      real, intent(inout)         :: AM
+      real, intent(in)            :: IP, PM, ZK_S_low
+      integer, intent(inout)      :: ntune
+      real, intent(in), optional  :: resol
+      real                        :: AM0, IP0, dIPdA,AMresol,IPDmax,IPD,dA,u
+      integer                     :: iter,niter,iA,iq,deep_check
+
+      deep_check = 1
+
+      if (present(resol)) then
+        AMresol = resol
+        else
+        AMresol = 0.01
+        end if
+
+      if ( ntune == 0 ) ntune = 3
+
+      ! Nearest uneven value above
+      ntune = 2*int(ntune/2)+1
+      
+      do iter = 1,ntune
+        niter=iter
+      ! Compare IP to IP0 provided from:
+        call IP_calc( IP0, AM, PM, dIPdA=dIPdA )
+
+      ! Apply a linear correction
+        if ( abs(dIPdA) < 1.e-7 ) then
+           if (xsmf_verbose > 0) WRITE (NDSV, *), '  WARNING: Small dIPdA', &
+                 '   for KsD, AM, PM = ', KsD, AM, PM, &
+                 '. Cannot tune AM further than', AM
+           ntune = 9
+           return
+        end if
+        
+        dA = ( IP - IP0 ) / dIPdA
+        
+        AM = min( max( AM + dA, max(0.7 * AM, AMIN) ), min(1.4*AM, AMAX) )
+        
+        if ( abs(dA) < AMresol ) then
+           ntune=niter
+           exit
+        end if
+        
+        if ( mod( iter, 2) == 1 ) then
+          u = AM * KsD**PM / (1./PM + 1.)
+          if ( u < 1.e+7 ) then
+          else
+            if (xsmf_verbose > 0) WRITE (NDSV, *), &
+                 '  WARNING: bad value of u=AM*KsD**PM/(1/PM+1)', &
+                 '   for KsD, AM, PM = ', KsD, AM, PM, &
+                 '. Cannot tune AM further than', AM-dA, '->', AM
+            ntune = 9
+            return
+          end if
+          
+          IPDmax=0.9*IP
+          ! Integrated pseudo-momentum in the interval between
+          ! ZK_S(lenSt) and KsD
+          IPD = IP_deep(JSEA, AM, PM, IPDmax, ZK_S_low)
+          IP0 = IP - IPD
+          ! Look-up indices for IPApq(iq,iA)
+          iA = min( max( int( (AM - AMIN)/delAMlu + 1.5 ), 1), NA )
+          iq = min( max( int( (1./PM - 1./PMAX)/dqlu + 1.5 ), 1), Nq )
+          !  = (qq-q0)/dqlu = (qq-1./PMAX+dqlu)/dqlu
+          if ( IP0 < 1.e-7 ) IP0 = 1.e-7
+          AM = max ( min( ( IPApq(iq,iA) / IP0 )**PM, min(1.4*AM, AMAX) ), &
+                     max(0.7 * AM, AMIN) )
+          end if
+        if (xsmf_verbose > 2 .and. iter > 1) &
+          WRITE (NDSV, *),'  Iterative call in AM_tune:', iter, '. AM=', AM
+
+        end do
+        
+        ntune = niter
+        
+      end subroutine AM_tune
+      
+
+      subroutine IP_calc( IP, AM, PM, dIPdA )
+        !
+        ! The integrated, normalized pseudo-momentum of the parameterized
+        ! profile has the mathematical form, in the limit of infinitesimal depth
+        ! increments,
+        !   IP = \int_0^KsD exp(- AM * KZ^PM ) dKZ,
+        ! where D is the local depth and Ks=KsD/D is an integral wave number.
+        !
+        ! This can be reformulated, substituting X = AM * KZ^PM,
+        !   IP = q AM^{-q} \int_0^u X^{q-1} exp(-X) dX,
+        ! where q = 1/PM and u = AM * KsD^PM
+        ! The integral is an incomplete gamma function gammainc(q,u), and thus
+        !   IP = AM^{-q} q gammainc(q,u)
+        !
+        ! Given a known value of KsD, and supposed value of PMs:
+        ! From a first look-up estimate AM1 of AM, and known value Im of
+        ! spectral  pseudo-momentum normalized by surface speed, calculate the
+        ! integrated volume flux IP1 for the parameter profile AM1, PMs and its
+        ! derivative dIPdA calling  IP_calc(IP1, KsD, AM1, PMs, dIPdA).
+        !
+        ! A 1-iteration, improved estimate is AM = AM1 + ( Im - IP1 ) / dIPdA
+        !
+        IMPLICIT NONE
+        REAL, intent(out)           :: IP
+        REAL, intent(in)            :: AM, PM
+        REAL, intent(out), optional :: dIPdA
+
+        real                        :: q, u
+
+        q = 1./PM
+        u = AM * KsD**PM
+
+        IP = q / AM**q * gammain(q,u)
+
+        IF ( PRESENT(dIPdA) ) THEN
+          if ( u > 25.0 ) then
+            ! asymptotic deep water, fx. 2.4*50.**0.6 = 25.0
+            ! dIPdA = ( KsD * 1.39e-11 - IP ) / (PM * AM)
+            dIPdA = - IP / (PM * AM)
+          else
+            dIPdA = ( KsD * exp (-u) - IP ) / (PM * AM)
+            end if
+          ! dIP = q*(-q) * AM**(-q-1) * dA  * gammain + q / AM**q * d(gammain)
+          ! d(gammain)/du = u**(q-1) * exp (-u). (By definition of gammain.)
+          !
+          ! u**q = AM**q * KsD
+          END IF
+
+      end subroutine IP_calc
+
+! Previous version:
+!     function IP_calc( KsD, AM, PM )
+!        
+        ! The integrated, normalized pseudo-momentum of the parameterized
+        ! profile has the mathematical form, in the limit of infinitesimal depth
+        ! increments,
+        !   IP = 1/KsD \int_0^KsD exp(- AM * KZ^PM ) dKZ,
+        ! where D is the local depth and Ks = KsD/D is an integral wave number.
+        !
+        ! This can be reformulated, substituting X = AM * KZ^PM,
+        !   IP = 1/KsD q AM^{-q} \int_0^u X^{q-1} exp(-X) dX,
+        ! where q = 1/PM and u = AM * KsD^PM
+        ! The integral is an incomplete gamma function gammainc(q,u), and thus
+        !   IP = 1/KsD AM^{-q} q gammainc(q,u)
+        !
+        
+!        IMPLICIT NONE
+!        REAL                     :: IP_calc
+!        REAL, intent(in)         :: KsD, AM, PM      
+!        real                     :: q, u
+!
+!        q = 1./PM
+!        u = AM * (KsD)**PM      
+!
+!        IP_calc = q / AM**q * gammain(q,u)
+
+!      end function IP_calc
+
+
+      FUNCTION IP_deep(JSEA, AM, PM, IPmax, ZK_S_low)
+        ! Integrated pseudo-momentum in the interval between
+        ! ZK_S(lenSt) and KsD
+        IMPLICIT NONE
+        REAL                 :: IP_deep
+        INTEGER, intent(in)  :: JSEA
+        REAL, intent(in)     :: AM, PM, IPmax, ZK_S_low
+
+        real                 :: q, u , u0,  xc, xc0, IP_test
+        real                 :: gammainD
+        ! Number of powers in series call in gammain, function gi():
+        real                 :: nmP = 0., nmP0 = 0., iter
+        ! Number of iterations in continued fraction call in gammain:
+        real                 :: nicf, nicf0
+
+        ! Be sure that always ZK_S(lenSt) <= KsD
+        !       and therefore always u0 < u and xc0 < xc
+        if ( .NOT. ZK_S_low <= KsD ) then
+           WRITE (NDSV, *), 'Must have ZK_S_low <= KsD. Code error'
+           CALL EXTCDE ( 73 )
+        end if
+
+        ! xc > 5.:
+        ! u_min / (q_max+ 1) > 5
+        ! AMIN * exp(PMIN*log_KsD)/(1./PMIN+1) > 5
+        ! log_KsD > logKsDlim
+        ! 
+        ! logKsDlim = log( 5*(1./PMIN+1)/AMIN ) / PMIN
+
+        q = 1./PM
+        u = AM * KsD**PM
+        !xca = 4. + (q - 0.8)/(q + 1.) - 0.4 
+        !KsDlim = ( xca*(q+1)/AM ) ** q
+        
+        if ( u  > 25. ) then
+          ! Avoid exp( KsD**PM ) for very deep water and large PM
+          xc = 10.
+        else
+          xc = u / (q + 1.)
+        end if
+        u0 = AM * ZK_S_low**PM
+        xc0 = u0 / (q + 1.)
+
+        if ( xc0 > 3. ) then              
+           if ( xc0 < 5.0 ) then
+              ! IP_deep = q/AM**q * ( gammain(q,u) - gammain(q,u0) )
+              ! IP_deep = q/AM**q * u0**(q-1) * exp(-u0) * (5.0-xc0)/3.0 )
+              ! u0**(q-1) =  AM**q * ZK_S_low**(PM*q)/u0
+              IP_deep = q * ZK_S_low/u0 * exp(-u0) * (5.0-xc0)/3.
+           else
+              IP_deep = 0.0              
+           end if
+           return
+        end if
+        
+        gammainD = gammain(q,u)
+        
+        IP_deep = q/AM**q * ( gammainD - gammain(q,u0) )
+        
+        if ( IP_deep < IPmax ) &
+           return
+        
+        if (IP_deep > 3.*IPmax) then
+           IP_deep = 3.*IPmax
+           if (xsmf_verbose > 0 ) &
+              WRITE (NDSV, *), JSEA, &
+                   '  WARNING: IP_deep set to limiter ==', 3.*IPmax
+        end if
+        
+        !if (xsmf_verbose < 2 .AND. (xsmf_verbose == 1 .OR. nmP0 < 10 ) ) &
+         if (xsmf_verbose == 0 ) &
+           return
+        
+        ! Before returning the value of IP_deep, test and report if a higher
+        ! order of power series nmP would yield IP_deep < IPmax
+        
+        if ( xc0 > 3.0 ) return
+           ! Continued fraction isn't used in gammain
+           ! for xc0 > 0.7, neither a power series is used in gammain
+           ! Presume that always xc > xc0
+ 
+        IP_test = IP_deep
+        WRITE (NDSV, *), JSEA, '  Large IP_deep=',IP_deep, ' > ', IPmax
+        if ( xc0 < 0.5 ) then
+           ! Power series part dominates in gammain
+           ! CHA 20190726: In previous versions nmP0 > 0 only if xc < 0.7
+           ! nmP0 = floor(4. * xc0) * 2. + 5.
+           nmP0 = 4. * xc0 + 2.6
+           ! Presume that always xc > xc0
+           ! if ( xc < 0.7 )
+           nmP = 4. * xc + 2.6
+           
+           nicf = 12
+           nicf0 = 12
+           iter = 0
+           do while (iter < 3 .and. IP_test > IPmax )
+              iter = iter + 1
+              if ( xc <= 5. ) gammainD = gammain(q,u,nmP+2.*iter,nicf)        
+              IP_test = q/AM**q  * ( gammainD - gammain(q,u0,nmP0+2.*iter,nicf0) )
+              if ( abs( IP_test - IP_deep) < 0.01*IP_deep ) exit
+              IP_deep = IP_test
+           end do
+           if ( xsmf_verbose > 1 .or. iter > 1 ) then
+             WRITE (NDSV, *), JSEA, '     IP_test=', IP_test
+             IF ( IP_test < IPmax ) iter = iter - 1.
+             WRITE (NDSV, *), '     nmP0 should be >= nmP0+', 2.*iter, ' for xc0=',xc0
+           end if
+        else
+           ! xc0 > 0.5 and xc0 < 3.0:  Continued fraction dominates in gammain
+           nicf = 4. + 2.5 / xc
+           nicf0 = 4. + 2.5 / xc0
+           !nmP0 = floor(4. * 0.7) * 2. + 5.
+           !nmP = floor(4. * 0.7) * 2. + 5.
+           nmP = 4. * 0.7 + 2.6
+           nmP0 = 4. * 0.7 + 2.6
+           iter = 0
+           do while (iter < 3 .and. IP_test > IPmax )
+              iter = iter + 1
+              if ( xc <= 5. ) gammainD = gammain(q,u,nmP,nicf+2.*iter)
+              IP_test = q/AM**q * ( gammainD - gammain(q,u0,nmP0,nicf0+2.*iter) )
+              if ( abs( IP_test - IP_deep) < 0.01*IP_deep ) exit
+              IP_deep = IP_test
+           end do
+           if ( xsmf_verbose > 1 .or. iter > 1 ) then
+             WRITE (NDSV, *),  JSEA, '     IP_test=', IP_test
+             IF ( IP_test < IPmax ) iter = iter - 1.
+             WRITE (NDSV, *), '  xc0,xc =',xc0, xc,' nicf0 should be > nicf0+', 2.*iter
+           end if
+           
+        end if
+
+        return
+
+      end FUNCTION IP_deep
+      
+           
+      real function gammain( q, u, nmPi, nicf )
+
+        ! The incomplete gamma function P(q,u) multiplied by Gamma(q).
+        !
+        ! Weighted average of four approximate functions depending on the water
+        ! depth, or more precisely, depending on the value of xc = u / (q + 1.)
+        !
+        ! Let xcm < xci < xct < xcd < xca with xcm >~ 0.4, xct ~ 4*xcm:
+        !
+        ! 1) 0.0 <= xc < xci : use a series representation, function gi()
+        !                        (shallow and transitional water waves)
+        ! 2) xcm <= xc < xcd   : Continued fraction factor, function GammaincG()
+        !                        (transitional and deep water waves)
+        ! 3) xct <= xc < xca   : Gamma(q) - u**(q-1) * exp(-u)
+        !                        (deep water)
+        ! 4) xca <= xc         : Gamma(q)
+        !                        (most of the deep ocean)
+        
+        IMPLICIT NONE
+        real, intent(in)             :: q, u
+        ! Number of powers in series, function gi():
+        real, intent(in), optional   :: nmPi
+        ! Number of iterations in continued fraction, function GammaincG():
+        real, intent(in), optional   :: nicf
+        real                         :: numit=0.
+        real                         :: xc, xce, xcm, xci, xct, xca, xcd
+        real                         :: GLQ, GmA, nmP
+        real                         :: wP, wG, gammainG
+
+        xc = u/(q + 1.)
+
+        ! Shallow and transitional water thresholds
+        !
+        ! A requirement in Numerical Recipes function gcf(a,x) is that
+        ! xc > (q-1)/(q+1). Ensure this with xcm = max(0.4, (q-0.8)/(q+1))
+        ! Apply gcf(q,u) for xc > xcm as long as xc <~ 1.6
+        ! Apply power series gi(u) when xc < 0.8 + xce, where
+        xce = max ( 0., (q - 0.8)/(q + 1.) - 0.4 )
+        xcm = 0.4 + xce
+        xci = 0.8 + xce
+        xct = 1.6 + xce
+        
+        ! Deep water thresholds
+        xcd = 2.0 + xce
+        xca = 4.0 + xce
+       
+        if ( xc >= xcm ) then
+           ! (transitional shallow and deep water waves)
+           GLQ = GAMMLN(q)
+           GmA = exp( GLQ )
+        end if
+        
+        if ( xc >= xca ) then
+           ! asymptotic value for xc -> infinity (very deep water)
+           gammain = GmA
+           ! For very deep water waves we are finished
+           return
+        end if
+        
+        if ( xc > xct ) then   
+           gammain = GmA - u**(q-1) * exp(-u) * (xca-xc)/(xca-xct)
+           ! W = (xca-xc)/(xca-xct); W->0 as xc -> xca; W -> 1 as xc -> xct
+        end if
+
+        ! For pure deep water waves we are finished
+        if ( xc > xcd ) return
+
+        if ( xc >= xcm ) then
+           ! (transitional from shallow to deep water waves)
+           ! Continued fraction with numit iterations
+           ! GammaincG() interpolates between floor(numit) and ceil(numit)
+           if ( present(nicf) ) then
+              numit = nicf
+           else
+              numit = 2
+              ! numit = 4. + 2.5 / xc
+           end if
+           gammainG = GammaincG(q, u, GmA, numit)
+           if ( xc > xct ) then
+              ! (deep water waves)
+              wG = (xcd-xc)/(xcd-xct)
+              ! wG -> 0 as xc -> xcd; wG -> 1 as xc -> xct
+              gammain = gammainG * wG + gammain * (1. - wG)
+           end if
+        end if
+        
+        if ( xc >= xci ) then
+           ! (transitional shallow to deep water waves)
+           gammain = gammainG
+           return
+        end if
+        
+        ! xc < xci: Asymptotic as xc -> 0
+        ! (shallow water waves)
+        ! Power series in u, truncated after nmP terms
+        if ( present(nmPi) ) then
+           nmP = nmPi
+        else
+           nmP = 4. * xc + 2.6
+        end if
+        ! gi() interpolates between power series order floor(nmP) and ceil(nmP)
+        gammain = gi(q, u, nmP)
+        
+        if ( xc < xcm ) &
+           return ! (pure shallow water waves)
+        
+        ! xc >= xcm and xc < xci (transitional shallow water waves)
+        wP = (xci - xc)/(xci - xcm)
+        ! wP -> 0 as xc -> xci; wP -> 1 as xc -> xcm
+        gammain = gammain *wP + gammainG * (1. - wP)
+        return
+
+      end function gammain
+      
+      real FUNCTION gi(q,u,nm)
+        !
+        ! The incomplete gamma function, power series representation for small
+        ! values of u / (q + 1.). Times Gamma(A).
+        !
+        ! Derived from Numerical Recipes subroutine gser(a,x)
+        IMPLICIT NONE
+        REAL, intent(in)         :: q, u
+        real, intent(in)         :: nm
+        integer                  :: n,inm
+        real                     :: EPS=3.e-3, ap, sum, dl
+        
+        inm=int(nm)
+        sum=1./q
+        ap=q+1.
+        dl=sum*u/ap
+        
+        do n = 1,inm
+           sum=sum+dl
+           ap=ap+1.
+           dl=dl*u/ap
+           end do
+        
+        ! Make the result continous in nm (although not differentiable!):
+        ! frac=nm-inm; sum = sum*(1.-frac) + (sum+dl)*frac
+        sum = sum + ( nm - real(inm) ) * dl 
+        
+        gi = sum * exp(-q) * u**q
+
+        return
+
+      END FUNCTION gi
+      
+      real FUNCTION giGR(q,u,nm)
+        !
+        ! The incomplete gamma function, power series representation for small
+        ! values of u / (q + 1.)
+        !
+        ! G&R: Gradshteyn and Ryzhik: Table of integrals, series and products,
+        ! Academic Press 1980
+        !
+        ! Apply G&R 8.354.1:
+        !           gi(al,x) = sum_n=0^nm -1**n * frac{x^(al+n)}{n!*(al+n)}
+        !                    = x^al * sum_n=0^nm -1**n * frac{x^n}{n!*(al+n)}
+        !
+        ! G&R 8.356.1: gi(al + 1, x) = al * gi(al,x) - x**al * exp(-x)
+
+        IMPLICIT NONE
+        REAL, intent(in)         :: q, u
+        real, intent(in)         :: nm
+        integer                  :: n,inm
+        real                     :: al, dn, tn, sm, xt
+
+        if ( q < 0.3 .AND. xsmf_verbose > 0 ) then
+           WRITE (NDSV, *), "WARNING in function w3xsmfmd::gi: q reset from", &
+                q, " to 0.3"
+           al = -0.7
+        else
+           al = q - 1.
+        end if
+
+        inm=int(nm)
+
+        dn = al
+        tn = 1.
+        sm = 0.
+        xt = -u
+        do n = 1,inm
+           sm = sm + tn/dn
+           tn = tn * xt/n
+           dn = dn + 1.
+        end do
+
+        ! Make the result continous in nm (although not differentiable!):
+        ! frac=nm-inm; sm = sm*(1.-frac) + (sm+tn/dn)*frac
+
+        sm = sm + tn/dn * ( nm - real(inm) )
+
+        giGR = ( al * sm  - exp(-u) ) * u**al
+
+      end FUNCTION giGR
+
+      real FUNCTION GAMMLN(XX)
+        ! A routine from Numerical Recipes
+
+        IMPLICIT NONE
+        REAL, intent(in)             :: XX
+        REAL*8 X,TMP,SER
+
+        REAL*8, dimension(6) :: COF = (/76.18009173, -86.50532033, 24.01409822,&
+                                     -1.231739516, .120858003E-2,-.536382E-5 /)
+        REAL*8               :: STP = 2.50662827465D0
+        REAL*8               :: HALF = 0.5D0, ONE = 1.0D0, FPF = 5.5D0
+
+        INTEGER              :: J
+
+        X = XX - ONE
+        TMP = X + FPF
+        TMP = ( X + HALF ) * LOG(TMP) - TMP
+        SER = ONE
+        DO J = 1,6
+           X = X + ONE
+           SER = SER + COF(J)/X
+        END DO
+        GAMMLN = TMP + LOG( STP * SER )
+
+      END FUNCTION GAMMLN
+
+      real FUNCTION GammaincG(A,X,GmA,NUMIT)
+        ! 
+        ! GammaincG(A,X,GmA) = GmA*gammainc(A,X) = GmA*(1-GAMMCF(A,X))
+        !                    = Gamma(A) - EXP(-X) * X**A * GCF(A,X,NUMIT)
+        ! GmA == Gamma(A). The user must supply this value.
+        ! GAMMCF: Continued fraction method for the complement of the
+        ! incomplete gamma function. GAMMCF is the name adpted in Numerical
+        ! Recipes routines
+
+        IMPLICIT NONE
+        real, intent(in)            :: A,X,GmA
+        real, intent(in)            :: NUMIT
+
+        GammaincG = GmA - EXP(-X + A * LOG(X)) * GCF(A,X,NUMIT) 
+        RETURN
+
+      END FUNCTION GammaincG
+
+      real FUNCTION GCF(A,X,NUMIT)
+        ! Continued fraction factor in complementary incomplete gamma function,
+        !    GammaincG = Gamma(A) - EXP(-X) * X**A * GCF(A,X,NUMIT)
+        ! Algorithm from Numerical Recipes
+        IMPLICIT NONE
+        real, intent(in)            :: A,X
+        real, intent(in)            :: NUMIT
+        real                        :: EPS = 0.01, NUMITm, frac
+        real                        :: G,GOLD,A0,A1,B0,B1
+        real                        :: AN,ANA,FAC,ANF
+        real                        :: FPMIN
+        integer                     :: N, INUMIT
+
+        G=0.
+        GOLD=G
+        A0=1.
+        A1=X
+        B0=0.
+        B1=1.
+        FAC=1.
+        FPMIN = X * 1.e-7
+        
+        NUMITm = max(NUMIT,1.)
+        INUMIT = int(NUMITm) + 1
+
+        DO N=1,INUMIT
+           AN=FLOAT(N)
+           ANA=AN-A
+           A0=(A1+A0*ANA)*FAC
+           B0=(B1+B0*ANA)*FAC
+           ANF=AN*FAC
+           A1=X*A0+ANF*A1
+           B1=X*B0+ANF*B1
+           IF ( ABS(A1) < FPMIN ) A1 = FPMIN
+           FAC=1./A1
+           GOLD=G
+           G=B1*FAC           
+        END DO
+
+        GCF=G
+        
+        ! Make GCF continous wrt the real parameter NUMIT (not differentiable!):
+        frac = INUMIT - NUMITm
+        IF ( frac > 0 ) GCF = G * (1.-frac) + GOLD * frac
+        IF ( ABS( (G-GOLD)/G ) > EPS .and.  xsmf_verbose > 1 ) &
+           write (NDSV, *), 'WARNING in w3xsmfmd function GCF: ', &
+           'number of iterations (', NUMIT, ') too small for A=', A, 'X=', X
+
+
+      END FUNCTION GCF
+
+      END MODULE W3XSMFMD
