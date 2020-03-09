@@ -263,18 +263,25 @@
         FLGR2(6,9)=.FALSE.
       END IF
 !/XSTO!  UXSP(JSEA,1:3+2*NZO) are set by CALC_XSTOKES(A) if
+!/MFIT!  NZO = 1 (for profile fit only), or
 !/XSTO!  NZO = XSND (for full profile)
 !/XSTO!  unless NZO is 0 (no Stokes profile output).
+!/MFIT!  For profile fit, also USERO(JSEA,1:6) are set by CALC_MFIT()
 !/XSTO      IF ( XSND .LE. 0 ) THEN
 !/XSTO        IF (FLGRD(6,13).OR.FLGR2(6,13)) THEN
 !/XSTO          WRITE(NDSEN,1009) 'XSP','XSTO'
 !/XSTO        END IF
+!/MFIT        FLGRD(10,1) = .FALSE.
+!/MFIT        FLGR2(10,1) = .FALSE.
 !/XSTO        FLGRD(6,13)=.FALSE.
 !/XSTO        FLGR2(6,13)=.FALSE.
 !/XSTO      END IF
 !/XSTO      ! Set NZO for use in W3DIMA and W3DIMX
 !/XSTO      NZO = 0
 !/XSTO      IF ( FLGRD(6,13) ) NZO = XSND
+!/MFIT      ! For FLGRD(10,1), if FLGRD( 6, 13) is False, only the surface U_S
+!/MFIT      ! and integral variables Kz, M will be written to UXSP(1:NSEA,1:5)
+!/MFIT      IF ( FLGRD(10,1) .AND. .NOT. FLGRD(6,13) ) NZO = 1
 !
       FLGD(3) = .FALSE.
       FLG2(3) = .FALSE.
@@ -367,6 +374,7 @@
       USE W3GDATMD, ONLY: US3DF, USSPF
       USE W3ODATMD, ONLY: NOGRP, NGRPP, NOGE, IDOUT
       USE W3SERVMD, ONLY: NEXTLN, STRSPLIT, STR_TO_UPPER
+!/MFIT      USE W3ODATMD, ONLY: NOEXTR
 !/S      USE W3SERVMD, ONLY: STRACE
 !
       IMPLICIT NONE
@@ -676,8 +684,11 @@
 !
            CASE('U1')
              FLG2D(10,1)=.TRUE.
+!/MFIT             FLG2D(10,2)=.TRUE. ! 'U1' and 'U2' are synonyms
            CASE('U2')
              FLG2D(10,2)=.TRUE.
+!/MFIT           CASE('MFIT')
+!/MFIT             FLG2D(10,1)=.TRUE.
 !/COU           CASE('DRY')
            CASE DEFAULT
              IF ( IAPROC .EQ. NAPOUT ) WRITE (NDSEN,1004) TRIM(TESTSTR)
@@ -830,6 +841,7 @@
       USE W3ODATMD, ONLY: NOGRP, NGRPP, NOGE, IDOUT
       USE W3SERVMD, ONLY: STRSPLIT, STR_TO_UPPER
       USE W3GDATMD, ONLY: US3DF, USSPF
+!/MFIT      USE W3ODATMD, ONLY: NOEXTR
 !/S      USE W3SERVMD, ONLY: STRACE
 !
       IMPLICIT NONE
@@ -1098,8 +1110,11 @@
 !
          CASE('U1')
            FLG2D(10,1)=.TRUE.
+!/MFIT             FLG2D(10,2)=.TRUE. ! 'U1' and 'U2' are synonyms
          CASE('U2')
            FLG2D(10,2)=.TRUE.
+!/MFIT         CASE('MFIT')
+!/MFIT           FLG2D(10,1)=.TRUE. ! NOEXTR == 7 but no flag for USERO(2:6)
 !/COU           CASE('DRY')
          CASE DEFAULT
            IF ( IAPROC .EQ. NAPOUT ) WRITE (NDSEN,1004) TRIM(TESTSTR)
@@ -1272,6 +1287,7 @@
 !/XSTO ! It would be nice to be able to use double switch '!/XSTO!/MPI'
 !/XSTO ! to avoid linking w3xstomd into ww3_ounf
 !/XSTO      USE W3XSTOMD, ONLY: CALC_XSTOKES
+!/MFIT      USE W3XSMFMD, ONLY: CALC_MFIT
 !
       IMPLICIT NONE
 !/
@@ -1972,7 +1988,9 @@
 !
 !/XSTO!  UXSP(JSEA,1:3+2*NZO) is set by CALC_XSTOKES(A), where
 !/XSTO!  NZO is either 0 (no Stokes profile output), or
+!/MFIT!  NZO = 1 (for profile fit only), or
 !/XSTO!  NZO = XSND (for full profile).
+!/MFIT!  For profile fitting, also USERO(JSEA,1:6) are set by CALC_MFIT()
 !/XSTO!  CALC_XSTOKES(A) has its own loop over JSEA and thus called
 !/XSTO!  after the present loop
           END IF
@@ -2356,9 +2374,14 @@
 !/XSTO!  Stokes drift with extended tail
 !/XSTO!  UXSP(JSEA,1:3+2*NZO) is set by CALC_XSTOKES(A), where
 !/XSTO!  NZO is either 0 (no Stokes profile output), or
+!/MFIT!  NZO = 1 (surface drift and integral values for MFIT), or
 !/XSTO!  NZO = XSND (for full profile).
 !/XSTO       IF ( FLOLOC(6,13)        &
-!/XSTO            ) CALL CALC_XSTOKES(A)
+!/MFIT            .OR.  FLOLOC(10,1)  &
+!/MFIT                         ) THEN
+!/XSTO           CALL CALC_XSTOKES(A)
+!/MFIT         END IF
+!/MFIT       IF ( FLOLOC(10,1) ) CALL CALC_MFIT()
 !/XSTO!        
       IF (FLOLOC( 6, 8)) THEN
         CALL CALC_U3STOKES(A,1)
@@ -2853,7 +2876,8 @@
                 IF ( FLOGRD( 6, 11) ) PHICE(ISEA) = UNDEF
                 IF ( FLOGRD( 6, 12) ) USSP(ISEA,:) = UNDEF
 !/XSTO                IF ( FLOGRD( 6, 13) ) UXSP(ISEA,:) = UNDEF
-!
+!/MFIT                IF ( FLOGRD( 10, 1) .AND. .NOT. FLOGRD( 6, 13) )  &
+!/MFIT                                      UXSP(ISEA,:) = UNDEF
                 IF ( FLOGRD( 7, 1) ) THEN
                                      ABA   (ISEA) = UNDEF
                                      ABD   (ISEA) = UNDEF
@@ -2920,6 +2944,8 @@
 !/XSTO          ! NZO is required for use in W3DIMA and W3DIMX
 !/XSTO          IF ( FLOGRD(6,13) .AND. .NOT. NZO == XSND ) &
 !/XSTO             WRITE (NDSE,*) 'ERROR: NZO=',NZO,' should be equal to ',XSND
+!/MFIT          IF ( FLOGRD(10,1) .AND. .NOT.FLOGRD(6,13) .AND. .NOT.NZO==1 ) &
+!/MFIT             WRITE (NDSE,*) 'ERROR: NZO=',NZO,' should be equal to 1'
           IF (.NOT.DINIT) CALL W3DIMW ( IGRD, NDSE, NDST, .TRUE. )
           IF (.NOT.AINIT) CALL W3DIMA ( IGRD, NDSE, NDST, .TRUE. )
         END IF
@@ -3215,7 +3241,14 @@
 !     Section 10)
 !
                   ELSE IF ( IFI .EQ. 10 ) THEN
+!/MFIT              IF ( IFJ .EQ. 1 ) THEN
+!/MFIT                WRITE ( NDSOG ) USERO(1:NSEA,1:6)
+!/MFIT                IF ( .NOT. FLOGRD(6,13) ) WRITE ( NDSOG ) UXSP(1:NSEA,1:5)
+!/MFIT                ! Only the integral and surface variables
+!/MFIT                ! We presume that UXSP(:,3+2*NZO) point to XUXSP(:,5)
+!/MFIT              ELSE
                     WRITE ( NDSOG ) USERO(1:NSEA,IFJ)
+!/MFIT              END IF
 !
                   END IF
 !
@@ -3534,8 +3567,16 @@
 !     Section 10)
 !
                   ELSE IF ( IFI .EQ. 10 ) THEN
+!/MFIT                    IF ( IFJ .EQ. 1 ) THEN
+!/MFIT                      READ ( NDSOG,END=801,ERR=802,IOSTAT=IERR)      &
+!/MFIT                                                        USERO(1:NSEA,1:6)
+!/MFIT                      IF ( .NOT. FLOGRD(6,13) )                      &
+!/MFIT                        READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)     &
+!/MFIT                                                        UXSP(1:NSEA,1:5)
+!/MFIT                    ELSE
                     READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)         &
                                                       USERO(1:NSEA,IFJ)
+!/MFIT                      END IF
                   END IF
 !
 ! End of test on WRITE/READ:
