@@ -103,8 +103,8 @@
 !/    20-Jun-2018 : Update of ST6  (Q. Liu)             ( version 6.06 )
 !/    26-Aug-2018 : UOST (Mentaschi et al. 2015, 2018)  ( version 6.06 )
 !/    27-Aug-2018 : Add WBT parameter                   ( version 6.06 )
-!/    09-Mar-2020 : Namelist group for extended tail Stokes 
-!/                  profile of Joint GEOMETOC Denmark   ( version 7.?? )
+!/    09-Mar-2020 : Namelist group for extended tail    ( version 7.?? ) 
+!/                  Stokes profile of GEOMETOC Support Denmark
 !/
 !/    Copyright 2009-2013 National Weather Service (NWS),
 !/       National Oceanic and Atmospheric Administration.  All rights
