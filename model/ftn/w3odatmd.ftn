@@ -43,6 +43,8 @@
 !/    27-Jul-2018 : Added PTMETH and PTFCUT variables   ( version 6.05 )
 !/                  for alternative partition methods.
 !/                  (C. Bunney, UKMO)
+!/    09-Mar-2020 : Stokes drift profile for extended   ( version 7.?? )
+!/                  spectral tail (C. Hansen, GEOMETOC Denmark)
 !/
 !/    Copyright 2009-2012 National Weather Service (NWS),
 !/       National Oceanic and Atmospheric Administration.  All rights
@@ -128,6 +130,8 @@
 !      OUT6      TYPE  Public   Data structure of type OTYPE6 with
 !                               suppl. data for output type 6.
 !      OFILES   I.A.  Public   Output in one or several files.
+!/XSTO!      XSVB      Int.  Public   Verboseness of CALC_XSTOKES()
+!/XSTO!      NZO       Int.  Public   Number of output profile depths
 !     ----------------------------------------------------------------
 !
 !     Elements of OUT1 are aliased to pointers with the same
@@ -404,6 +408,7 @@
                                  TBPI0(2), TBPIN(2), NDS(13), OFILES(7)
         REAL                  :: DTOUT(8)
         LOGICAL               :: FLOUT(8)
+!/XSTO  INTEGER               :: XSVB, NZO
         TYPE(OTYPE1)          :: OUT1
         TYPE(OTYPE2)          :: OUT2
         TYPE(OTYPE3)          :: OUT3
@@ -428,6 +433,8 @@
       INTEGER, POINTER        :: OFILES(:)
       REAL, POINTER           :: DTOUT(:)
       LOGICAL, POINTER        :: FLOUT(:)
+!/XSTO  INTEGER, POINTER               :: XSVB
+!/XSTO  INTEGER, POINTER               :: NZO
 !/
 !/ Data aliasses for substructures for output types
 !/ Type 1 ...
@@ -620,6 +627,8 @@
 !
         OUTPTS(I)%NOSWLL = -1
 !
+!/XSTO        OUTPTS(I)%XSVB = 1
+!/XSTO        OUTPTS(I)%NZO = -1
         OUTPTS(I)%TBPI0 = (-1,0)
         OUTPTS(I)%TBPIN = (-1,0)
 !
@@ -758,6 +767,7 @@
 ! 6) Wave-ocean layer
 !
       NOGE(6) = 12 
+!/XSTO      NOGE(6) = 13
 !
       IDOUT( 6, 1)  = 'Radiation stresses  '
       IDOUT( 6, 2)  = 'Wave-ocean mom. flux'
@@ -771,6 +781,7 @@
       IDOUT( 6,10)  = 'Wave-ice mom. flux  '
       IDOUT( 6,11)  = 'Wave-ice energy flux'
       IDOUT( 6,12)  = 'Split Surface Stokes'
+!/XSTO      IDOUT( 6,13)  = 'Stokes drift profile'
 !
 ! 7) Wave-bottom layer
 !
@@ -1451,7 +1462,7 @@
 !/ Local parameters
 !/
       INTEGER                 :: NLOW
-      INTEGER                 :: J
+!      INTEGER                 :: J
 !/S      INTEGER, SAVE           :: IENT = 0
 !/
 !/S      CALL STRACE (IENT, 'W3SETO')
@@ -1499,6 +1510,9 @@
       NAPPRT => OUTPTS(IMOD)%NAPPRT
 !
       NOSWLL => OUTPTS(IMOD)%NOSWLL
+!
+!/XSTO     XSVB  => OUTPTS(IMOD)%XSVB
+!/XSTO     NZO  => OUTPTS(IMOD)%NZO
 !
       TOFRST => OUTPTS(IMOD)%TOFRST
       TONEXT => OUTPTS(IMOD)%TONEXT

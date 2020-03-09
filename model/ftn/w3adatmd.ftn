@@ -160,6 +160,8 @@
 !      CFLTHMAX  R.A.  Public   Max. CFL number for refraction.
 !      CFLKMAX   R.A.  Public   Max. CFL number for wavenumber shift.
 !
+!      UXSP      R.A.  Public   EXtended Spectrum Stokes drift Profile /XSTO
+!
 !    Old parameters not yet in new structure ...
 !
 !      FP1       R.A.  Public   Wind sea peak frequency. (parked in 2)
@@ -417,6 +419,11 @@
                                  XUSSY(:), XPRMS(:), XTPMS(:),        &
                                  XPHICE(:), XTAUICE(:,:)
         REAL, POINTER         :: XP2SMS(:,:), XUS3D(:,:), XUSSP(:,:)
+!/XSTO
+!/XSTO! UXSP(1,1) will always exist
+        REAL, POINTER         ::  UXSP(:,:)
+!/XSTO! XUXSP(1,1) will always exist
+        REAL, POINTER         ::  XUXSP(:,:)
 !
 ! Output fields group 7)
 !
@@ -505,6 +512,9 @@
         INTEGER               :: ITIME, IPASS, IDLAST, NSEALM
         REAL, POINTER         :: ALPHA(:,:)
         LOGICAL               :: AINIT, AINIT2, FL_ALL, FLCOLD, FLIWND
+!
+!/XSTO       REAL                  :: M_X, M_Y, K_S
+!/XSTO       REAL, POINTER         :: U_S(:), V_S(:), ZK_S(:)
 !
       END TYPE WADAT
 !/
@@ -619,7 +629,12 @@
       INTEGER, POINTER        :: ITIME, IPASS, IDLAST, NSEALM
       REAL, POINTER           :: ALPHA(:,:)
       LOGICAL, POINTER        :: AINIT, AINIT2, FL_ALL, FLCOLD, FLIWND
-
+!
+!/XSTO      REAL, POINTER           :: M_X, M_Y, K_S
+!/XSTO      REAL, POINTER           :: U_S(:), V_S(:), ZK_S(:)
+!/XSTO! UXSP(1,1) always exists
+      REAL, POINTER           :: UXSP(:,:)
+!
 !/MEMCHECK      type(MallInfo_t)        :: mallinfos
 
 !/
@@ -828,6 +843,8 @@
       USE W3GDATMD, ONLY: NGRIDS, IGRID, W3SETG, NK, NX, NY, NSEA,    &
                           NSEAL, NSPEC, NTH, E3DF, P2MSF, US3DF,      &
                           USSPF, GTYPE, UNGTYPE
+!/XSTO      USE W3GDATMD, ONLY: XSND
+!/XSTO      USE W3ODATMD, ONLY: NZO
       USE W3ODATMD, ONLY: IAPROC, NAPROC, NTPROC, NAPFLD,             &
                           NOSWLL, NOEXTR, UNDEF, FLOGRD, FLOGR2
       USE W3IDATMD, ONLY: FLCUR, FLWIND
@@ -1148,7 +1165,29 @@
       IF (  P2MSF(1).GT.0 ) WADATS(IMOD)%P2SMS  = UNDEF
       IF (  US3DF(1).GT.0 ) WADATS(IMOD)%US3D   = UNDEF
       IF (  USSPF(1).GT.0 ) WADATS(IMOD)%USSP   = UNDEF
-
+!/XSTO
+!/XSTO      IF ( NZO .GT. 0 ) THEN
+!/XSTO        WADATS(IMOD)%M_X  = UNDEF
+!/XSTO        WADATS(IMOD)%M_Y  = UNDEF
+!/XSTO        WADATS(IMOD)%K_S  = UNDEF
+!/XSTO        ALLOCATE ( WADATS(IMOD)%U_S(XSND), STAT=ISTAT )
+!/XSTO        CHECK_ALLOC_STATUS ( ISTAT )
+!/XSTO        ALLOCATE ( WADATS(IMOD)%V_S(XSND), STAT=ISTAT )
+!/XSTO        CHECK_ALLOC_STATUS ( ISTAT )
+!/XSTO        ALLOCATE ( WADATS(IMOD)%ZK_S(XSND), STAT=ISTAT )
+!/XSTO        CHECK_ALLOC_STATUS ( ISTAT )
+!/XSTO        ALLOCATE ( WADATS(IMOD)%UXSP(NSEALM,3+XSND*2), STAT=ISTAT )
+!/XSTO        CHECK_ALLOC_STATUS ( ISTAT )
+!/XSTO        WADATS(IMOD)%U_S     = UNDEF
+!/XSTO        WADATS(IMOD)%V_S     = UNDEF
+!/XSTO        WADATS(IMOD)%ZK_S  = UNDEF
+!/XSTO        WADATS(IMOD)%UXSP    = UNDEF
+!/XSTO      ELSE
+        ALLOCATE ( WADATS(IMOD)%UXSP(1,1), STAT=ISTAT )
+        CHECK_ALLOC_STATUS ( ISTAT )
+        WADATS(IMOD)%UXSP    = UNDEF
+!/XSTO        END IF
+!
 !/MEMCHECK       WRITE(740+IAPROC,*) 'memcheck_____:', 'W3DIMA 6'
 !/MEMCHECK       call getMallocInfo(mallinfos)
 !/MEMCHECK       call printMallInfo(IAPROC,mallInfos)
@@ -1424,6 +1463,8 @@
       USE W3GDATMD, ONLY: NGRIDS, IGRID, W3SETG, NK, NX, NY, NSEA,    &
                           NSEAL, NSPEC, NTH, E3DF, P2MSF, US3DF,      &
                           USSPF, GTYPE, UNGTYPE
+!/XSTO      USE W3GDATMD, ONLY: XSND
+!/XSTO      USE W3ODATMD, ONLY: NZO
       USE W3ODATMD, ONLY: IAPROC, NAPROC, NTPROC, NAPFLD,             &
                           NOSWLL, NOEXTR, UNDEF, FLOGRD, FLOGR2,      &
                           NOGRP, NGRPP
@@ -2030,7 +2071,17 @@
           ALLOCATE ( WADATS(IMOD)%XUSSP(1,1), STAT=ISTAT )
           CHECK_ALLOC_STATUS ( ISTAT )
         END IF
-
+!/XSTO!
+!/XSTO      IF ( NZO .GT. 0 ) THEN
+!/XSTO          ALLOCATE ( WADATS(IMOD)%XUXSP(NXXX,3+2*NZO), STAT=ISTAT )
+!/XSTO          CHECK_ALLOC_STATUS ( ISTAT )
+!/XSTO        ELSE
+!/XSTO          ! XUXSP(1,1) will always exist
+          ALLOCATE ( WADATS(IMOD)%XUXSP(1,1), STAT=ISTAT )
+          CHECK_ALLOC_STATUS ( ISTAT )
+!/XSTO        END IF 
+!
+      WADATS(IMOD)%XUXSP   = UNDEF
 !
       WADATS(IMOD)%XSXX    = UNDEF
       WADATS(IMOD)%XSYY    = UNDEF
@@ -2207,15 +2258,18 @@
       WADATS(IMOD)%XCFLTHMAX = UNDEF
       WADATS(IMOD)%XCFLKMAX  = UNDEF
 !
-      DO I=1, NOEXTR
-        IF ( OUTFLAGS(10, i) ) THEN
+      ISTAT=-1
+      DO I = NOEXTR, 1, -1
+        IF ( OUTFLAGS(10, I) ) THEN
             ALLOCATE ( WADATS(IMOD)%XUSERO(NXXX,I), STAT=ISTAT )
             CHECK_ALLOC_STATUS ( ISTAT )
-          ELSE
-            ALLOCATE ( WADATS(IMOD)%XUSERO(1,I), STAT=ISTAT )
-            CHECK_ALLOC_STATUS ( ISTAT )
+            EXIT
           END IF
         END DO
+      IF ( ISTAT == -1 ) THEN
+          ALLOCATE ( WADATS(IMOD)%XUSERO(1,1), STAT=ISTAT )
+          CHECK_ALLOC_STATUS ( ISTAT )
+        END IF
 !
       WADATS(IMOD)%XUSERO  = UNDEF
 !
@@ -2850,6 +2904,16 @@
 !/MPI      GSTORE => WADATS(IMOD)%GSTORE
 !/MPI      SSTORE => WADATS(IMOD)%SSTORE
 !
+!/XSTO          M_X => WADATS(IMOD)%M_X
+!/XSTO          M_Y => WADATS(IMOD)%M_Y
+!/XSTO          K_S => WADATS(IMOD)%K_S
+!
+!/XSTO          U_S => WADATS(IMOD)%U_S
+!/XSTO          V_S => WADATS(IMOD)%V_S
+!/XSTO          ZK_S => WADATS(IMOD)%ZK_S
+!/XSTO! For storage in out_grd.ww3: UXSP and XUXSP
+          UXSP => WADATS(IMOD)%UXSP
+!
       RETURN
 !
 ! Formats
@@ -3026,7 +3090,8 @@
           CFLKMAX =>  WADATS(IMOD)%XCFLKMAX
 !
           USERO  => WADATS(IMOD)%XUSERO
-!
+!/XSTO!
+          UXSP => WADATS(IMOD)%XUXSP
         END IF
 !
       RETURN

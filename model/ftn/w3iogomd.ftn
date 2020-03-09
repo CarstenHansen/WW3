@@ -55,6 +55,8 @@
 !/                  calculations. (J Dykes, NRL)
 !/    04-Oct-2019 : Optional one file per output stride ( version 7.00 )
 !/                  (Roberto Padilla-Hernandez & J.H. Alves)
+!/    06-Mar-2020 : Stokes drift with extended tail
+!/                  ( C Hansen, Joint GeoMETOC Denmark) ( version 7.?? )
 !/
 !/    Copyright 2009-2014 National Weather Service (NWS),
 !/       National Oceanic and Atmospheric Administration.  All rights
@@ -199,6 +201,8 @@
 !/ ------------------------------------------------------------------- /
       USE CONSTANTS
       USE W3GDATMD, ONLY: E3DF, P2MSF, US3DF, USSPF, STEXU, STEYU, STEDU
+!/XSTO      USE W3GDATMD, ONLY: XSND
+!/XSTO      USE W3ODATMD, ONLY: NZO
       USE W3ODATMD, ONLY: NOGRP, NGRPP
 !/S      USE W3SERVMD, ONLY: STRACE
 !
@@ -258,6 +262,19 @@
         FLGRD(6,9)=.FALSE.
         FLGR2(6,9)=.FALSE.
       END IF
+!/XSTO!  UXSP(JSEA,1:3+2*NZO) are set by CALC_XSTOKES(A) if
+!/XSTO!  NZO = XSND (for full profile)
+!/XSTO!  unless NZO is 0 (no Stokes profile output).
+!/XSTO      IF ( XSND .LE. 0 ) THEN
+!/XSTO        IF (FLGRD(6,13).OR.FLGR2(6,13)) THEN
+!/XSTO          WRITE(NDSEN,1009) 'XSP','XSTO'
+!/XSTO        END IF
+!/XSTO        FLGRD(6,13)=.FALSE.
+!/XSTO        FLGR2(6,13)=.FALSE.
+!/XSTO      END IF
+!/XSTO      ! Set NZO for use in W3DIMA and W3DIMX
+!/XSTO      NZO = 0
+!/XSTO      IF ( FLGRD(6,13) ) NZO = XSND
 !
       FLGD(3) = .FALSE.
       FLG2(3) = .FALSE.
@@ -274,6 +291,11 @@
                '     PARAMETER ',A,' not allowed: need to set',        &
                ' parameter ',A,' in OUTS namelist (in ww3_grid.inp)'   &
                ' with proper bounds' )
+!
+!/XSTO 1009 FORMAT (/' *** WAVEWATCH III WARNING  : '/                       &
+!/XSTO               '     OUTPUT FIELD ',A,' not allowed: need to set',     &
+!/XSTO               ' namelist group ',A,' (in ww3_grid.inp)'               &
+!/XSTO               ' with proper values' )
 !
       END SUBROUTINE W3FLGRDUPDT
 !/ ------------------------------------------------------------------- /
@@ -405,7 +427,7 @@
              IF ( OUT_NAMES(IFJ) .EQ. 'T' )                            &
                                FLG2D(IFI,IFJ)=.TRUE.
           ENDDO
-          IF ( IAPROC .EQ. NAPOUT .AND. IFJ .LT. NOGE(IFI) ) WRITE(NDSEN,1007) IFI
+          IF ( IAPROC .EQ. NAPOUT .AND. IFJ .LT. NOGE(IFI)) WRITE(NDSEN,1007) IFI
          ENDIF
         END DO
 !
@@ -608,6 +630,8 @@
              ELSE
                IF ( IAPROC .EQ. NAPOUT ) WRITE(NDSEN,1008) 'USP','USSP'
                END IF
+!/XSTO           CASE('XSP')
+!/XSTO             FLG2D(6,13)=.TRUE.
 !
 ! Group 7
 !
@@ -1028,7 +1052,8 @@
            ELSE
              IF ( IAPROC .EQ. NAPOUT ) WRITE(NDSEN,1008) 'USP','USSP'
              END IF
-
+!/XSTO         CASE('XSP')
+!/XSTO           FLG2D(6,13)=.TRUE.
 !
 ! Group 7
 !
@@ -1074,7 +1099,7 @@
          CASE('U1')
            FLG2D(10,1)=.TRUE.
          CASE('U2')
-           FLG2D(10,1)=.TRUE.
+           FLG2D(10,2)=.TRUE.
 !/COU           CASE('DRY')
          CASE DEFAULT
            IF ( IAPROC .EQ. NAPOUT ) WRITE (NDSEN,1004) TRIM(TESTSTR)
@@ -1151,6 +1176,8 @@
 !/    22-Aug-2018 : Add WBT parameter                   ( version 6.06 )
 !/    25-Sep-2019 : Corrected th2m and sth2m            ( version 6.07 )
 !/                  calculations. (J Dykes, NRL)
+!/    06-Mar-2020 : Stokes drift with extended tail
+!/                  ( C Hansen, Joint GeoMETOC Denmark) ( version 7.?? )
 !/
 !  1. Purpose :
 !
@@ -1241,6 +1268,11 @@
 !/S      USE W3SERVMD, ONLY: STRACE
 !
       USE W3PARALL, ONLY : INIT_GET_ISEA
+!/XSTO ! Stokes drift with extended tail
+!/XSTO ! It would be nice to be able to use double switch '!/XSTO!/MPI'
+!/XSTO ! to avoid linking w3xstomd into ww3_ounf
+!/XSTO      USE W3XSTOMD, ONLY: CALC_XSTOKES
+!
       IMPLICIT NONE
 !/
 !/ ------------------------------------------------------------------- /
@@ -1938,6 +1970,11 @@
 !
 !  Add here USERO(JSEA,1) ...
 !
+!/XSTO!  UXSP(JSEA,1:3+2*NZO) is set by CALC_XSTOKES(A), where
+!/XSTO!  NZO is either 0 (no Stokes profile output), or
+!/XSTO!  NZO = XSND (for full profile).
+!/XSTO!  CALC_XSTOKES(A) has its own loop over JSEA and thus called
+!/XSTO!  after the present loop
           END IF
         END DO
 !
@@ -2316,6 +2353,13 @@
 
         END IF
 
+!/XSTO!  Stokes drift with extended tail
+!/XSTO!  UXSP(JSEA,1:3+2*NZO) is set by CALC_XSTOKES(A), where
+!/XSTO!  NZO is either 0 (no Stokes profile output), or
+!/XSTO!  NZO = XSND (for full profile).
+!/XSTO       IF ( FLOLOC(6,13)        &
+!/XSTO            ) CALL CALC_XSTOKES(A)
+!/XSTO!        
       IF (FLOLOC( 6, 8)) THEN
         CALL CALC_U3STOKES(A,1)
       END IF
@@ -2479,6 +2523,9 @@
                           TH1M, STH1M, TH2M, STH2M, HSIG, PHICE, TAUICE,&
                           STMAXE, STMAXD, HMAXE, HCMAXE, HMAXD, HCMAXD,&
                           USSP
+!/XSTO      USE W3ADATMD, ONLY: UXSP
+!/XSTO!      USE W3GDATMD, ONLY: XSND
+!/XSTO      USE W3ODATMD, ONLY: NZO
 !/
       USE W3ODATMD, ONLY: NOGRP, NGRPP, IDOUT, UNDEF, NDST, NDSE,     &
                           FLOGRD, IPASS => IPASS1, WRITE => WRITE1,   &
@@ -2552,11 +2599,11 @@
 !
 !/T      WRITE (NDST,9000) IPASS, INXOUT, WRITE, NDSOG, IGRD, FILEXT
 !
-!
 ! open file ---------------------------------------------------------- *
 ! ( IPASS = 1 )
 !
       IF ( IPASS.EQ.1 .AND. OFILES(1) .EQ. 0) THEN
+!
           I      = LEN_TRIM(FILEXT)
           J      = LEN_TRIM(FNMPRE)
 !
@@ -2577,10 +2624,12 @@
           IF ( WRITE ) THEN
               WRITE (NDSOG)                                           &
                 IDSTR, VEROGR, GNAME, NOGRP, NGRPP, NSEA, NX, NY,     &
+!/XSTO                NZO,                                                  &
                 UNDEF, NOSWLL
             ELSE
               READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)                &
                 IDTST, VERTST, TNAME, MOGRP, MGRPP, NSEA, NX, NY,     &
+!/XSTO                NZO,                                                  &
                 UNDEF, MOSWLL
 !
               IF ( IDTST .NE. IDSTR ) THEN
@@ -2647,10 +2696,12 @@
           IF ( WRITE ) THEN
               WRITE (NDSOG)                                           &
                 IDSTR, VEROGR, GNAME, NOGRP, NGRPP, NSEA, NX, NY,     &
+!/XSTO                NZO,                                                  &
                 UNDEF, NOSWLL
             ELSE
               READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)                &
                 IDTST, VERTST, TNAME, MOGRP, MGRPP, NSEA, NX, NY,     &
+!/XSTO                NZO,                                                  &
                 UNDEF, MOSWLL
 !
               IF ( IDTST .NE. IDSTR ) THEN
@@ -2800,6 +2851,7 @@
                 IF ( FLOGRD( 6, 10) ) TAUICE(ISEA,:) = UNDEF
                 IF ( FLOGRD( 6, 11) ) PHICE(ISEA) = UNDEF
                 IF ( FLOGRD( 6, 12) ) USSP(ISEA,:) = UNDEF
+!/XSTO                IF ( FLOGRD( 6, 13) ) UXSP(ISEA,:) = UNDEF
 !
                 IF ( FLOGRD( 7, 1) ) THEN
                                      ABA   (ISEA) = UNDEF
@@ -2864,6 +2916,9 @@
             END DO
 !
         ELSE
+!/XSTO          ! NZO is required for use in W3DIMA and W3DIMX
+!/XSTO          IF ( FLOGRD(6,13) .AND. .NOT. NZO == XSND ) &
+!/XSTO             WRITE (NDSE,*) 'ERROR: NZO=',NZO,' should be equal to ',XSND
           IF (.NOT.DINIT) CALL W3DIMW ( IGRD, NDSE, NDST, .TRUE. )
           IF (.NOT.AINIT) CALL W3DIMA ( IGRD, NDSE, NDST, .TRUE. )
         END IF
@@ -3085,6 +3140,8 @@
                  ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 12 ) THEN
                     WRITE ( NDSOG ) USSP(1:NSEA,   1:USSPF(2))
                     WRITE ( NDSOG ) USSP(1:NSEA,NK+1:NK+USSPF(2))
+!/XSTO                 ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 13 ) THEN
+!/XSTO                    WRITE ( NDSOG ) UXSP(1:NSEA,1:3+XSND*2)
 !
 !     Section 7)
 !
@@ -3405,6 +3462,9 @@
                                    USSP(1:NSEA,1:USSPF(2))
                      READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)  &
                                    USSP(1:NSEA,NK+1:NK+USSPF(2))
+!/XSTO                  ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 13 ) THEN
+!/XSTO                    READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)    &
+!/XSTO                                   UXSP(1:NSEA,1:3+XSND*2)
 
 !
 !     Section 7)
@@ -3746,6 +3806,7 @@
 !
 !
 !/OMPG/!$OMP PARALLEL DO PRIVATE(JSEA,ISEA,FACTOR,KD,FKD,USSCO,MINDIFF,IB)
+
 !
          DO JSEA=1, NSEAL
 !/DIST              ISEA         = IAPROC + (JSEA-1)*NAPROC
@@ -3784,6 +3845,7 @@
                ENDDO
                MINDIFF=1.e8
                !Put spectral energey into whichever band central wavenumber fits in
+               NB=NK!allocated to size2*NK! STKBND_IN(NK)
                USSP(JSEA,Spc2Bnd(IK))    =  USSP(JSEA,Spc2Bnd(IK)) + ABX(JSEA)*USSCO
                USSP(JSEA,NK+Spc2BND(IK)) =  USSP(JSEA,NK+Spc2Bnd(IK)) + ABY(JSEA)*USSCO
             ENDIF
