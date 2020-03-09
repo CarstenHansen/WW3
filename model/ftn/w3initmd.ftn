@@ -878,7 +878,7 @@
 !/DEBUGINIT     WRITE(740+IAPROC,*) 'W3INIT, aft BLOCK_SOLVER_INIT, step 4.1'
 !/DEBUGINIT     WRITE(740+IAPROC,*) '    sum(VA)=', sum(VA)
 !/DEBUGINIT     FLUSH(740+IAPROC)
-      RSCOLD = RSTYPE.LE.1  .OR. RSTYPE.EQ.4
+      FLCOLD = RSTYPE.LE.1  .OR. RSTYPE.EQ.4
       IF ( IAPROC .EQ. NAPLOG ) THEN
           IF (RSTYPE.EQ.0) THEN
               WRITE (NDSO,930) 'cold start (idealized).'
@@ -2875,7 +2875,7 @@
 !/MPIT              WRITE (NDST,9012)
 !/MPIT              WRITE (NDST,9013) NRQGO, NRQMAX
 !
-!/MPI            END IF  !  ( IAPROC .LE. NAPROC )
+!/MPI            END IF
 !
 !/MPI          IF ( NRQGO .GT. NRQMAX ) THEN
 !/MPI              WRITE (NDSE,1010) NRQGO, NRQMAX
