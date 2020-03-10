@@ -39,11 +39,6 @@
 !/                  profile parametric fit              ( version 7.?? )
 !/    07-Oct-2019 : RTD option with standard lat-lon
 !/                  grid when nesting to rotated grid   ( version ?.?? )
-!/    15-Jan-2020 : Extend handling of 3'rd dimension   ( version 7.?? )
-!/    28-Jan-2020 : XSTO option: Stokes drift profile
-!/                  for extended spectral tail          ( version 7.?? )
-!/    28-Jan-2020 : MFIT+XSTO options: Stokes drift
-!/                  profile parametric fit              ( version 7.?? )
 !/
 !/    Copyright 2009-2013 National Weather Service (NWS),
 !/       National Oceanic and Atmospheric Administration.  All rights
