@@ -2238,9 +2238,16 @@
                      (FLLST_ALL(J) .AND. J.EQ.-1) .OR.            &
                      (FLLST_ALL(J) .AND. J.EQ.0 ) .OR.            &
                      (FLLSTI .AND. J.EQ.4) ) ) THEN
+
+!/GMOS! Changes in w3fldsmd.ftn: If an input time step was equal to the model
+!/GMOS! hotstart time, and the field is ice or water level, W3FLDG would
+!/GMOS! return TTT=TIME0. This is unwanted - check the comment in w3fldsmd.ftn:
+!/GMOS! "Exit if the time is the first time and the field is not interpolated
+!/GMOS! in time").
               TTIME  = TTT
+              
 ! notes: if model has run out beyond field input, then this line should not 
-!    be reached. 
+!    be reached.
             END IF
           END IF
 !

@@ -403,7 +403,7 @@
                ID='Stokes drift Mfit'
                TS='MFIT'
                OK='MFIT' ;;
-   esac
+    esac
 
     n_found='0'
     s_found=
