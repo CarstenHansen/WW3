@@ -2048,12 +2048,6 @@
 !
 !/MPI      NZ2=0
 !/XSTO      IF ( NZO .GT. 0 ) NZ2=3+2*NZO
-              IF ( .FALSE. ) THEN
-!/MFIT              ELSE
-             ! Code here if output of USERO(1:6)
-!/MPI             IF ( FLGRDALL(10, 2) ) FLGRDALL(10, 7) = .TRUE.
-!/MPI             IF ( FLGRDALL(10, 1) ) FLGRDALL(10, 1:6) = .TRUE.
-                END IF
 !
 !/MPI      IF ((FLOUT(1) .OR. FLOUT(7)).and.(.not. LPDLIB .or.       &
 !/MPI          (GTYPE .ne. UNGTYPE).or. .TRUE.)) THEN

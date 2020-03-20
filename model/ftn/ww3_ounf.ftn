@@ -820,6 +820,10 @@
       LOGICAL                 :: CUSTOMFRQ=.FALSE.
 !/T      LOGICAL                 :: LTEMP(NGRPP)
 
+! RTDL == False for a standard lat-lon, x-y grid. Will be set to True if the
+! grid is rotated lat-lon under switch RTD
+      LOGICAL                 :: RTDL = .FALSE.
+
 !/MFIT      REAL, ALLOCATABLE       :: M2K(:)
 !/
 !/ ------------------------------------------------------------------- /
@@ -1027,8 +1031,8 @@
             ! UNITS2='SAME'
 !
             ! NCVARTYPEI.EQ.3 means the NetCDF data type depends on the
-            ! field. Datatype real is set for a field 
-            ! (IFI,IFJ,IFP) by coding: 'IF (NCVARTYPEI.EQ.3) NCVARTYPE=4'
+            ! field. Datatype real is set for a field
+            ! (IFI,IFJ,IFX) by coding: 'IF (NCVARTYPEI.EQ.3) NCVARTYPE=4'
             ! The default data type is short integer: 
             IF (NCVARTYPEI.EQ.3) NCVARTYPE=2
 !
@@ -3030,51 +3034,6 @@
               NFP = 3 ! Number of subfields loop over IFP=1,NFP
 !
               IF ( IFP .EQ. 1 ) THEN
-                ! Vertical profile of Stokes drift
-                DIM3NAME='zk'
-                NFIELD=2
-                VARNM(1)='usvp'
-                VARNM(2)='vsvp'
-                VARNL(1)='eastward stokes drift profile'
-                VARNL(2)='northward stokes drift profile'
-                VARNS(1)='eastward_stokes_drift_profile'
-                VARNS(2)='northward_stokes_drift_profile'
-                VARNG(1)=''
-                VARNG(2)=''
-                VARNC(1)='Try piece-wise interpolation of u(Z) + jv(Z)'
-                VARNC(2)='u(Z) + jv(Z) = (u(0) + jv(0)) e^{j B zk} e^{A zk^0.5}'
-                VARND(1)=''
-                VARND(2)=''
-!/RTD                ! Override standard direction comment
-!/RTD                IF ( FLAGUNR ) THEN
-!/RTD                  VARND(1) = 'True North'
-!/RTD                  VARND(2) = 'True North'
-!/RTD                ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                  VARND(1) = 'Rotated Pole Grid North'
-!/RTD                  VARND(2) = 'Rotated Pole Grid North'
-!/RTD                END IF
-                UNITS   = 'm s-1'
-                I1F=1
-                I2F=NZO
-                DO IK = 4,NZO+3
-!/RTD                  ! Rotate x,y vector back to standard pole
-!/RTD                  IF ( FLAGUNR ) CALL W3XYRTN(NSEA, UXSP(:,IK), UXSP(:,NZO+IK), AnglD)
-                  IF( SMCGRD ) THEN
-!/SMC                    CALL W3S2XY_SMC( UXSP(:,IK), XX )
-!/SMC                    CALL W3S2XY_SMC( UXSP(:,NZO+IK), XY )
-                  ELSE
-                    CALL W3S2XY ( NSEA, NSEA, NX+1,NY,UXSP(:,IK), MAPSF, XX )
-                    CALL W3S2XY ( NSEA, NSEA, NX+1,NY,UXSP(:,NZO+IK), MAPSF, XY )
-                  ENDIF ! SMCGRD
-                  XXK(:,:,IK-3)=XX
-                  XYK(:,:,IK-3)=XY
-                END DO
-                FSC    = 0.0001
-                ENAME  = '.svp'
-                VMIN = -30000 
-                VMAX =  30000
-!
-              ELSE IF ( IFP .EQ. 2 ) THEN
                 ! 'Wavenumber of the zero-upcrossing period'
                 ! For an XSTO spectral tail
                 FSC    = 0.01
@@ -3095,7 +3054,7 @@
                 VMIN = 0 
                 VMAX = 30000              
 !
-              ELSE IF ( IFP .EQ. 3 ) THEN
+              ELSE IF ( IFP .EQ. 2 ) THEN
                 ! Vertically integrated Stokes drift == wave pseudo momentum
                 ! This variable is nearly the same as TUS, the
                 ! 'Stokes transport', but for the XSTO extended tail
@@ -3152,10 +3111,56 @@
 !/RTD                IF ( FLAGUNR ) THEN
 !/RTD                  VARND(1) = 'True North'
 !/RTD                  VARND(2) = 'True North'
-!/RTD                ELSE IF ( .NOT. FLAGUNR ) THEN
+!/RTD                ELSE IF ( RTDL ) THEN
 !/RTD                  VARND(1) = 'Rotated Pole Grid North'
 !/RTD                  VARND(2) = 'Rotated Pole Grid North'
 !/RTD                END IF
+!
+              ELSE IF ( IFP .EQ. 3 ) THEN
+                ! Vertical profile of Stokes drift
+                DIM3NAME='zk'
+                NFIELD=2
+                VARNM(1)='usvp'
+                VARNM(2)='vsvp'
+                VARNL(1)='eastward stokes drift profile'
+                VARNL(2)='northward stokes drift profile'
+                VARNS(1)='eastward_stokes_drift_profile'
+                VARNS(2)='northward_stokes_drift_profile'
+                VARNG(1)=''
+                VARNG(2)=''
+                VARNC(1)='Try piece-wise interpolation of u(Z) + jv(Z)'
+                VARNC(2)='u(Z) + jv(Z) = (u(0) + jv(0)) e^{j B zk} e^{A zk^0.5}'
+                VARND(1)=''
+                VARND(2)=''
+!/RTD                ! Override standard direction comment
+!/RTD                IF ( FLAGUNR ) THEN
+!/RTD                  VARND(1) = 'True North'
+!/RTD                  VARND(2) = 'True North'
+!/RTD                ELSE IF ( RTDL ) THEN
+!/RTD                  VARND(1) = 'Rotated Pole Grid North'
+!/RTD                  VARND(2) = 'Rotated Pole Grid North'
+!/RTD                END IF
+                UNITS   = 'm s-1'
+                I1F=1
+                I2F=NZO
+                DO IK = 4,NZO+3
+!/RTD                  ! Rotate x,y vector back to standard pole
+!/RTD                  IF ( FLAGUNR ) CALL W3XYRTN(NSEA, UXSP(:,IK), UXSP(:,NZO+IK), AnglD)
+                  IF( SMCGRD ) THEN
+!/SMC                    CALL W3S2XY_SMC( UXSP(:,IK), XX )
+!/SMC                    CALL W3S2XY_SMC( UXSP(:,NZO+IK), XY )
+                  ELSE
+                    CALL W3S2XY ( NSEA, NSEA, NX+1,NY,UXSP(:,IK), MAPSF, XX )
+                    CALL W3S2XY ( NSEA, NSEA, NX+1,NY,UXSP(:,NZO+IK), MAPSF, XY )
+                  ENDIF ! SMCGRD
+                  XXK(:,:,IK-3)=XX
+                  XYK(:,:,IK-3)=XY
+                END DO
+                FSC    = 0.0001
+                ENAME  = '.svp'
+                VMIN = -30000 
+                VMAX =  30000
+!
                 END IF ! IFP .EQ. 3
               END IF ! .FALSE. unless switch XSTO
 !
