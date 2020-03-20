@@ -105,8 +105,6 @@
 !/    27-Aug-2018 : Add WBT parameter                   ( version 6.06 )
 !/    07-Oct-2019 : RTD output b. c. from standard or
 !/                  rotated to rotated grid (C. Hansen) ( version 6.?? )
-!/    09-Mar-2020 : Namelist group for extended tail Stokes 
-!/                  profile of Joint GEOMETOC Denmark   ( version 7.?? )
 !/    09-Mar-2020 : Namelist group for extended tail    ( version 7.?? ) 
 !/                  Stokes profile of GEOMETOC Support Denmark
 !/
