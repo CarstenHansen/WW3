@@ -189,19 +189,18 @@
 !/MFIT!  FCOO Stokes drift parametric fit ('MFIT') NetCDF variable names
 !/MFIT!      
 !/MFIT      character(len=3), dimension(6) :: MFIT_varname = &
-!/MFIT              (/ "S0N", "SdN", "AM ", "PM ", "AMd", "SIC" /)
+!/MFIT              (/ "S0 ", "Sd ", "AM ", "PM ", "AMd", "SIC" /)
 !/MFIT!
 !/MFIT      character(len=39), dimension(6) :: MFIT_longname = &
-!/MFIT              (/ "Surface Stokes-drift / (2 K M)         ", &
-!/MFIT                 "Deep part Stokes-drift / (2 K M)       ", &
+!/MFIT              (/ "Surface Stokes-drift / abs(MK)         ", &
+!/MFIT                 "Deep part Stokes-drift / abs(MK)       ", &
 !/MFIT                 "MFIT parameter AM                      ", &
 !/MFIT                 "MFIT parameter PM                      ", &
 !/MFIT                 "MFIT parameter AMd                     ", &
 !/MFIT                 "Quality measure ITSIC                  "/)
 !/MFIT!
-! !/MFIT      character (len=4), dimension(6) :: MFIT_units = &
-! !/MFIT              (/'m/s ','m/s ','1   ','1   ','1   ','1   '/)
-!/MFIT!
+!/MFIT      LOGICAL                 :: SVP=.TRUE.
+!/MFIT      character(len=10)       :: cmt_PMd = 'PMd = 0.40'
 !/
 !/ ------------------------------------------------------------------- /
 !/
@@ -386,6 +385,12 @@
           END IF
         END DO
       END DO
+
+!/MFIT      ! Write UXSP(1:3) to netCDF if not the full profile is to be written
+!/MFIT      IF ( FLG2D(10,1) .AND. .NOT. FLG2D(6,13) ) THEN
+!/MFIT        SVP=.False.
+!/MFIT        FLG2D(6,13) = .TRUE.
+!/MFIT      END IF
 
 
 ! 4.3 Output type
@@ -3043,6 +3048,7 @@
 !/XSTO              ELSE
               ! The three subfields (NFP=3) are joined in the netCDF file
               NFP = 3 ! Number of subfields loop over IFP=1,NFP
+!/MFIT        IF (.NOT. SVP) NFP = 2 ! Write only UXSP(:,1:3), not the profile
 !
               IF ( IFP .EQ. 1 ) THEN
                 ! 'Wavenumber of the zero-upcrossing period'
@@ -3057,10 +3063,13 @@
                 ENDIF ! SMCGRD
                 NFIELD=1
                 VARNM(1)='ksc'
+!/MFIT          VARNM(1)='Kz'
                 VARNL(1)='Wavenumber of zero-upcross'
+!/MFIT          VARNL(1)='Wavenumber of zero-upcrossing frequency'
                 VARNS(1)=''
                 VARNG(1)=''
                 VARNC(1)='Profile depths Z = zk / ksc'
+!/MFIT          VARNC(1)='Profile depths Z = zk / Kz'
                 VARND(1)=''
                 VMIN = 0 
                 VMAX = 30000              
@@ -3104,11 +3113,11 @@
 !/MFIT                  FSC    = 0.0003
 !/MFIT                  VMIN = -30000 
 !/MFIT                  VMAX =  30000
-!/MFIT                  VARNM(1)='uxsm2k'
-!/MFIT                  VARNM(2)='vxsm2k'
-!/MFIT                  UNITS  = 'm s-1'
-!/MFIT                  VARNL(1)='eastward wave pseudo momentum * 2 K'
-!/MFIT                  VARNL(2)='northward wave pseudo momentum * 2 K'
+!/MFIT                  VARNM(1)='MKX'
+!/MFIT                  VARNM(2)='MKY'
+!/MFIT                  UNITS  = 'm/s'
+!/MFIT                  VARNL(1)='Eastward wave pseudo-momentum * 2 * Kz'
+!/MFIT                  VARNL(2)='Northward wave pseudo-momentum * 2 * Kz'
 !/MFIT                  VARNS(1)=''
 !/MFIT                  VARNS(2)=''
 !/MFIT                END IF
@@ -3116,6 +3125,8 @@
                 VARNG(2)=''
                 VARNC(1)='K = ksc'
                 VARNC(2)='K = ksc'
+!/MFIT                VARNC(1)=''
+!/MFIT                VARNC(2)=''
                 VARND(1)=''
                 VARND(2)=''
 !/RTD                ! Override standard direction comment
@@ -3580,21 +3591,21 @@
 !/MFIT              WRITE (ENAME,'(A2,I2.2)') '.f', IFP
 !/MFIT!
 !/MFIT!  These have been declared in the module header:
-!/MFIT!  MFIT_varname(1:6) = (/"S0N","SdN","AM ","PM ","AMd", "SIC"/)
+!/MFIT!  MFIT_varname(1:6) = (/"S0 ","Sd ","AM ","PM ","AMd", "SIC"/)
 !/MFIT!  MFIT_longname(1:6) = ( ... )
 !/MFIT!              
 !/MFIT              IF ( IFP .LE. 2 ) THEN
-!/MFIT                ! 2D Vectors "S0N", "SdN"
+!/MFIT                ! 2D Vectors "S0", "Sd"
 !/MFIT                NFIELD=2
                 IF ( .FALSE. ) THEN
 !/MFIT                ELSE
 !                 ! Code here will be run under switch /MFIT
 !/RTD                  IF ( FLAGUNR ) THEN
 !/RTD                    ! Rotate x,y vector back to standard pole
-!/RTD                    ! Upper MFIT "S0N"
+!/RTD                    ! Upper MFIT "S0"
 !/RTD                    IF ( IFP .EQ. 1 ) &
 !/RTD                      CALL W3XYRTN(NSEA, UXSP(:,4), UXSP(:,4+NZO), AnglD)
-!/RTD                    ! Deep MFIT "SdN"
+!/RTD                    ! Deep MFIT "Sd"
 !/RTD                    IF ( IFP .EQ. 2 ) &
 !/RTD                      CALL W3XYRTN(NSEA, USERO(:,1), USERO(:,2), AnglD)
 !/RTD                  END IF
@@ -3612,12 +3623,16 @@
 !/MFIT                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY,                   &
 !/MFIT                                UXSP(:,4+NZO)/M2K(:), MAPSF, XY )
 !/MFIT                  deallocate ( M2K )
+!/MFIT                varnc(1)='U_S(Z) = Up(Z) + Ud(Z); U_S(0) = S0 * abs(MK)'
+!/MFIT                varnc(2)='Up(Z) = Up(0) exp( -AM (Z Kz)^PM )'
 !/MFIT                ELSE
-!/MFIT                  ! "SdN": Deep fit "Sd" already normalized by abs(M2K)
+!/MFIT                  ! "Sd": Deep fit "Sd" already normalized by abs(M2K)
 !/MFIT                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,1),      &
 !/MFIT                                                           MAPSF, XX )
 !/MFIT                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,2),       &
 !/MFIT                                                           MAPSF, XY )
+!/MFIT                  varnc(1)='Ud(Z) = Ud(0) exp( -AMd (Z Kz)^PMd ); '//cmt_PMd
+!/MFIT                  varnc(2)='Ud(0) = Sd * abs(MK)'
 !/MFIT                END IF                      
 !/MFIT!              
 !/MFIT                varnm(1) = trim(MFIT_varname(IFP))//'X'
@@ -3626,8 +3641,6 @@
 !/MFIT                varnl(2) = 'Northward '//trim(MFIT_longname(IFP))
 !/MFIT                varng(2)=''
 !/MFIT                varns(2)=''
-!/MFIT                varnc(1)=trim(MFIT_varname(IFP))//' = U_S(0)/(2 K M)'
-!/MFIT                varnc(2)='2 K M = 2*ksc*abs(xsm)'
                 IF ( .FALSE. ) THEN
 !/MFIT                ELSE
 !                    ! Code here under combined switches /MFIT and /RTD
@@ -3635,7 +3648,7 @@
 !/RTD                IF ( FLAGUNR ) THEN
 !/RTD                  VARND(1) = 'True North'
 !/RTD                  VARND(2) = 'True North'
-!/RTD                ELSE IF ( .NOT. FLAGUNR ) THEN
+!/RTD                ELSE IF ( RTDL ) THEN
 !/RTD                  VARND(1) = 'Rotated Pole Grid North'
 !/RTD                  VARND(2) = 'Rotated Pole Grid North'
 !/RTD                END IF
