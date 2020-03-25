@@ -299,6 +299,7 @@
 !     !/S      Enable subroutine tracing.
 !     !/T      Enable test output
 !     !/MFIT   Extended tail Stokes drift (XSTO) with parameter fit  
+!     !/BD     A 2'nd boundary exists (CHA at Danish GEOMETOC 20181005)
 !
 !  7. Source code :
 !
@@ -376,6 +377,8 @@
       TYPE OTYPE5
         INTEGER               :: NBI, NBI2, NFBPO, NBO(0:9),          &
                                  NBO2(0:9), NDSL(9), NKI, NTHI
+!/BD! Number of spectra in 2'nd boundary file:
+!/BD        INTEGER               :: NBI2B
 !/MPI        INTEGER               :: NRQBP = 0, NRQBP2 = 0
         INTEGER, POINTER      :: IPBPI(:,:), ISBPI(:),                &
                                  IPBPO(:,:), ISBPO(:)
@@ -403,6 +406,8 @@
 !/
       TYPE OUTPUT
         INTEGER               :: NDSO, NDSE, NDST, SCREEN
+!/BD! 2'nd boundary exists, NDSC: file identifier for read
+!/BD        INTEGER               :: NDSC
         INTEGER               :: NTPROC, NAPROC, IAPROC, NAPLOG,      &
                                  NAPOUT, NAPERR, NAPFLD, NAPPNT,      &
                                  NAPTRK, NAPRST, NAPBPT, NAPPRT
@@ -427,6 +432,8 @@
 !/ Data aliasses for structure OUTPUT
 !/
       INTEGER, POINTER        :: NDSO, NDSE, NDST, SCREEN
+!/BD! 2'nd boundary exists, NDSC: file identifier for read
+!/BD      INTEGER, POINTER        :: NDSC
       INTEGER, POINTER        :: NTPROC, NAPROC, IAPROC, NAPLOG,      &
                                  NAPOUT, NAPERR, NAPFLD, NAPPNT,      &
                                  NAPTRK, NAPRST, NAPBPT, NAPPRT
@@ -484,6 +491,8 @@
 !/ Type 5 ...
 !/
       INTEGER, POINTER        :: NBI, NBI2, NFBPO, NKI, NTHI
+!/BD! Number of spectra in 2'nd boundary file:
+!/BD      INTEGER, POINTER        :: NBI2B
       INTEGER, POINTER        :: NBO(:), NBO2(:), NDSL(:)
 !/MPI      INTEGER, POINTER        :: NRQBP, NRQBP2
       INTEGER, POINTER        :: IPBPI(:,:), ISBPI(:),                &
@@ -615,6 +624,8 @@
         OUTPTS(I)%NDSO   = 6
         OUTPTS(I)%NDSE   = 6
         OUTPTS(I)%NDST   = 6
+!/BD! 2'nd boundary exists, NDSC: file identifier for read
+!/BD        OUTPTS(I)%NDSC   = 0
         OUTPTS(I)%SCREEN = 6
 !
         OUTPTS(I)%NTPROC = 1
@@ -1454,6 +1465,7 @@
 !     !/MPI  MPI specific calls.
 !     !/S    Enable subroutine tracing.
 !     !/T    Enable test output
+!     !/BD   A 2'nd boundary exists (Danish GEOMETOC)
 !
 ! 10. Source code :
 !
@@ -1534,6 +1546,8 @@
       NDS    => OUTPTS(IMOD)%NDS
       OFILES => OUTPTS(IMOD)%OFILES
 !
+!/BD      NDSC   => OUTPTS(IMOD)%NDSC
+!
       DTOUT  => OUTPTS(IMOD)%DTOUT
       FLOUT  => OUTPTS(IMOD)%FLOUT
 !
@@ -1609,6 +1623,7 @@
 !
       NBI    => OUTPTS(IMOD)%OUT5%NBI
       NBI2   => OUTPTS(IMOD)%OUT5%NBI2
+!/BD      NBI2B   => OUTPTS(IMOD)%OUT5%NBI2B
       NFBPO  => OUTPTS(IMOD)%OUT5%NFBPO
 !/MPI      NRQBP  => OUTPTS(IMOD)%OUT5%NRQBP
 !/MPI      NRQBP2 => OUTPTS(IMOD)%OUT5%NRQBP2
