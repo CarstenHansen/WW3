@@ -1,5 +1,5 @@
 $ -------------------------------------------------------------------- $
-$ WAVEWATCH III shel input file                                        $
+$ WAVEWATCH III shell input file                                       $
 $ -------------------------------------------------------------------- $
 $ Define input to be used with F/T/C flag for use or nor or coupling and
 $ T/F flag for definition as a homogeneous field.
@@ -16,7 +16,7 @@ $   F F     Mud parameter 3
    F F     Water levels
    F F     Currents
    T F     Winds
-   F       Ice concentrations
+   T       Ice concentrations
    F       Assimilation data : Mean parameters
    F       Assimilation data : 1-D spectra
    F       Assimilation data : 2-D spectra
@@ -24,14 +24,11 @@ $
 $ Time frame of calculations ----------------------------------------- $
 $ - Starting time in yyyymmdd hhmmss format.
 $ - Ending time in yyyymmdd hhmmss format.
-$
-$   19680606 000000
-$   19680606 060000
-$
+$ 
    __SIMSTART__
    __SIMSTOP__
 $
-$ Define output data ------------ ------------------------------------- $
+$ Define output data ------------------------------------------------- $
 $
 $ Define output server mode. This is used only in the parallel version
 $ of the model. To keep the input file consistent, it is always needed.
@@ -123,9 +120,9 @@ $        2                          Standard mean wave Parameters
 $   -------------------------------------------------
 $  T  T  2     1   HS         HS    Wave height.
 $  T  T  2     2   WLM        LM    Mean wave length.
-$  T  T  2     3   T02        T02   Mean wave period (Tm0,2).
+$  T  T  2     3   T02        T02   Mean wave period (Tm02).
 $  T  T  2     4   T0M1       T0M1  Mean wave period (Tm0,-1).
-$  T  T  2     5   T01        T01   Mean wave period (Tm0,1).
+$  T  T  2     5   T01        T01   Mean wave period (Tm01).
 $  T  T  2     6   FP0        FP    Peak frequency.
 $  T  T  2     7   THM        DIR   Mean wave direction.
 $  T  T  2     8   THS        SPR   Mean directional spread.
@@ -137,7 +134,6 @@ $  T  T  2    13   HMAXE      MXH   Max wave height (STE)
 $  T  T  2    14   HCMAXE     MXHC  Max wave height from crest (STE)
 $  T  T  2    15   HMAXD      SDMH  St Dev of MXC (STE)
 $  T  T  2    16   HCMAXD     SDMHC St Dev of MXHC (STE)
-$  F  T  2    17   WBT        WBT   Dominant wave breaking probability bT
 $   -------------------------------------------------
 $        3                          Spectral Parameters (first 5)
 $   -------------------------------------------------
@@ -156,17 +152,8 @@ $  T  T  4     3   PLP        PLP   Partitioned peak wave length.
 $  T  T  4     4   PDIR       PDIR  Partitioned mean direction.
 $  T  T  4     5   PSI        PSPR  Partitioned mean directional spread.
 $  T  T  4     6   PWS        PWS   Partitioned wind sea fraction.
-$  T  T  4     7   PTHP0      PDP   Peak wave direction of partition.
-$  T  T  4     8   PQP        PQP   Goda peakdedness parameter of partition.
-$  T  T  4     9   PPE        PPE   JONSWAP peak enhancement factor of partition.
-$  T  T  4    10   PGW        PGW   Gaussian frequency width of partition.
-$  T  T  4    11   PSW        PSW   Spectral width of partition.
-$  T  T  4    12   PTM1       PTM10 Mean wave period (m-1,0) of partition.
-$  T  T  4    13   PT1        PT01  Mean wave period (m0,1) of partition.
-$  T  T  4    14   PT2        PT02  Mean wave period (m0,2) of partition.
-$  T  T  4    15   PEP        PEP   Peak spectral density of partition.
-$  T  T  4    16   PWST       TWS   Total wind sea fraction.
-$  T  T  4    17   PNR        PNR   Number of partitions.
+$  T  T  4     7   PWST       TWS   Total wind sea fraction.
+$  T  T  4     8   PNR        PNR   Number of partitions.
 $   -------------------------------------------------
 $        5                          Atmosphere-waves layer
 $   -------------------------------------------------
@@ -225,8 +212,8 @@ $  F  F  9     5   CFLKMAX    CFK   Max. CFL number for k-advection.
 $   -------------------------------------------------
 $        10                         User defined          
 $   -------------------------------------------------
-$  F  F  10    1..6           MFIT  User defined #1. (requires coding ...)
-$  F  F  10    7              U1    User defined #2. (requires coding ...)
+$  F  F  10    1              U1    User defined #1. (requires coding ...)
+$  F  F  10    2              U2    User defined #1. (requires coding ...)
 $   -------------------------------------------------
 $
 $     Section 4 consist of a set of fields, index 0 = wind sea, index
@@ -237,31 +224,28 @@ $
 $ (1) Forcing Fields
   T
 $ DPT CUR WND AST WLV ICE IBG D50 IC1 IC5
-$  T   T   T   T   T   F   F   F   F   F
-  T   F   T   F   F   F   F   F   F   F
+  T   F   T   F   F   T   F   F   F   F
 $ (2) Standard mean wave Parameters
   T
-$ CHA at GMOC 20190417 added 8 parameters HIG MXE ...
 $ HS  LM  T02 T0M1 T01 FP DIR SPR DP HIG MXE MXES MXH MXHC SDMH SDMHC WBT
-$  T   T   T   T   T   T   T   T   T   F   F   F   F   F    F    F     F
-  T   F   T   T   F   T   T   T   T   F   F   F   F   F    F    F     F
+  T   F   T   T   F   T   T   T   T  F   F   F    F   F    F    F     F
 $ (3) Frequency-dependent parameters
   F
 $ EF TH1M STH1M TH2M STH2M WN
-$  T   T   T   F   F   F
+$  F   F   F   F   F   F
 $ (4) Spectral Partition Parameters
   F
-$ PHS PTP PLP PDIR PSPR PNR PDP PQP PPE PGW PSW PTM10 PT01 PT02 PEP PWS TWS 
-$  T   T   T   T    T    T   T   T   T   T   T   T     T    T    T   T   T
+$ PHS PTP PLP PDIR PSPR PWS TWS PNR
+$  T   T   T   T   T   T   T   T
 $ (5) Atmosphere-waves layer
   F
-$ UST CHA CGE FAW TAW TWA WCC WCF WCH WCM FWS
-$  T   T   T   T   T   T   T   T   T   T   T
+$ UST CHA CGE FAW TAW TWA WCC WCF WCH WCM
+$  T   T   T   T   T   T   T   T   T   T
 $ (6) Wave-Ocean layer
   T
 $ SXY TWO BHD FOC TUS USS P2S USF P2L TWI FIC USP XSP
-$  T   T   T   T   T   T   T   F   F   F   F   T   F
   F   F   F   F   T   T   F   F   F   F   F   F   T
+$  T   T   T   T   T   T   T   F   F   F   F  F   F
 $ (7) Wave-bottom layer
   F
 $ ABR UBR BED FBB TBB
@@ -274,7 +258,7 @@ $ (9) Numerical diagnostics
   T
 $ DTD FC  CFX CFD CFK
   T   T   T   T   T
-$ (10) User defined (NOEXTR flags needed)
+$ (10) User defined (NOEXTR = 11 flags needed)
   T
 $ MFIT  U2 (for NOEXTR==6 + 1)
   T   T   T   T   T   T   F
@@ -299,77 +283,34 @@ $
     __SIMSTART__  1200  __SIMSTOP__
 $   19680606 000000    900  19680608 000000
 $
-    -1.620   49.695  '62059     ' $ 62059
-     2.000   51.240  '62170     ' $ 62170
-     2.703   51.350  'Kwintebank' $ Kwintebank
-     2.439   51.389  'Westhinder' $ Westhinder
-     3.370   51.393  'CadzanBoei' $ CadzandBoei
-     2.770   51.410  'Akkaert   ' $ Akkaert
-     3.415   51.433  'WielinNoor' $ WielingenNoord
-     3.242   51.504  'Deurlo    ' $ Deurlo
-     3.399   51.620  'DomburRass' $ DomburgerRassen
-     3.682   51.620  'Roompotslu' $ Roompotsluis
-     3.481   51.644  'Oostersc11' $ Oosterschelde11
-     3.694   51.656  'Oostersch4' $ Oosterschelde4
-     3.312   51.748  'Schouwenba' $ Schouwenbank, Schouwenbank2
-     3.617   51.769  'Brouwersha' $ Brouwershavensegat
-     3.670   51.926  'LichteiGoe' $ LichteilandGoeree1, LichteilandGoeree2
-     3.000   51.948  'EurogeuDWE' $ EurogeulDWE
-     3.276   51.999  'Europlatf2' $ Europlatform2, Europlatform3
-     3.737   52.010  'EurogeuE13' $ EurogeulE13
-     4.519   52.466  'IJgeulstr1' $ IJgeulstroompaal1
-     4.268   52.493  'IJgeul5   ' $ IJgeul5
-     4.058   52.550  'IJmuidMuni' $ IJmuidenMunitiestort, IJmuidenMunitiestort2
-     4.151   52.926  'Q1        ' $ Q1, Q11
-     4.957   52.995  'MeetPBWW11' $ MeetboeiPBW1
-     1.700   53.000  '62130     ' $ 62130
-     2.800   53.103  '62145     ' $ 62145
-     3.220   53.218  'K13a      ' $ K13a, K13a2, K13a3
-     3.633   53.267  'K141      ' $ K141
-     4.662   53.277  'WaddenEGat' $ WaddenEierlandseGat
-     5.576   53.320  'Amelande61' $ Amelander61
-     5.102   53.322  'StortemelO' $ StortemelkOost
-     4.989   53.323  'StortemelB' $ StortemelkBoei
-     5.772   53.374  'Amelande62' $ Amelander62
-     5.699   53.394  'Amelander5' $ Amelander51, Amelander52
-     1.700   53.400  '62144     ' $ 62144
-     5.636   53.425  'Amelander4' $ Amelander42
-     5.604   53.452  'Amelander3' $ Amelander31, Amelander32
-     6.760   53.470  'Uithuizer3' $ Uithuizerwad3
-     5.574   53.478  'Amelander2' $ Amelander21, Amelander22
-     5.950   53.500  'AWG       ' $ AWG
-     5.482   53.509  'Amelander1' $ Amelander11, Amelander12
-     6.165   53.529  'SchierWest' $ SchiermonnikoogWestgat
-     6.632   53.570  'MeetbRZGN1' $ MeetboeiRZGN1
-     6.167   53.596  'SchierNoor' $ SchiermonnikoogNoord
-     0.700   53.600  '62150     ' $ 62150
-     4.961   53.614  'L91       ' $ L91
-     6.518   53.617  'MeetboWEO1' $ MeetboeiWEO1
-     6.368   53.620  'MeetboWEW1' $ MeetboeiWEW1
-     1.100   53.700  '62149     ' $ 62149
-     2.800   53.800  '62146     ' $ 62146
-     2.950   53.817  'J61       ' $ J61
-     6.839   53.985  'NO1       ' $ NO1
-     0.700   54.000  '62127     ' $ 62127
-     1.100   54.000  '62165     ' $ 62165
-     8.114   54.017  'Elbe      ' $ ElbeWR
-     4.017   54.117  'F161      ' $ F161
-     7.891   54.180  'Helgoland ' $ HelgolandWR
-     7.818   54.219  'HelgolNort' $ Helgoland-NorthWR
-     4.727   54.854  'F3platform' $ F3platform
-     8.089   54.919  'Sylt      ' $ Sylt
-     3.817   55.417  'A121      ' $ A121, A122
-    11.223   58.251  'Brofjorden' $ BrofjordenWR
-     1.909   58.371  'Sleipner-A' $ Sleipner-A
-    10.932   58.488  'Vaderoarna' $ VaderoarnaWR    
-$ Old known sites:
-$ KDI:
-    8.582    57.1315 'Hanstholm '     
-    9.4105   57.577  'Hirtshals '
-    9.9622   57.607  'HirtshalsN'    
-    7.940    55.810  'Nymindegab'
-    8.230    55.350  'FanoeBugt '
-    8.060    56.470  'Fjaltring '
+$ JCOMM stations:
+   13.870    54.880 '66021_Balt'
+   14.200    54.100 '66022_Balt'
+   12.700    54.700 '66024_Balt'
+$ Near-coast stations WW3_NSBaltic 3 stations
+    8.220    54.920 'BSH05_NSea'
+    8.060    56.470 '24023_NSea'
+    1.120    53.061 '62042_NSea'
+$ End of near-coast stations WW3_NSBaltic
+$ New stations dec 2015, 26 stations:
+$ SMHI, 4 stations: 'HuvudskarO', 'Vaderoarna', 'Finngrunde', 'Knollsgrun'
+$ FIMR, 3 stations: 'HelsinkiBu', 'NorthernBa', 'BothnianSe'
+   10.267    54.500 'LTKiel    '
+   10.931    58.489 'Vaderoarna'
+   13.154    55.008 'FINO2     '
+$   17.617    57.217 'Knollsgrun'
+$ Corrected 2017-02-15
+   17.617    57.516 'Knollsgrun'
+   18.606    60.893 'Finngrunde'
+   19.160    58.936 'HuvudskarO'
+   20.233    61.800 'BothnianSe'
+   21.000    59.250 'NorthernBa'
+   24.732    59.712 'Tallinnama'
+   25.235    59.965 'HelsinkiBu'
+$ Old known sites, 5 st.:
+$ FIMR:
+   22.8500   59.5500  'Hanko     '
+   23.7667   65.2167  'Bothnian_B'
 $
 $ End of stations
 $
@@ -380,9 +321,9 @@ $          Flag for formatted input file.
 $                         The data files are track_i.ww3 and
 $                         track_o.ww3, see w3iotr.ftn for ad. doc.
 $
-$ CHA at GMOC 20190417: Step '0' means this is ignored
-   19680606 000000   0  19680606 013000
-$     T
+$   __SIMSTART__   1200   __SIMSTOP__
+   19680606 000000   1800  19680606 013000
+     T
 $
 $ Type 4 : Restart files (no additional data required).
 $                               The data file is restartN.ww3, see
@@ -401,9 +342,9 @@ $
 $ Type 6 : Separated wave field data (dummy for now).
 $          First, last step IX and IY, flag for formatted file
 $
-$ CHA at GMOC 20190417: Step '0' means this is ignored
+$ CHA at GMOS 20190417: Step '0' means this is ignored
    19680606 000000   0  20010102 000000
-$      0 999 1 0 999 1 T
+      0 999 1 0 999 1 T
 $
 $ Type 7 : Coupling. (must be fully commented if not used with switch COU)
 $          Namelist type selection is used here.
@@ -413,16 +354,14 @@ $  19680606 000000   3600  20010102 000000
 $  N
 $
 $   - Sent fields by ww3:
-$       - Ocean model : T0M1 OCHA OHS DIR BHD TWO UBR FOC TAW TUS USS LM DRY
-$       - Atmospheric model : ACHA AHS TP (or FP) FWS
-$       - Ice model : IC5 TWI
+$       - Ocean model : T0M1 OHS DIR BHD TWO UBR FOC TAW TUS USS LM DRY
+$       - Atmospheric model : CHA AHS TP (or FP)
 $
 $  CHA
 $
 $   - Received fields by ww3:
 $       - Ocean model : SSH CUR
 $       - Atmospheric model : WND
-$       - Ice model : ICE IC1 IC5
 $
 $  WND
 $
@@ -439,7 +378,7 @@ $   'LEV' 19680606 010000    1.00
 $   'CUR' 19680606 073125    2.0    25.
 $   'WND' 19680606 000000   20.    145.    2.0
 $   'MOV' 19680606 013000    4.0    25.
-    'STP'
+$   'STP'
 $
 $ -------------------------------------------------------------------- $
 $ End of input file                                                    $

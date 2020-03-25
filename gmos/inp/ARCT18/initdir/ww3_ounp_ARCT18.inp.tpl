@@ -29,7 +29,7 @@ $ flag for global attributes WW3 [0] or variable version [1-2-3-4]
 $ flag for dimensions order time,station [T] or station,time [F]
 $
  ww3.
- 6
+ 0
  3
  T 150 
  1
