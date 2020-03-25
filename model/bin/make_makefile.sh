@@ -100,7 +100,7 @@
               wind windx wcor rwind curr currx mgwind mgprop mggse \
               subsec tdyn dss0 pdif tide refrx ig rotag arctic nnt mprf \
               cou oasis agcm ogcm igcm trknc setup pdlib memck uost rstwind b4b \
-              xsto xsmf
+              xsto xsmf bd
   do
     case $type in
 #sort:mach:
@@ -408,7 +408,12 @@
                ID='Stokes drift Mfit'
                TS='MFIT'
                OK='MFIT' ;;
-    esac
+#sort:bd:
+      bd     ) TY='upto2'
+               ID='Second b.d. file for strait'
+               TS='BD'
+               OK='BD' ;;
+   esac
 
     n_found='0'
     s_found=
