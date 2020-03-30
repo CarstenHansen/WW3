@@ -174,7 +174,7 @@
 !     !/T0    Point info test output.
 !     !/T1    Wave heights at input/output points.
 !
-!     !/BD    2'nd b.c. file 'nestb.ww3' (Danish Joint GEOMETOC Support Center)
+!     !/BD    2'nd b.c. file 'nestb.ww3' (DNK GEOMETOC Support)
 !
 ! 10. Source code :
 !
@@ -205,10 +205,9 @@
                           IPBPI, ISBPI, XBPI, YBPI, RDBPI,            &
                           IPBPO, ISBPO, XBPO, YBPO, RDBPO,            &
                           ABPI0, ABPIN, ABPOS, FLBPI, FILER, FILEW,   &
-!/BD! A 2'nd boundary file for a strait region may exist, e.g. 'nestb.ww3'
-!/BD!   NDSC:  File identifier for read
-!/BD!   NBI2B: Number of spectra in 2'nd boundary file:
-!/BD                          NDSC, NDS, NBI2B,                           &
+!/BD! A 2'nd boundary file for a strait region may exist, 'nestb.ww3'.
+!/BD! Check NDS to set its file id NDSC
+!/BD                          NDS,                                        &
                           FILED, SPCONV, FNMPRE
       USE W3GSRUMD
 !
@@ -232,9 +231,16 @@
 !/
       INTEGER                 :: IFILE, IERR, I, J, IX, IY, ISEA,     &
                                  IP, ISP, NPTS, ISOUT, IS, IGRD
-!/BD! A 2'nd boundary file for a strait region may exist, e.g. 'nestb.ww3'
+!/BD!
+!/BD! A 2'nd boundary file for a strait region may exist named 'nestb.ww3'
+!/BD! Number of spectra to interpolate to from each boundary file.
 !/BD      INTEGER                 :: NBIA, NBIB
-!/BD      LOGICAL                 :: BDYB
+!/BD! NDSC: Id. of 2'nd boundary file
+!/BD! NBI2B: Number of spectra in 2'nd boundary file.
+!/BD      INTEGER, SAVE           :: NDSC, NBI2B
+!/BD      LOGICAL, SAVE           :: BDYB
+!/BD! Dimension parameters for the 2'nd b.c.
+!/BD! They must equal the parameterss for the 1'st b.c. file
 !/BD      INTEGER                 :: TIME2B(2)
 !/BD      INTEGER                 :: NKIB, NTHIB
 !/BD      REAL                    :: XFRIB, FR1IB, TH1IB
@@ -298,13 +304,11 @@
 !/BD! Check that NDSC is not in NDS(:)
 !/BD            NDSC = NDSB + 10
 !/BD            DO WHILE ( ANY( NDS == NDSC ) )
-!/BD                NDSC = NDSC + 10
+!/BD                NDSC = NDSC + 9
 !/BD                WRITE (NDST, *) '    WARNING in w3iobc: NDSC ->', NDSC
 !/BD              END DO
 !/BD            OPEN (NDSC,FILE=FNMPRE(:J)//FILEN(:6+I),FORM='UNFORMATTED', &
 !/BD                ERR=801,IOSTAT=IERR,STATUS='OLD')
-!/BD          ELSE
-!/BD            NDSC = 0
 !/BD            END IF
         END IF
 !
@@ -400,15 +404,20 @@
                    WRITE (NDSE,902) VERTST, VERBPTBC
               CALL EXTCDE ( 11 )
             END IF
-!/BD! 2'nd boundary file
-!/BD          NBIA = NBI
+!/BD!
+!/BD! If a 2'nd boundary conditions data set exists
 !/BD          IF ( BDYB ) THEN
+!/BD            NBIA = NBI
+!/BD            ! The spectra of the two b.c. data must have identical dimensions
 !/BD            READ (NDSC,ERR=803,IOSTAT=IERR)                             &
 !/BD                  IDTST, VERTST, NKIB, NTHIB, XFRIB, FR1IB, TH1IB, NBIB
+!/BD!
+!/BD/!/T          WRITE (NDST,9002) 1, NDSB, IDTST, VERTST, NBI
+!/BD!
 !/BD            IF ( NKIB .NE. NKI .OR. NTHIB .NE. NTHI .OR. XFRIB .NE. XFRI &
 !/BD                 .OR. FR1IB .NE. FR1I .OR. TH1IB .NE. TH1I ) THEN
 !/BD                IF ( IAPROC .EQ. NAPERR )                               &
-!/BD                     WRITE (NDSE,902) VERTST, VERBPTBC
+!/BD                     WRITE (NDSE,903) NKI,NTHI,XFRI,FR1I,TH1I,NKIB,NTHIB,XFRIB,FR1IB,TH1IB
 !/BD                CALL EXTCDE ( 11 )
 !/BD              END IF
 !/BD            IF ( IDTST .NE. IDSTRBC ) THEN
@@ -421,8 +430,6 @@
 !/BD                     WRITE (NDSE,902) VERTST, VERBPTBC
 !/BD                CALL EXTCDE ( 11 )
 !/BD              END IF            
-!/BD          ELSE
-!/BD            NBIB = 0
 !/BD            END IF
 !
 ! Determines if the spectrum in nest file needs to be converted 
@@ -433,27 +440,29 @@
                    ABS(TH1I-TH(1)).GT.0.01*DTH 
 !
 !/BD! 2'nd boundary file: Prepare allocation of arrays
-!/BD          NBI = NBI + NBIB
+!/BD          IF ( BDYB ) NBI = NBIA + NBIB
 !/BD! Allocation of b.c. arrays:
           CALL W3DMO5 ( IGRD, NDSE, NDST, 1 )
-!/BD/!/T          WRITE (NDST,*) 'Number of b.c. positions:', NBIA, '+', NBIB
-!/BD! NBI -> NBIA = NBI - NBIB
-!/BD            NBI = NBIA
 !
+!/BD          IF ( BDYB ) THEN         
+!/BD/!/T            WRITE (NDST,*) 'Number of b.c. positions:', NBIA, '+', NBIB
+!/BD            NBI = NBIA
+!/BD            END IF        
           READ (NDSB,ERR=803,IOSTAT=IERR)                             &
               (XBPI(I),I=1,NBI), (YBPI(I),I=1,NBI),                   &
               ((IPBPI(I,J),I=1,NBI),J=1,4),                           &
               ((RDBPI(I,J),I=1,NBI),J=1,4)
-!/BD          IF ( NBIB .NE. 0 ) THEN
+!/BD!
+!/BD          IF ( BDYB ) THEN
 !/BD            NBI = NBIA + NBIB
 !/BD            READ (NDSC,ERR=803,IOSTAT=IERR)                             &
 !/BD              (XBPI(I),I=NBIA+1,NBI), (YBPI(I),I=NBIA+1,NBI),         &
 !/BD              ((IPBPI(I,J),I=NBIA+1,NBI),J=1,4),                      &
 !/BD              ((RDBPI(I,J),I=NBIA+1,NBI),J=1,4)
+!/BD/!/T        WRITE (NDST,*) 'First boundary lon,lat index:', XBPI(1), YBPI(1)
+!/BD/!/T        WRITE (NDST,*) 'Last b.d. lon,lat index:', XBPI(NBI), YBPI(NBI)
+!/BD/!/T        WRITE (NDST,*) 'Read index and weights for outer spectra'
 !/BD            END IF
-!/BD/!/T      WRITE (NDST,*) 'First boundary lon,lat index:', XBPI(1), YBPI(1)
-!/BD/!/T      WRITE (NDST,*) 'Last b.d. lon,lat index:', XBPI(NBI), YBPI(NBI)
-!/BD/!/T      WRITE (NDST,*) 'Read index and weights for outer spectra'
 !
 !/RTD ! All boundary conditions position arrays XBPI, YBPI are defined
 !/RTD ! in standard lat/lon coordinates. If Polat = 90. (and Polon = -180.),
@@ -539,13 +548,13 @@
 !
           READ (NDSB,END=810,ERR=810) TIME2, NBI2
           BACKSPACE (NDSB)
-!/BD! 2'nd boundary file
-!/BD/!/T             WRITE (NDST,*) NBI2, 'spectra to read 1st from file', NDSB
-!/BD          IF ( NDSC .NE. 0 ) THEN
+!/BD! If 2'nd boundary file exists
+!/BD          IF ( BDYB ) THEN
+!/BD/!/T             WRITE (NDST,*) NBI2, 'spectra to read from file', NDSB
 !/BD            READ (NDSC,END=810,ERR=810) TIME2B, NBI2B
-!/BD/!/T             WRITE (NDST,*) NBI2B, 'spectra to read 1st from file', NDSC
+!/BD/!/T             WRITE (NDST,*) NBI2B, 'spectra to read from file', NDSC
 !/BD            IF ( TIME2B(1) .NE. TIME2(1) .OR. TIME2B(2) .NE. TIME2(2) ) THEN
-!/BD              write (NDSE,*) "1'st timestep mismatch between two bdy files"
+!/BD              WRITE (NDSE,*) "Time mismatch between the two bdy files"
 !/BD              CALL EXTCDE ( 20 )
 !/BD              END IF
 !/BD!
@@ -591,8 +600,10 @@
       IF ( INXOUT .EQ. 'READ'  ) THEN
           READ (NDSB,ERR=810,END=810) TIME2, NBI2
 !/T          WRITE (NDST,9011) NDSB, TIME2, NBI2
-!/BD! 2'nd boundary file
-!/BD          IF ( NDSC .NE. 0 ) THEN
+!/BD!
+!/BD          NBI2B = 0   
+!/BD! If 2'nd boundary file exists
+!/BD          IF ( BDYB ) THEN
 !/BD            READ (NDSC,END=810,ERR=810) TIME2B, NBI2B
 !/BD/!/T        WRITE (NDST,9011) NDSC, TIME2B, NBI2B
 !/BD            END IF
@@ -659,37 +670,43 @@
 !
       IF ( INXOUT .EQ. 'READ' ) THEN
 !
-!/BD/!/T! 2'nd boundary file exists (NDSC > 0)
-!/BD/!/T          if ( NDSC .GT. 0 ) WRITE (NDST,*) 'read', NBI2, &
+!/BD/!/T! If 2'nd boundary file exists
+!/BD/!/T          if ( BDYB ) WRITE (NDST,*) 'read', NBI2, &
 !/BD/!/T            'bdy spectra from file id', NDSB
           IF ( .NOT. SPCONV ) THEN
               DO IP=1, NBI2
                 READ (NDSB,ERR=803,IOSTAT=IERR) ABPIN(:,IP)
                 END DO
-!/BD! 2'nd boundary file (NDSC > 0)
-!/BD/!/T              if ( NDSC .GT. 0 ) WRITE (NDST,*) 'read', NBI2B, &
-!/BD/!/T                'bdy spectra from file id', NDSC
-!/BD              DO IP=NBI2+1, NBI2+NBI2B
-!/BD                READ (NDSC,ERR=803,IOSTAT=IERR) ABPIN(:,IP)
-!/BD                END DO
-!/BD              NBI2 = NBI2 + NBI2B
+!/BD! If 2'nd boundary exists
+!/BD              IF ( BDYB ) THEN
+!/BD/!/T            WRITE (NDST,*) 'Read', NBI2B, &
+!/BD/!/T                'bdy spectra from 2nd file id', NDSC
+!/BD                DO IP=NBI2+1, NBI2+NBI2B
+!/BD                  READ (NDSC,ERR=803,IOSTAT=IERR) ABPIN(:,IP)
+!/BD                  END DO
+!/BD                NBI2 = NBI2 + NBI2B
+!/BD                END IF
             ELSE
 !
 ! In this case the spectral resolution is not compatible and 
 ! the spectrum TMPSPC in nest file must be re-gridded into ABPIN to fit the model run
 ! spectral conversion is done by W3CSPC in w3cspcmd.ftn 
 !
+!/BD          NBI2=NBI2+NBI2B              
               ALLOCATE ( TMPSPC(NKI*NTHI,NBI2) )
+!/BD          NBI2=NBI2-NBI2B              
               DO IP=1, NBI2
                 READ (NDSB,ERR=803,IOSTAT=IERR) TMPSPC(:,IP)
                 END DO
-!/BD! 2'nd boundary file (NDSC > 0)
-!/BD/!/T              if ( NDSC .GT. 0 ) WRITE (NDST,*) 'read', NBI2B, &
+!/BD! If 2'nd boundary exists
+!/BD              IF ( BDYB ) THEN
+!/BD/!/T            WRITE (NDST,*) 'Regrid', NBI2B, &
 !/BD/!/T                 'bdy spectra from file id', NDSC
-!/BD              DO IP=NBI2+1, NBI2+NBI2B
-!/BD                READ (NDSC,ERR=803,IOSTAT=IERR) TMPSPC(:,IP)
-!/BD                END DO              
-!/BD              NBI2 = NBI2 + NBI2B
+!/BD                DO IP=NBI2+1, NBI2+NBI2B
+!/BD                  READ (NDSC,ERR=803,IOSTAT=IERR) TMPSPC(:,IP)
+!/BD                  END DO              
+!/BD                NBI2 = NBI2 + NBI2B
+!/BD                END IF
               CALL W3CSPC ( TMPSPC     ,    NKI, NTHI, XFRI, FR1I, TH1I, &
                             ABPIN(:,1:NBI2),NK,  NTH,  XFR,  FR1,  TH(1),&
                             NBI2, NDST, NDSE, FACHFE )
@@ -780,6 +797,9 @@
   902 FORMAT (/' *** WAVEWATCH III ERROR IN W3IOBC :'/                &
                '     ILLEGAL VEROGR, READ : ',A/                      &
                '                   CHECK : ',A/)
+!/BD  903 FORMAT (/' *** WAVEWATCH III ERROR IN W3IOBC :'/            &
+!/BD               '     Two bdy spectra differ, A : ',2I3,3F6.3/     &
+!/BD               '                             B : ',2I3,3F6.3/)
 !
   909 FORMAT (/' *** WAVEWATCH III ERROR IN W3IOBC :'/                &
                '     POINT',2I4,' NOT ACTIVE SEA POINT (',I1,')')
