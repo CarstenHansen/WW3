@@ -33,8 +33,8 @@
 !/    25-Sep-2018 : Add WBT parameter                   ( version 6.06 )
 !/    28-Mar-2019 : Bugfix to NBIPART check.            ( version 6.07 )
 !/    15-Jan-2020 : Extend handling of 3'rd dimension   ( version 7.?? )
-!/    28-Jan-2020 : XSTO option: Stokes drift profile
-!/                  for extended spectral tail          ( version 7.?? )
+!/    28-Jan-2020 : XSTO option: Stokes drift profile   ( version 7.?? )
+!/                  for extended spectral tail
 !/
 !/    Copyright 2009-2013 National Weather Service (NWS),
 !/       National Oceanic and Atmospheric Administration.  All rights
@@ -1010,7 +1010,7 @@
 !
             ! NCVARTYPEI.EQ.3 means the NetCDF data type depends on the
             ! field. Datatype real is set for a field
-            ! (IFI,IFJ,IFX) by coding: 'IF (NCVARTYPEI.EQ.3) NCVARTYPE=4'
+            ! (IFI,IFJ,IFP) by coding: 'IF (NCVARTYPEI.EQ.3) NCVARTYPE=4'
             ! The default data type is short integer: 
             IF (NCVARTYPEI.EQ.3) NCVARTYPE=2
 !
@@ -3014,7 +3014,17 @@
               IF ( IFP .EQ. 1 ) THEN
                 ! 'Wavenumber of the zero-upcrossing period'
                 ! For an XSTO spectral tail
-                FSC    = 0.01
+!/XSTO          ! NOTE: The magnitude of ksc spans from O(1e-2) to O(1e+1)
+!/XSTO          !       It can be scaled to a 16-bit integer only with an
+!/XSTO          !       accuracy of order O(1e-3), and a value of FSC larger
+!/XSTO          !       than about 0.0005.
+                IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
+                FSC    = 1.
+                VMIN =  0
+                VMAX =  100
+                ! FSC  = 0.0002
+                ! VMIN = 1
+                ! VMAX = 32766              
                 UNITS  = 'm-1'
                 ENAME  = '.ksc'
                 IF( SMCGRD ) THEN
@@ -3029,13 +3039,12 @@
                 VARNG(1)=''
                 VARNC(1)='Profile depths Z = zk / ksc'
                 VARND(1)=''
-                VMIN = 0 
-                VMAX = 30000              
 !
               ELSE IF ( IFP .EQ. 2 ) THEN
                 ! Vertically integrated Stokes drift == wave pseudo momentum
+                ! For an XSTO spectral tail
                 ! This variable is nearly the same as TUS, the
-                ! 'Stokes transport', but for the XSTO extended tail
+                ! 'Stokes transport', but with the XSTO extended tail
                 ENAME  = '.xsm'
 !/RTD                ! Rotate x,y vector back to standard pole
 !/RTD                IF ( FLAGUNR ) CALL W3XYRTN(NSEA, UXSP(1:NSEA,2), &
@@ -3079,6 +3088,7 @@
 !
               ELSE IF ( IFP .EQ. 3 ) THEN
                 ! Vertical profile of Stokes drift
+                ! For an XSTO spectral tail
                 DIM3NAME='zk'
                 NFIELD=2
                 VARNM(1)='usvp'
@@ -3117,7 +3127,7 @@
                   XXK(:,:,IK-3)=XX
                   XYK(:,:,IK-3)=XY
                 END DO
-                FSC    = 0.0001
+                FSC    = 1./30000.
                 ENAME  = '.svp'
                 VMIN = -30000 
                 VMAX =  30000
@@ -3615,7 +3625,7 @@
             ! separate netCDF file (similar to FLFRQ=.TRUE. when DIM3NAME=='f').
             ! If you choose FLSEP=.FALSE., the field can go to a common
             ! netCDF if mode TOGETHER is chosen by the user.
-            !  
+            !
 
             ! FLSEP: Default is .FALSE. unless it has a frequency 'f' dimension
             FLSEP = .FALSE.
@@ -3833,6 +3843,7 @@
                 DEALLOCATE(DIM3VAR)
               END IF
             END IF
+
 
 ! 2.4 Manage netCDF file id
 
