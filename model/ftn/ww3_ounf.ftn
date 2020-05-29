@@ -7,7 +7,7 @@
 !/                  |           F. Ardhuin              |
 !/                  |           M. Accensi              |
 !/                  |                        FORTRAN 90 |
-!/                  | Last update :         28-Mar-2019 |
+!/                  | Last update :         28-Jan-2020 |
 !/                  +-----------------------------------+
 !/
 !/    17-Mar-2010 : Creation                            ( version 3.14_SHOM )
@@ -33,10 +33,10 @@
 !/    25-Sep-2018 : Add WBT parameter                   ( version 6.06 )
 !/    28-Mar-2019 : Bugfix to NBIPART check.            ( version 6.07 )
 !/    15-Jan-2020 : Extend handling of 3'rd dimension   ( version 7.?? )
-!/    28-Jan-2020 : XSTO option: Stokes drift profile
-!/                  for extended spectral tail          ( version 7.?? )
-!/    28-Jan-2020 : MFIT+XSTO options: Stokes drift
-!/                  profile parametric fit              ( version 7.?? )
+!/    28-Jan-2020 : XSTO option: Stokes drift profile   ( version 7.?? )
+!/                  for extended spectral tail
+!/    28-Jan-2020 : MFIT+XSTO options: Stokes drift     ( version 7.?? )
+!/                  profile parametric fit
 !/
 !/    Copyright 2009-2013 National Weather Service (NWS),
 !/       National Oceanic and Atmospheric Administration.  All rights
@@ -187,19 +187,18 @@
 !/MFIT!  FCOO Stokes drift parametric fit ('MFIT') NetCDF variable names
 !/MFIT!      
 !/MFIT      character(len=3), dimension(6) :: MFIT_varname = &
-!/MFIT              (/ "S0N", "SdN", "AM ", "PM ", "AMd", "SIC" /)
+!/MFIT              (/ "S0 ", "Sd ", "AM ", "PM ", "AMd", "SIC" /)
 !/MFIT!
 !/MFIT      character(len=39), dimension(6) :: MFIT_longname = &
-!/MFIT              (/ "Surface Stokes-drift / (2 K M)         ", &
-!/MFIT                 "Deep part Stokes-drift / (2 K M)       ", &
+!/MFIT              (/ "Surface Stokes-drift / abs(MK)         ", &
+!/MFIT                 "Deep part Stokes-drift / abs(MK)       ", &
 !/MFIT                 "MFIT parameter AM                      ", &
 !/MFIT                 "MFIT parameter PM                      ", &
 !/MFIT                 "MFIT parameter AMd                     ", &
 !/MFIT                 "Quality measure ITSIC                  "/)
 !/MFIT!
-! !/MFIT      character (len=4), dimension(6) :: MFIT_units = &
-! !/MFIT              (/'m/s ','m/s ','1   ','1   ','1   ','1   '/)
-!/MFIT!
+!/MFIT      LOGICAL                 :: SVP=.TRUE.
+!/MFIT      character(len=10)       :: cmt_PMd = 'PMd = 0.40'
 !/
 !/ ------------------------------------------------------------------- /
 !/
@@ -384,6 +383,12 @@
           END IF
         END DO
       END DO
+
+!/MFIT      ! Write UXSP(1:3) to netCDF if not the full profile is to be written
+!/MFIT      IF ( FLG2D(10,1) .AND. .NOT. FLG2D(6,13) ) THEN
+!/MFIT        SVP=.False.
+!/MFIT        FLG2D(6,13) = .TRUE.
+!/MFIT      END IF
 
 
 ! 4.3 Output type
@@ -746,6 +751,10 @@
       USE W3GDATMD, ONLY : SIG, GTYPE, FLAGLL, MAPSTA, MAPST2
 !/T      USE W3ODATMD, ONLY : NDST
 !/XSTO      USE W3ODATMD, ONLY : NZO
+      USE W3GDATMD, ONLY : NK, UNGTYPE, MAPSF, NTRI, CLGTYPE, RLGTYPE, &
+                           XGRD, YGRD, SX, SY, X0, Y0, XYB, TRIGP, USSP_WN
+!/RTD ! Rotated pole data from the mod_def file
+!/RTD      USE W3GDATMD, ONLY : POLAT, POLON, FLAGUNR, AnglD
       USE NETCDF
       IMPLICIT NONE
 
@@ -820,17 +829,20 @@
       LOGICAL                 :: CUSTOMFRQ=.FALSE.
 !/T      LOGICAL                 :: LTEMP(NGRPP)
 
-! RTDL == False for a standard lat-lon, x-y grid. Will be set to True if the
-! grid is rotated lat-lon under switch RTD
-      LOGICAL                 :: RTDL = .FALSE.
-
 !/MFIT      REAL, ALLOCATABLE       :: M2K(:)
+
+!/RTD ! RTDL == False for a standard lat-lon grid. Will be set to True if the
+!/RTD ! grid is rotated
+!/RTD      LOGICAL                 :: RTDL = .FALSE.
 !/
 !/ ------------------------------------------------------------------- /
 !/
 !
 !/S      CALL STRACE (IENT, 'W3EXNC')
 !
+!/RTD ! Is the grid really rotated
+!/RTD      IF ( Polat < 90. ) RTDL = .True.
+!/RTD !
 !/T      DO IFI=1, NOGRP 
 !/T        LTEMP  = FLG2D(IFI,:)
 !/T        WRITE (NDST,9000) IFI, LTEMP
@@ -1032,7 +1044,7 @@
 !
             ! NCVARTYPEI.EQ.3 means the NetCDF data type depends on the
             ! field. Datatype real is set for a field
-            ! (IFI,IFJ,IFX) by coding: 'IF (NCVARTYPEI.EQ.3) NCVARTYPE=4'
+            ! (IFI,IFJ,IFP) by coding: 'IF (NCVARTYPEI.EQ.3) NCVARTYPE=4'
             ! The default data type is short integer: 
             IF (NCVARTYPEI.EQ.3) NCVARTYPE=2
 !
@@ -3032,11 +3044,22 @@
 !/XSTO              ELSE
               ! The three subfields (NFP=3) are joined in the netCDF file
               NFP = 3 ! Number of subfields loop over IFP=1,NFP
+!/MFIT        IF (.NOT. SVP) NFP = 2 ! Write only UXSP(:,1:3), not the profile
 !
               IF ( IFP .EQ. 1 ) THEN
                 ! 'Wavenumber of the zero-upcrossing period'
                 ! For an XSTO spectral tail
-                FSC    = 0.01
+!/XSTO          ! NOTE: The magnitude of ksc spans from O(1e-2) to O(1e+1)
+!/XSTO          !       It can be scaled to a 16-bit integer only with an
+!/XSTO          !       accuracy of order O(1e-3), and a value of FSC larger
+!/XSTO          !       than about 0.0005.
+                IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
+                FSC    = 1.
+                VMIN =  0
+                VMAX =  100
+                ! FSC  = 0.0002
+                ! VMIN = 1
+                ! VMAX = 32766              
                 UNITS  = 'm-1'
                 ENAME  = '.ksc'
                 IF( SMCGRD ) THEN
@@ -3046,22 +3069,35 @@
                 ENDIF ! SMCGRD
                 NFIELD=1
                 VARNM(1)='ksc'
+!/MFIT          VARNM(1)='Kz'
                 VARNL(1)='Wavenumber of zero-upcross'
+!/MFIT          VARNL(1)='Wavenumber of zero-upcrossing frequency'
                 VARNS(1)=''
                 VARNG(1)=''
                 VARNC(1)='Profile depths Z = zk / ksc'
+!/MFIT          VARNC(1)='Profile depths Z = zk / Kz'
                 VARND(1)=''
-                VMIN = 0 
-                VMAX = 30000              
 !
               ELSE IF ( IFP .EQ. 2 ) THEN
                 ! Vertically integrated Stokes drift == wave pseudo momentum
+                ! For an XSTO spectral tail
                 ! This variable is nearly the same as TUS, the
-                ! 'Stokes transport', but for the XSTO extended tail
+                ! 'Stokes transport', but with the XSTO extended tail
                 ENAME  = '.xsm'
 !/MFIT                ! Multiply by 2*ksc
 !/MFIT                UXSP(1:NSEA,2) = UXSP(1:NSEA,2)*UXSP(1:NSEA,1)*2
 !/MFIT                UXSP(1:NSEA,3) = UXSP(1:NSEA,3)*UXSP(1:NSEA,1)*2
+!/MFIT                allocate ( M2K(NSEA), stat=IRET )
+!/MFIT                M2K(1:NSEA) = SQRT( UXSP(1:NSEA,2) * UXSP(1:NSEA,2)   &
+!/MFIT                                  + UXSP(1:NSEA,3) * UXSP(1:NSEA,3) )
+!/MFIT
+!/MFIT                IF (NCVARTYPEI.EQ.3) THEN
+!/MFIT                  ! Apply a lower limiter to |M2K| if short int output
+!/MFIT                  WHERE ( ABS(UXSP(:,4)/M2K(:)) > 30. &
+!/MFIT                        .OR. ABS(UXSP(:,4+NZO)/M2K(:)) > 30. ) &
+!/MFIT                    M2K = MAX( ABS(UXSP(:,4)), ABS(UXSP(:,4+NZO)) )/30.
+!/MFIT                  ENDIF
+!/MFIT                
 !/RTD                ! Rotate x,y vector back to standard pole
 !/RTD                IF ( FLAGUNR ) CALL W3XYRTN(NSEA, UXSP(1:NSEA,2), &
 !/RTD                                             UXSP(1:NSEA,3), AnglD)
@@ -3089,15 +3125,15 @@
                 VARNS(1)='eastward_wave_pseudo_momentum'
                 VARNS(2)='northward_wave_pseudo_momentum'
 !/MFIT                ELSE
-!/MFIT                  ! xsm * 2 * ksc spans from O(1e-2) to less than O(10)
-!/MFIT                  FSC    = 0.0003
+!/MFIT                  ! abs(xsm * 2 * ksc) is less than O(1)
+!/MFIT                  FSC    = 1./30000.
 !/MFIT                  VMIN = -30000 
 !/MFIT                  VMAX =  30000
-!/MFIT                  VARNM(1)='uxsm2k'
-!/MFIT                  VARNM(2)='vxsm2k'
-!/MFIT                  UNITS  = 'm s-1'
-!/MFIT                  VARNL(1)='eastward wave pseudo momentum * 2 K'
-!/MFIT                  VARNL(2)='northward wave pseudo momentum * 2 K'
+!/MFIT                  VARNM(1)='MKX'
+!/MFIT                  VARNM(2)='MKY'
+!/MFIT                  UNITS  = 'm/s'
+!/MFIT                  VARNL(1)='Eastward wave pseudo-momentum * 2 * Kz'
+!/MFIT                  VARNL(2)='Northward wave pseudo-momentum * 2 * Kz'
 !/MFIT                  VARNS(1)=''
 !/MFIT                  VARNS(2)=''
 !/MFIT                END IF
@@ -3105,6 +3141,8 @@
                 VARNG(2)=''
                 VARNC(1)='K = ksc'
                 VARNC(2)='K = ksc'
+!/MFIT                VARNC(1)=''
+!/MFIT                VARNC(2)=''
                 VARND(1)=''
                 VARND(2)=''
 !/RTD                ! Override standard direction comment
@@ -3118,6 +3156,7 @@
 !
               ELSE IF ( IFP .EQ. 3 ) THEN
                 ! Vertical profile of Stokes drift
+                ! For an XSTO spectral tail
                 DIM3NAME='zk'
                 NFIELD=2
                 VARNM(1)='usvp'
@@ -3156,7 +3195,7 @@
                   XXK(:,:,IK-3)=XX
                   XYK(:,:,IK-3)=XY
                 END DO
-                FSC    = 0.0001
+                FSC    = 1./30000.
                 ENAME  = '.svp'
                 VMIN = -30000 
                 VMAX =  30000
@@ -3564,26 +3603,26 @@
 !/MFIT              varng(1)=''
 !/MFIT              varns(1)=''
 !/MFIT              VARND(1)=''
-!/MFIT              vmin = -20000
-!/MFIT              vmax = 20000
+!/MFIT              vmin = -32766
+!/MFIT              vmax = 32766
 !/MFIT              WRITE (ENAME,'(A2,I2.2)') '.f', IFP
 !/MFIT!
 !/MFIT!  These have been declared in the module header:
-!/MFIT!  MFIT_varname(1:6) = (/"S0N","SdN","AM ","PM ","AMd", "SIC"/)
+!/MFIT!  MFIT_varname(1:6) = (/"S0 ","Sd ","AM ","PM ","AMd", "SIC"/)
 !/MFIT!  MFIT_longname(1:6) = ( ... )
 !/MFIT!              
 !/MFIT              IF ( IFP .LE. 2 ) THEN
-!/MFIT                ! 2D Vectors "S0N", "SdN"
+!/MFIT                ! 2D Vectors "S0", "Sd"
 !/MFIT                NFIELD=2
                 IF ( .FALSE. ) THEN
 !/MFIT                ELSE
 !                 ! Code here will be run under switch /MFIT
 !/RTD                  IF ( FLAGUNR ) THEN
 !/RTD                    ! Rotate x,y vector back to standard pole
-!/RTD                    ! Upper MFIT "S0N"
+!/RTD                    ! Upper MFIT "S0"
 !/RTD                    IF ( IFP .EQ. 1 ) &
 !/RTD                      CALL W3XYRTN(NSEA, UXSP(:,4), UXSP(:,4+NZO), AnglD)
-!/RTD                    ! Deep MFIT "SdN"
+!/RTD                    ! Deep MFIT "Sd"
 !/RTD                    IF ( IFP .EQ. 2 ) &
 !/RTD                      CALL W3XYRTN(NSEA, USERO(:,1), USERO(:,2), AnglD)
 !/RTD                  END IF
@@ -3595,14 +3634,16 @@
 !/MFIT                                    + UXSP(1:NSEA,3) * UXSP(1:NSEA,3) )
 !/MFIT                  ! Has already been multiplied by 2. * UXSP(1:NSEA,1)
 !/MFIT                               
-!/MFIT                  ! "S0N": Upper fit "S0" normalized by abs(M2K)
+!/MFIT                  ! "S0": Upper fit "S0" normalized by abs(M2K)
 !/MFIT                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY,                   &
 !/MFIT                                UXSP(:,4)/M2K(:), MAPSF, XX )
 !/MFIT                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY,                   &
 !/MFIT                                UXSP(:,4+NZO)/M2K(:), MAPSF, XY )
+!/MFIT                  varnc(1)='U_S(Z) = Up(Z) + Ud(Z); U_S(0) = S0 * abs(MK)'
+!/MFIT                  varnc(2)='Up(Z) = Up(0) exp( -AM (Z Kz)^PM )'
 !/MFIT                  deallocate ( M2K )
 !/MFIT                ELSE
-!/MFIT                  ! "SdN": Deep fit "Sd" already normalized by abs(M2K)
+!/MFIT                  ! "Sd": Deep fit "Sd" already normalized by abs(M2K)
 !/MFIT                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,1),      &
 !/MFIT                                                           MAPSF, XX )
 !/MFIT                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,2),       &
@@ -3615,8 +3656,8 @@
 !/MFIT                varnl(2) = 'Northward '//trim(MFIT_longname(IFP))
 !/MFIT                varng(2)=''
 !/MFIT                varns(2)=''
-!/MFIT                varnc(1)=trim(MFIT_varname(IFP))//' = U_S(0)/(2 K M)'
-!/MFIT                varnc(2)='2 K M = 2*ksc*abs(xsm)'
+!/MFIT                varnc(1)='Ud(Z) = Ud(0) exp( -AMd (Z Kz)^PMd ); '//cmt_PMd
+!/MFIT                varnc(2)='Ud(0) = Sd * abs(MK)'
                 IF ( .FALSE. ) THEN
 !/MFIT                ELSE
 !                    ! Code here under combined switches /MFIT and /RTD
@@ -3638,8 +3679,8 @@
 !/MFIT                vmin = 0
 !/MFIT                IF ( IFP .EQ. 6 ) then
 !/MFIT                   FSC  = 1.
-!/MFIT                   vmax = 32000
-!/MFIT                   vmin = -32000
+!/MFIT                   vmax = 32766
+!/MFIT                   vmin = -32766
 !/MFIT                END IF
 !/MFIT                varnm(1) = trim(MFIT_varname(IFP))
 !/MFIT                varnl(1) = trim(MFIT_longname(IFP))
@@ -3746,7 +3787,7 @@
             ! separate netCDF file (similar to FLFRQ=.TRUE. when DIM3NAME=='f').
             ! If you choose FLSEP=.FALSE., the field can go to a common
             ! netCDF if mode TOGETHER is chosen by the user.
-            !  
+            !
 
             ! FLSEP: Default is .FALSE. unless it has a frequency 'f' dimension
             FLSEP = .FALSE.
@@ -4123,13 +4164,15 @@
                   ! instanciates lon with x/lon for regular grid or nodes for unstructured mesh
                   IF (.NOT.ALLOCATED(LON)) ALLOCATE(LON(NX))
 !/RTD                  ! 2d longitude array for standard grid coordinates
-!/RTD                  IF (.NOT.ALLOCATED(LON2D)) ALLOCATE(LON2D(NX,NY),LON2DEQ(NX,NY),ANGLD2D(NX,NY))
+!/RTD                  IF ( RTDL .AND. .NOT.ALLOCATED(LON2D)) &
+!/RTD                    ALLOCATE(LON2D(NX,NY),LON2DEQ(NX,NY),ANGLD2D(NX,NY))
                   IF (.NOT.ALLOCATED(LAT)) THEN 
                     ! If regular grid, instanciates lat with y/lat
                     IF (GTYPE.EQ.RLGTYPE) THEN 
                       ALLOCATE(LAT(NY))
 !/RTD                      ! 2d latitude array for standard grid coordinates
-!/RTD                      IF (.NOT.ALLOCATED(LAT2D)) ALLOCATE(LAT2D(NX,NY),LAT2DEQ(NX,NY))
+!/RTD                      IF ( RTDL .AND. .NOT.ALLOCATED(LAT2D)) &
+!/RTD                        ALLOCATE(LAT2D(NX,NY),LAT2DEQ(NX,NY))
                     ! If unstructured mesh, instanciates lat with nodes
                     ELSE 
                       ALLOCATE(LAT(NX))
@@ -4192,23 +4235,27 @@
 !/RTD                                  ANGLD2D, POLAT, POLON, RTDNY*RTDNX)
 !/SMC                  ENDIF ! SMCTYPE
                 ELSE ! SMCGRD
-                  SXD=DBLE(0.000001d0*DNINT(1d6*(DBLE(SX)) ))
-                  SYD=DBLE(0.000001d0*DNINT(1d6*(DBLE(SY)) ))
-                  X0D=DBLE(0.000001d0*DNINT(1d6*(DBLE(X0)) ))
-                  Y0D=DBLE(0.000001d0*DNINT(1d6*(DBLE(Y0)) ))
-                  DO I=1,NX
-                    LON(I)=REAL(X0D+SXD*DBLE(I-1))
-!/RTD                    LON2DEQ(I,1:NY)=LON(I)
-                  END DO
-                  DO I=1,NY
-                    LAT(I)=REAL(Y0D+SYD*DBLE(I-1))
-!/RTD                    LAT2DEQ(1:NX,I)=LAT(I)
-                  END DO
-!/RTD                  ! Calculate the standard grid coordinates
-!/RTD                  DO I=1,NX
-!/RTD                    CALL W3EQTOLL(LAT2DEQ(I,1:NY), LON2DEQ(I,1:NY), LAT2D(I,1:NY), &
-!/RTD                                   LON2D(I,1:NY), ANGLD2D(I,1:NY), POLAT, POLON, NY)
-!/RTD                  END DO   
+                    SXD=DBLE(0.000001d0*DNINT(1d6*(DBLE(SX)) ))
+                    SYD=DBLE(0.000001d0*DNINT(1d6*(DBLE(SY)) ))
+                    X0D=DBLE(0.000001d0*DNINT(1d6*(DBLE(X0)) ))
+                    Y0D=DBLE(0.000001d0*DNINT(1d6*(DBLE(Y0)) ))
+                    DO I=1,NX
+                      LON(I)=REAL(X0D+SXD*DBLE(I-1))
+                    END DO
+                    DO I=1,NY
+                      LAT(I)=REAL(Y0D+SYD*DBLE(I-1))
+                    END DO
+!/RTD                  IF ( RTDL ) THEN
+!/RTD                    ! Calculate the standard grid coordinates
+!/RTD                    DO I=1,NX
+!/RTD                      LON2DEQ(I,:)=LON(I)
+!/RTD                    END DO
+!/RTD                    DO I=1,NY
+!/RTD                      LAT2DEQ(:,I)=LAT(I)
+!/RTD                    END DO                    
+!/RTD                    CALL W3EQTOLL(LAT2DEQ, LON2DEQ, LAT2D, LON2D,       &
+!/RTD                                  ANGLD2D, POLAT, POLON, NY*NX)
+!/RTD                  END IF ! RTDL
                   WRITE(STR2,'(F12.0)') SY
                   STR2=ADJUSTL(STR2)
                   IRET=NF90_PUT_ATT(NCID,NF90_GLOBAL,   &
@@ -4289,10 +4336,12 @@
                   'altitude_resolution','n/a')
               CALL CHECK_ERR(IRET)
 
+!/RTD              IF ( RTDL ) THEN
 !/RTD                  IRET=NF90_PUT_ATT(NCID,NF90_GLOBAL,  &
 !/RTD                      'grid_north_pole_latitude',POLAT)
 !/RTD                  IRET=NF90_PUT_ATT(NCID,NF90_GLOBAL,  &
 !/RTD                      'grid_north_pole_longitude',POLON)
+!/RTD                END IF
 
               CALL T2D(TIME,STARTDATE,IERR)
               WRITE(STRSTARTDATE,'(I4.4,A,4(I2.2,A),I2.2)') STARTDATE(1),'-',STARTDATE(2),'-', &
@@ -4325,10 +4374,12 @@
                   IRET=NF90_PUT_VAR(NCID,VARID(2),LAT(IY1:IYN))
                   CALL CHECK_ERR(IRET)
                 ENDIF ! SMCGRD
-!/RTD                IRET=NF90_PUT_VAR(NCID,VARID(291),LON2D(IX1:IXN,IY1:IYN))
-!/RTD                CALL CHECK_ERR(IRET)
-!/RTD                IRET=NF90_PUT_VAR(NCID,VARID(292),LAT2D(IX1:IXN,IY1:IYN))
-!/RTD                CALL CHECK_ERR(IRET)
+!/RTD                IF ( RTDL ) THEN
+!/RTD                  IRET=NF90_PUT_VAR(NCID,VARID(291),LON2D(IX1:IXN,IY1:IYN))
+!/RTD                  CALL CHECK_ERR(IRET)
+!/RTD                  IRET=NF90_PUT_VAR(NCID,VARID(292),LAT2D(IX1:IXN,IY1:IYN))
+!/RTD                  CALL CHECK_ERR(IRET)
+!/RTD                  END IF
               END IF
 
               ! If curvilinear grid
@@ -4546,10 +4597,12 @@
                   CALL CHECK_ERR(IRET)
                 END IF
 !/RTD
+!/RTD                IF ( RTDL ) THEN
 !/RTD                  ! Add grid mapping attribute for rotated pole grids:
 !/RTD                  IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'grid_mapping',    &
 !/RTD                                    'rotated_pole')
 !/RTD                  CALL CHECK_ERR(IRET)
+!/RTD                  END IF
 !/RTD
               END DO
 !
