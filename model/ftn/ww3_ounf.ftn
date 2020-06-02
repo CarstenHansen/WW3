@@ -7,7 +7,7 @@
 !/                  |           F. Ardhuin              |
 !/                  |           M. Accensi              |
 !/                  |                        FORTRAN 90 |
-!/                  | Last update :         07-Oct-2019 |
+!/                  | Last update :         28-Jan-2020 |
 !/                  +-----------------------------------+
 !/
 !/    17-Mar-2010 : Creation                            ( version 3.14_SHOM )
@@ -38,7 +38,7 @@
 !/    28-Jan-2020 : MFIT+XSTO options: Stokes drift
 !/                  profile parametric fit              ( version 7.?? )
 !/    07-Oct-2019 : RTD option with standard lat-lon
-!/                  grid when nesting to rotated grid   ( version ?.?? )
+!/                  grid when nesting to rotated grid   ( version 7.?? )
 !/
 !/    Copyright 2009-2013 National Weather Service (NWS),
 !/       National Oceanic and Atmospheric Administration.  All rights
@@ -830,7 +830,9 @@
       LOGICAL                 :: FLSEP, NEW3D, FIRST_TOGETHER
       LOGICAL                 :: CUSTOMFRQ=.FALSE.
 !/T      LOGICAL                 :: LTEMP(NGRPP)
+
 !/MFIT      REAL, ALLOCATABLE       :: M2K(:)
+
 !/RTD ! RTDL == False for a standard lat-lon grid. Will be set to True if the
 !/RTD ! grid is rotated
 !/RTD      LOGICAL                 :: RTDL = .FALSE.
@@ -3636,22 +3638,20 @@
 !/MFIT                                    + UXSP(1:NSEA,3) * UXSP(1:NSEA,3) )
 !/MFIT                  ! Has already been multiplied by 2. * UXSP(1:NSEA,1)
 !/MFIT                               
-!/MFIT                  ! "S0N": Upper fit "S0" normalized by abs(M2K)
+!/MFIT                  ! "S0": Upper fit "S0" normalized by abs(M2K)
 !/MFIT                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY,                   &
 !/MFIT                                UXSP(:,4)/M2K(:), MAPSF, XX )
 !/MFIT                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY,                   &
 !/MFIT                                UXSP(:,4+NZO)/M2K(:), MAPSF, XY )
-!/MFIT                  deallocate ( M2K )
 !/MFIT                  varnc(1)='U_S(Z) = Up(Z) + Ud(Z); U_S(0) = S0 * abs(MK)'
 !/MFIT                  varnc(2)='Up(Z) = Up(0) exp( -AM (Z Kz)^PM )'
+!/MFIT                  deallocate ( M2K )
 !/MFIT                ELSE
 !/MFIT                  ! "Sd": Deep fit "Sd" already normalized by abs(M2K)
 !/MFIT                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,1),      &
 !/MFIT                                                           MAPSF, XX )
 !/MFIT                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,2),       &
 !/MFIT                                                           MAPSF, XY )
-!/MFIT                  varnc(1)='Ud(Z) = Ud(0) exp( -AMd (Z Kz)^PMd ); '//cmt_PMd
-!/MFIT                  varnc(2)='Ud(0) = Sd * abs(MK)'
 !/MFIT                END IF                      
 !/MFIT!              
 !/MFIT                varnm(1) = trim(MFIT_varname(IFP))//'X'
@@ -3660,6 +3660,8 @@
 !/MFIT                varnl(2) = 'Northward '//trim(MFIT_longname(IFP))
 !/MFIT                varng(2)=''
 !/MFIT                varns(2)=''
+!/MFIT                varnc(1)='Ud(Z) = Ud(0) exp( -AMd (Z Kz)^PMd ); '//cmt_PMd
+!/MFIT                varnc(2)='Ud(0) = Sd * abs(MK)'
                 IF ( .FALSE. ) THEN
 !/MFIT                ELSE
 !                    ! Code here under combined switches /MFIT and /RTD
@@ -4344,7 +4346,7 @@
 !/RTD                  IRET=NF90_PUT_ATT(NCID,NF90_GLOBAL,  &
 !/RTD                      'grid_north_pole_longitude',POLON)
 !/RTD                END IF
-              
+
               CALL T2D(TIME,STARTDATE,IERR)
               WRITE(STRSTARTDATE,'(I4.4,A,4(I2.2,A),I2.2)') STARTDATE(1),'-',STARTDATE(2),'-', &
                     STARTDATE(3),' ',STARTDATE(5),':',STARTDATE(6),':',STARTDATE(7)
