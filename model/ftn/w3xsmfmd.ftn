@@ -410,7 +410,7 @@
       USE W3SERVMD, ONLY: EXTCDE
       USE W3ADATMD, ONLY: USERO
       USE W3ODATMD, ONLY: NDSO, NDST, IAPROC, NAPROC, NAPOUT
-      USE W3GDATMD, ONLY: XSND, XSDS, XSTY, NSEAL, NK, NTH, SIG, DMIN
+      USE W3GDATMD, ONLY: XSND, XSDS, NSEAL, NK, NTH, SIG, DMIN
       ! Stokes drift profile data      
       USE W3ADATMD, ONLY: DW, UXSP, ZK_S
       ! XSVB: Verboseness level [0..4] of XSTO output to NDST or NDSO 
