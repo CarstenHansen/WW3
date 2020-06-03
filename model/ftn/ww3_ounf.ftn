@@ -3058,12 +3058,9 @@
 !/XSTO          !       accuracy of order O(1e-3), and a value of FSC larger
 !/XSTO          !       than about 0.0005.
                 IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
-                FSC    = 1.
-                VMIN =  0
-                VMAX =  100
-                ! FSC  = 0.0002
-                ! VMIN = 1
-                ! VMAX = 32766              
+                FSC  = 0.0002
+                VMIN = 1
+                VMAX = 32766              
                 UNITS  = 'm-1'
                 ENAME  = '.ksc'
                 IF( SMCGRD ) THEN
@@ -3646,16 +3643,12 @@
 !/MFIT                  varnc(1)='U_S(Z) = Up(Z) + Ud(Z); U_S(0) = S0 * abs(MK)'
 !/MFIT                  varnc(2)='Up(Z) = Up(0) exp( -AM (Z Kz)^PM )'
 !/MFIT                  deallocate ( M2K )
-!/MFIT                varnc(1)='U_S(Z) = Up(Z) + Ud(Z); U_S(0) = S0 * abs(MK)'
-!/MFIT                varnc(2)='Up(Z) = Up(0) exp( -AM (Z Kz)^PM )'
 !/MFIT                ELSE
 !/MFIT                  ! "Sd": Deep fit "Sd" already normalized by abs(M2K)
 !/MFIT                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,1),      &
 !/MFIT                                                           MAPSF, XX )
 !/MFIT                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,2),       &
 !/MFIT                                                           MAPSF, XY )
-!/MFIT                  varnc(1)='Ud(Z) = Ud(0) exp( -AMd (Z Kz)^PMd ); '//cmt_PMd
-!/MFIT                  varnc(2)='Ud(0) = Sd * abs(MK)'
 !/MFIT                END IF                      
 !/MFIT!              
 !/MFIT                varnm(1) = trim(MFIT_varname(IFP))//'X'
@@ -4013,6 +4006,7 @@
                 DEALLOCATE(DIM3VAR)
               END IF
             END IF
+
 
 ! 2.4 Manage netCDF file id
 
