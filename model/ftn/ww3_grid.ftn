@@ -107,7 +107,7 @@
 !/    20-Feb-2020 : Include Romero's dissipation in ST4 ( version 7.06 )
 !/    15-Apr-2020 : Adds optional opt-out for CFL on BC ( version 7.08 )
 !/    28-May-2020 : RTD output b.c. to rotated grid     ( version 7.?? )
-!/    09-Mar-2020 : Namelist group for extended tail    ( version 7.?? ) 
+!/    28-May-2020 : Namelist group for extended tail    ( version 7.?? ) 
 !/                  Stokes profile of GEOMETOC Support Denmark
 !/
 !/    Copyright 2009-2013 National Weather Service (NWS),
