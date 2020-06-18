@@ -5,7 +5,7 @@
 !/                  +------------------------------------------+
 !/                  | Extended spectral tail for Stokes drift  |
 !/                  |          Carsten Hansen                  |
-!/                  | Joint GeoMETOC Support Center Denmark    |
+!/                  | Joint GEOMETOC Support Center Denmark    |
 !/                  |                            FORTRAN 90    |
 !/                  | Last update :             09-OCT-2019    |
 !/                  +------------------------------------------+
@@ -48,7 +48,7 @@
 !/                  constant of Donelan et al., 1985.
 !/    22-Dec-2017 : Adoption to version WW3 v5.16:
 !/                  + Call CALC_XSTOKES() from W3OUTG(), outside loop over JSEA
-!/    09-Mar-2020 : Adoption to version WW3 v6.??
+!/    09-Mar-2020 : Adoption to version WW3 v7.??
 !/                  + Mattsson fitting is separated to module 'W3XSMFMD'
 !/                  + Namelist group &XSTO
 !/                  + from W3OUTG pass the array A of spectra to CALC_XSTOKES(A)
@@ -75,8 +75,9 @@
 !     $ NDP: Number of depths (->NDEPTH)
 !     $ DSC: Depth scale specifying the largest depth Z(NDP)
 !     $ TYP: Tail type (C*4); 'DoEw': Donelan-Ewans,
-!     $      or 'None': Truncated spectrum
-!     &XSTO NDP = 5, DSC = 1.0, TYP = 'DoEw' /
+!     $      'DE20': Donelan-Ewans tail truncated at 2.0 Hz
+!     $      or 'None': Spectrum truncated with no extention
+!     &XSTO NDP = 5, DSC = 1.0, TYP = 'DE20' /
 !
 !  b) In w3iogomd.ftn: Call the subroutine CALC_XSTOKES() (module W3XSTOMD): At
 !     each WW3 output time step, calculation of the Stokes drift profile
@@ -403,6 +404,11 @@
 
 ! Spectral parameters for Stokes spectral tail calculation
       real               :: SBDia , StT0, StTE
+      
+! CHA 20200603  ftr: truncation frequency, default 10 Hz
+!              ntre: relative truncation bin ntre = ntr - nt
+      real               :: ftr = 10.0
+      integer            :: ntre
 
 ! Profile arrays
       real, allocatable  :: StkDiag(:)
@@ -609,7 +615,7 @@
 !                     NK is the highest possible such limit
 !
 ! cha 20121123: Shift fitting interval limits away from NK, from NK-5 to NK-2
-      if ( XSTY == 'DoEw' ) then
+      if ( XSTY == 'DoEw' .OR. XSTY(1:2) == 'DE' ) then
           ! Donelan-Ewans 
           IKT = NK - MAX( 2, NINT( 0.2/log(XFR) ) )      
 ! cha 20110627: IKTT: Lower edge of tail fitting to the prognostic spectrum
@@ -656,16 +662,43 @@
       ! Im(bin): A look-up table for integrated momemtum
       if ( .not. allocated(Im) )  allocate ( Im(NP+1), stat=IERR )
       
-      if ( XSTY == 'DoEw' ) then
+      if ( XSTY == 'DoEw' .OR. XSTY(1:2) == 'DE' ) then
         ! Stokes drift for the diagnostic tail. Calculate a normalized array
         ! DStkOsn(1:NP)
         ! Also calculate the look-up table Im(1:NP)
         if ( xsto_verbose .gt. 1 ) &
           WRITE (NDSV, 904), 'call diag_DE_init(', NP, ')'
-        CALL diag_DE_init(NP)      
+        CALL diag_DE_init(NP)
+
       else
         WRITE (NDSV, 916), 'XSTOKES_INIT: Unknown spectral tail type: ', XSTY
         CALL EXTCDE ( 73 )
+        end if
+      
+      ! CHA 20200603 temporary test output
+      write (NDSV, 916)  'XSTOKES_INIT:  XSTY:', XSTY
+      ! CHA 20200603 If the tail is truncated at a specific frequency ftr,
+      if ( XSTY(1:2) == 'DE' ) then
+        read(XSTY(3:4),'(F2.0)') ftr
+        ftr = 0.1 * ftr
+        ! else ftr=10.0
+        end if
+        
+      
+      ! Truncation at frequency ftr corresponds to a truncation at tail bin ntr:
+      ! ftr/fd=DFH**ntr, or ntr = log( ftr/fp ) / log(DFH). Here,
+      ! log( ftr/fp ) = log( ftr/fd*fd/fp ) = log( fd/fp ) + log( ftr/fd ),
+      ! where fd = SIG(IKT) / TPI. The relative truncation bin is near
+      ! ntre = ntr - nt
+      if ( ftr > SIG(IKT) / TPI .and. ftr <= 10.0 ) then
+        if (ftr >= 9.89) then
+          ntre = NP+1
+        else
+          ntre = log( ftr / SIG(IKT) * TPI ) / log(DFH)
+          end if
+      else
+        WRITE (NDSV, 916), 'XSTOKES_INIT: Wrong 2 last digits in XSTY: ', XSTY
+        CALL EXTCDE ( 74 )
         end if
       
       ! For the Diagnostic range the surface Stokes drift for every spectral
@@ -816,7 +849,7 @@
       ! Tail mean direction and spectral level parameter    
       real                        :: thetat, Dsn
       
-      INTEGER               :: numDepths, IZ, nt, ntt
+      INTEGER               :: numDepths, IZ, nt, ntt, ntr
       
       ! Factors for the diagnostic (spectral tail) calculation
       REAL                  :: k_scl, fOfp_ini, ntf
@@ -966,20 +999,26 @@
         fOfp(JSEA) = min( max ( fOfp(JSEA), fOfp_min ), DFH**NP)
 
         ! Index nt in SBDiaZ(:,nt) corresponds to fd/fp rounded to nearest 
-        ! integer: fd/fp = DFH**nt * DFH**ntf
+        ! integer: fd/fp = DFH**ntf; nt=nint( ntf )
         ! The part of the pre-calculated tail that covers the present tail
         ! is the range ntt = nt,NP
         ntf = log( fOfp(JSEA) ) / log(DFH)
         ntf = max( min(ntf,real(NP)), 1. )
         nt = nint( ntf )
+        
+        ! CHA 20200603 If the tail is truncated at a bin ntr,
+        ntr = nint( ntf + ntre )
+        
+        ! Now, let ntf be the fractional part of nt
         ntf = ntf - nt
 
         ! The integrated pseudo-momentum of the diagnostic spectral tail is
         ! Mdiag = Dsn * sigP^{-2} Im(nt), where nt = log(ft/fP)/log(DFH)
         ! and sigP = SIG(IKT) / fOfP.
-        ! Linear interpolation to nt+ntf between bins nt and nt+1.
+        ! Linear interpolation to nt+ntf between bins nt and nt+1. Note
+        ! that if nt == NP, then ntf == 0., and note that Im(NP+1) == 0. 
         Mdiag = Dsn * ( fOfP(JSEA)/SIG(IKT) )**2              &
-                * ( Im(nt) * ( 1. - ntf ) + ntf * Im(nt+1) )
+                * ( Im(nt) * ( 1. - ntf ) + ntf * Im(nt+1) - Im(min(ntr,NP+1)) )
 
         ! Calculate a vertical profile for the Stokes Drift. The surface Stokes
         ! drift for every spectral bin is multiplied with a depth factor 
@@ -1006,7 +1045,7 @@
         StkDiag(:) = SBDiaZ(:,nt) * (1. - ntf)
         
         ! -for the rest of the precalculated tail
-        do ntt = nt+1, NP
+        do ntt = nt+1, min(ntr,NP)
           StkDiag(:) = StkDiag(:) + SBDiaZ(:,ntt)
         end do
 
@@ -1018,40 +1057,44 @@
                ' StT0 = ', StT0*Dsn, ' Mdiag = ', Mdiag
         end if
 
-        !
-        ! Add remaining 'tail of the tail'. See discussion '4. Tail of the tail'
-        ! in SUBROUTINE diag_DE_init
-        !
-        ! Simplified model. The surface magnitude StT0*Dsn should be small.
-        ! Parameters estimated in diag_DE_init(): The normalized
-        ! ( tail-of-the-tail Stokes drift ) / Dsn is        
-        ! StTail(ZK) = StT0 * exp ( -StTE * ZK ). StT0 and StTE are 
-        ! estimated by a fit at two points, ZK=(0.0,0.05) .
+        if ( ntr > NP ) then
+           
+          !
+          ! Add remaining 'tail of the tail'. See discussion
+          ! '4. Tail of the tail' in SUBROUTINE diag_DE_init
+          !
+          ! Simplified model. The surface magnitude StT0*Dsn should be small.
+          ! Parameters estimated in diag_DE_init(): The normalized
+          ! ( tail-of-the-tail Stokes drift ) / Dsn is        
+          ! StTail(ZK) = StT0 * exp ( -StTE * ZK ). StT0 and StTE are 
+          ! estimated by a fit at two points, ZK=(0.0,0.05) .
+          
+          k_scl = -StTE * ( SIG(IKT) /TPI * Ts / fOfP(JSEA) )**2
 
-        k_scl = -StTE * ( SIG(IKT) /TPI * Ts / fOfP(JSEA) )**2
+          StkDiag(:) = StkDiag(:) + StT0 * exp ( ZK_S(:)*k_scl )
 
-        StkDiag(:) = StkDiag(:) + StT0 * exp ( ZK_S(:)*k_scl )
+          ! This may be faster:
+          ! xkzm1_scl=(XZK-1.)*k_scl
+          ! tt=StT0
+          ! StkDiag(1) = StkDiag(1) + tt
+          ! do IZ = 2,XSND
+          !    if ( tt < 1.e-3*StkDiag(IZ) ) exit
+          !    tt = tt*exp((ZK_S(IZ)+1)*xkzm1_scl)
+          !    ! or: tt = tt*(1+(ZK_S(IZ)+1)*xkzm1_scl)
+          !    StkDiag(IZ) = StkDiag(IZ) + tt
+          !    
+          ! end do
 
-        ! This may be faster:
-        ! xkzm1_scl=(XZK-1.)*k_scl
-        ! tt=StT0
-        ! StkDiag(1) = StkDiag(1) + tt
-        ! do IZ = 2,XSND
-        !    if ( tt < 1.e-3*StkDiag(IZ) ) exit
-        !    tt = tt*exp((ZK_S(IZ)+1)*xkzm1_scl)
-        !    ! or: tt = tt*(1+(ZK_S(IZ)+1)*xkzm1_scl)
-        !    StkDiag(IZ) = StkDiag(IZ) + tt
-        !    
-        ! end do
+          if ( xsto_verbose .gt. 2 ) &
+             WRITE (NDSV, 906), 'k_scl =', k_scl, 'nt =', nt
+
+          end if
 
         ! Multiply with the normalization factor (spectral level * U10)
         StkDiag(:) = StkDiag(:) * Dsn
 
         ! The drift values be zero below the sea floor
         StkDiag(numDepths+1:XSND) = 0.
-
-        if ( xsto_verbose .gt. 2 ) &
-             WRITE (NDSV, 906), 'k_scl =', k_scl, 'nt =', nt
 
       end if ! ( IKT < IKTT )
       
@@ -1234,7 +1277,7 @@
       M_X = MprogX * GRAV
       M_Y = MprogY * GRAV
 
-      ! Control output below only when high verboseness is chosen
+      ! Output if high level of verboseness
       
       if ( xsto_verbose .le. 1 ) return
         
@@ -1630,8 +1673,8 @@
         fh = fh * dfhi        
         end do
       
-      Im(Np+1) = ImS * 2 - Im(Np-1) ! Just some value for extended linear
-                                     ! interpolation
+      ! Im(Np+1) = ImS * 2 - Im(Np-1) ! Used in extended linear interpolation
+      Im(Np+1) = 0. ! When used in extended linear interpolation
       Im(:) = Im(:) * ( m1t_Ew97(1.) * logdf )
 
       if ( xsto_verbose .gt. 2 ) WRITE (NDSV, *), 'Im(:) =', Im(:)

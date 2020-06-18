@@ -2600,10 +2600,12 @@
 !/XSTO! XSND: Number of depths for Stokes profile
 !/XSTO! XSDS: Depth scale specifying the largest depth for the profile,
 !/XSTO!       XSDS = Kz * Z(XSND)
-!/XSTO! XSTY: Tail type (C*4); 'DoEw': Donelan-Ewans, or 'None': Truncated spectrum
+!/XSTO! XSTY: Tail type (C*4);  'DoEw': Donelan-Ewans to f_tr=10 Hz, 
+!(XSTO!                        'DE[IF]: Donelan-Ewans to f_tr=I.F Hz,
+!(XSTO!                      or 'None': Spectrum truncated with no tail
 !/XSTO     NDP = 5
 !/XSTO     DSC = 1.0
-!/XSTO     TYP = 'DoEw'
+!/XSTO     TYP = 'DE20'
 !/XSTO     CALL READNL ( NDSS, 'XSTO', STATUS )
 !/XSTO     XSND = NDP
 !/XSTO     XSDS = DSC
