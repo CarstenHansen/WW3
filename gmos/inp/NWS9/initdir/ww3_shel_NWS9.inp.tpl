@@ -298,26 +298,49 @@ $
     __SIMSTART__  1200  __SIMSTOP__
 $   19680606 000000    900  19680608 000000
 $
+$ Added 20200812:
+    -6.100    50.103  '62107     ' $ 62107
+    -9.999    55.000  '62093     ' $ 62093
+   -11.401    59.100  '64045     ' $ 64045
+    -5.430    53.484  '62091     ' $ 62091
+    -9.268    53.228  'SmartBayWa' $ SmartBayWaveBuoy
+    -4.072    48.728  '6200053   ' $ 6200053
+    -4.968    48.290  '6200069   ' $ 6200069
+    -2.900    49.900  '62103     ' $ 62103
+    -2.889    49.026  '6200058   ' $ 6200058
+    -4.500    60.701  '64046     ' $ K7
+     1.000    61.100  '63112     ' $ 63112
+$ In CMEMS 202004:
+   -10.146   54.231  'AMETSBer-B' $ BelmulletB-coast-buoy
+   -10.278   54.268  'AMETSBer-A' $ BelmulletA-coast-buoy
+     1.500   59.500  '63110     ' $ 63110
+     2.227   59.574  'Heimdal   ' $ Heimdal
+     3.719   60.644  'Troll-A   ' $ Troll-A
+     3.817   55.417  'A121      ' $ A121, A122
+   -10.548   51.216  '62092     ' $ M3   
+    -6.704   51.690  '62094     ' $ M5   
+     2.269   61.204  'GullfaksC ' $ Gullfaks-C
+     1.909   58.371  'Sleipner-A' $ Sleipner-A
+$ Older, may be in inner domains:
+     1.708   61.000  '63113     ' $ 63113
     -2.295   46.833  '62067     ' $ 62067
     -8.500   47.500  '62163     ' $ 62163
-   -10.548   51.216  'M3        ' $ 62092
-     2.000   51.240  '62170     ' $ 62170
-     2.703   51.350  'Kwintebank' $ Kwintebank
-     2.439   51.389  'Westhinder' $ Westhinder
-     3.370   51.393  'CadzanBoei' $ CadzandBoei
-     2.770   51.410  'Akkaert   ' $ Akkaert
-     3.415   51.433  'WielinNoor' $ WielingenNoord
-     3.242   51.504  'Deurlo    ' $ Deurlo
-     3.399   51.620  'DomburRass' $ DomburgerRassen
-    -6.704   51.690  'M5        ' $ 62094
-     3.312   51.748  'Schouwenba' $ Schouwenbank, Schouwenbank2
-     3.617   51.769  'Brouwersha' $ Brouwershavensegat
-     3.670   51.926  'LichteiGoe' $ LichteilandGoeree1, LichteilandGoeree2
-     3.000   51.948  'EurogeuDWE' $ EurogeulDWE
-     3.276   51.999  'Europlatf2' $ Europlatform2, Europlatform3
-     3.737   52.010  'EurogeuE13' $ EurogeulE13
-     4.268   52.493  'IJgeul5   ' $ IJgeul5
-     4.058   52.550  'IJmuidMuni' $ IJmuidenMunitiestort, IJmuidenMunitiestort2
+$     2.000   51.240  '62170     ' $ 62170
+$     2.703   51.350  'Kwintebank' $ Kwintebank
+$     2.439   51.389  'Westhinder' $ Westhinder
+$     3.370   51.393  'CadzanBoei' $ CadzandBoei
+$     2.770   51.410  'Akkaert   ' $ Akkaert
+$     3.415   51.433  'WielinNoor' $ WielingenNoord
+$     3.242   51.504  'Deurlo    ' $ Deurlo
+$     3.399   51.620  'DomburRass' $ DomburgerRassen
+$     3.312   51.748  'Schouwenba' $ Schouwenbank, Schouwenbank2
+$     3.617   51.769  'Brouwersha' $ Brouwershavensegat
+$     3.670   51.926  'LichteiGoe' $ LichteilandGoeree1, LichteilandGoeree2
+$     3.000   51.948  'EurogeuDWE' $ EurogeulDWE
+$     3.276   51.999  'Europlatf2' $ Europlatform2, Europlatform3
+$     3.737   52.010  'EurogeuE13' $ EurogeulE13
+$     4.268   52.493  'IJgeul5   ' $ IJgeul5
+$     4.058   52.550  'IJmuidMuni' $ IJmuidenMunitiestort, IJmuidenMunitiestort2
      4.151   52.926  'Q1        ' $ Q1, Q11
      1.700   53.000  '62130     ' $ 62130
      2.800   53.103  '62145     ' $ 62145
@@ -347,20 +370,11 @@ $
      4.017   54.117  'F161      ' $ F161
      7.891   54.180  'Helgoland ' $ HelgolandWR
      7.818   54.219  'HelgolNort' $ Helgoland-NorthWR
-   -10.146   54.231  'BelmulB-co' $ BelmulletB-coast-buoy
-   -10.278   54.268  'BelmulA-co' $ BelmulletA-coast-buoy
      4.727   54.854  'F3platform' $ F3platform
      8.089   54.919  'Sylt      ' $ Sylt
-     3.817   55.417  'A121      ' $ A121, A122
 $    11.223   58.251  'Brofjorden' $ BrofjordenWR
-     1.909   58.371  'Sleipner-A' $ Sleipner-A
 $    10.932   58.488  'Vaderoarna' $ VaderoarnaWR
-     1.500   59.500  '63110     ' $ 63110
-     2.227   59.574  'Heimdal   ' $ Heimdal
      2.826   60.491  'Oseberg-A ' $ Oseberg-A
-     3.719   60.644  'Troll-A   ' $ Troll-A
-     1.708   61.000  '63113     ' $ 63113
-     2.269   61.204  'GullfaksC ' $ GullfaksC
      1.149   61.240  'NorthCormo' $ NorthCormorant
 $
      0.0   0.0  'STOPSTRING'
