@@ -260,7 +260,7 @@ $ (6) Wave-Ocean layer
   T
 $ SXY TWO BHD FOC TUS USS P2S USF P2L TWI FIC USP XSP
 $  T   T   T   T   T   T   T   F   F   F   F   T   F
-  F   F   F   F   T   T   F   F   F   F   F   F   F
+  F   F   F   F   T   T   F   F   F   F   F   F   T
 $ (7) Wave-bottom layer
   F
 $ ABR UBR BED FBB TBB
@@ -274,9 +274,9 @@ $ (9) Numerical diagnostics
 $ DTD FC  CFX CFD CFK
   T   T   T   T   T
 $ (10) User defined (NOEXTR flags needed)
-  T
+  F
 $ MFIT  U2 (for NOEXTR==6 + 1)
-  T   T   T   T   T   T   F
+$  T   T   T   T   T   T   F
 $
 $----------------------------------------------------------------
 $
