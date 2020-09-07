@@ -672,8 +672,9 @@
 !     Internal parameters
 !     ----------------------------------------------------------------
 !       NTIM    Int.  Output time counter, saved. Initial value == 1
-!       FLTWO   Log.  Flags for two-dimensional field X Y.
-!       FLDIR   Log.  Flags for two-dimensional, directional field.
+!       ! C Hansen: FLTWO FLDIR are obsolete
+!       ! FLTWO   Log.  Flags for two-dimensional field X Y.
+!       ! FLDIR   Log.  Flags for two-dimensional, directional field.
 !       FLFRQ   Log.  Flags for frequency array (3D field)
 !       X1, X2, XX, XY, XK, XXK, YYK
 !               R.A.  Output fields
@@ -775,9 +776,11 @@
       DOUBLE PRECISION        :: OUTJULDAY
       DOUBLE PRECISION        :: SXD, SYD, X0D, Y0D
 !
-      CHARACTER*80            :: VARNM(8),VARNL(8)
-      CHARACTER*120           :: VARNS(8),VARNG(8), VARND(8), STR2
-      CHARACTER*512           :: VARNC(8), PARTCOM
+      ! C. Hansen 20200907: grid coordinates VARNM(NFIELD+1,NFIELD+2,...)
+      ! are *not* used (were they used some time before?)
+      CHARACTER*80            :: VARNM(3),VARNL(3)
+      CHARACTER*120           :: VARNS(3),VARNG(3), VARND(3), STR2
+      CHARACTER*512           :: VARNC(3), PARTCOM
       CHARACTER*30            :: UNITVAR(3),FORMAT1
       CHARACTER*30            :: STRSTARTDATE
       ! C Hansen: Commented out obsolete UNITS2 and FORMF
@@ -787,7 +790,8 @@
       CHARACTER, SAVE         :: TIMEID*16 = '0000000000000000'
 !
       CHARACTER*9             :: DIM3NAME = '         '
-      LOGICAL                 :: FLFRQ, FLDIR, FEXIST, FREMOVE
+!     ! C Hansen: ! FLDIR is obsolete
+      LOGICAL                 :: FLFRQ, FLDIR, FEXIST, FREMOVE ! , FLDIR
       LOGICAL                 :: FLSEP, NEW3D, FIRST_TOGETHER
       LOGICAL                 :: CUSTOMFRQ=.FALSE.
 !/T      LOGICAL                 :: LTEMP(NGRPP)
@@ -952,7 +956,7 @@
           ENAME='      '
           ! Instanciates the partition array
           INDEXIPART=1
-          IPART=TABIPART(INDEXIPART)
+          ! IPART=TABIPART(INDEXIPART)
           VARNS(:)=''
 
           ! NFP: Number of partitions or sub-fields under each fields flag.
@@ -991,8 +995,8 @@
 !
             ! Initializes the flags for freq and direction dimensions
             FLFRQ = .FALSE.
-            FLDIR = .FALSE.
-            ! C Hansen: Comment out obsolete UNITS2
+            ! C Hansen: Comment out obsolete UNITS2 and FLDIR
+            ! FLDIR = .FALSE.
             ! UNITS2='SAME'
             IF (NCVARTYPEI.EQ.3) NCVARTYPE=2
 !
@@ -3451,8 +3455,8 @@
             ! contains two or more subfields with different units or scales.
             ! 
             ! To manage this, the loop over partition variables is rewritten
-            ! to loop over such subfields as well. A loop counter IFP equals
-            ! IPART+1 when the loop is over partitions. Any such subfield
+            ! to loop over such subfields as well applying a counter IFP 
+            ! starting at 1 and incremented by one. Any such subfield
             ! with IFP >= 2, which is NOT a swell partition, is put in the
             ! same file as the field with IFP == 1, even if TOGETHER is .FALSE.
             ! 
@@ -3475,39 +3479,25 @@
             ! netCDF if mode TOGETHER is chosen by the user.
             !  
 
-            ! FLSEP: Default is .FALSE. unless it has a frequency 'f' dimension
+            ! FLSEP: Default is .FALSE.
             FLSEP = .FALSE.
             FLSEP = (FLSEP .OR. FLFRQ)
 
-            ! The field goes to a separate file if TOGETHER is .FALSE.
+            ! The variable goes to a separate file if TOGETHER is .FALSE.
             FLSEP = (FLSEP .OR. .NOT.TOGETHER)
 
             ! The negation (.NOT. FLSEP) is equivalent to
             ! (TOGETHER .AND. .NOT.FLFRQ)
 
-            ! The index of field and group at the first
+            ! The index of variable and group at the first
             ! write to a file in mode together
             IF (I1.EQ.0 .AND. .NOT. FLSEP) I1=IFI
             IF (J1.EQ.0 .AND. .NOT. FLSEP) J1=IFJ
 
-            ! NCJID: ID of a requested joint netCDF file
+            ! NCJID: ID of a requested joint netCDF file (NOT for swell part.)
             NCJID = 0
-            IF ( IFP .GT. 1 .AND. FLSEP .AND. IPART .EQ. 0 ) &
+            IF ( IFP .GT. 1 .AND. FLSEP .AND. INDEXIPART .EQ. 1 ) &
               NCJID = NCIDS(IFI, IFJ, 1) ! is already open
-            !
-            ! This might be configured directly by referencing another
-            ! field NCJOIN(:) = (FI,FJ) (NCJOIN has a default of (0,0)).
-            ! However, NCIDS(FI, FJ, 1) would not always be open. To solve
-            ! this, we could declare a LOGICAL, SAVE :: NCJREG(<length>) = 0,
-            ! and initialize a counter NJN = 1 in the start of W3EXNC,
-            ! and determine NCJID at the very first timestep as follows:
-            ! IF ( ( NCJOIN(1) * NCJOIN(2) ) .NE. 0) THEN
-            !   ! At the very first time step of the model run, save the NCJID
-            !   IF ( INDEX('0000000000000000',OLDTIMEID).EQ.1 ) &
-            !     NCJREG(NJN) = NCIDS(NCJOIN(1), NCJOIN(2), 1)
-            !   NCJID = NCJREG(NJN)
-            !   NJN = NJN+1
-            ! END IF
 
 ! 2.3.2 Set variable name substring in the name of a new file (ENAME in FNAMENC)
 
@@ -3533,9 +3523,10 @@
             ! to a separate file),
             IF ( NCJID .NE. 0 ) FLSEP = .FALSE.
 
-            ! Note: From here FLSEP == .TRUE. implies that NCJID == 0,
-            ! If NCJID == 0, then FLSEP indicates if the field goes to
-            ! a separate netCDF file
+            ! Note: From here FLSEP == .TRUE. implies that NCJID == 0.
+            ! If NCJID == 0 and FLSEP is True, the variable goes to
+            ! a separate netCDF file. If NCJID == 0 and FLSEP is False,
+            ! the variable go in a common netCDF id. NCIDS(1,1,1)
 
 ! 2.3.3 Initialize the space-time grid dimension lengths for a new netCDF file
             
@@ -3660,7 +3651,12 @@
             ! If we need the third dimension in a netCDF file already open,
             ! check if the third dimension exists, and if it matches
             IF ( NEW3D .AND. .NOT.FLSEP ) THEN
-              CALL W3NCINQ3( NCJID, DIM3NAME, DIMID3, DIMLN(ITD-1), &
+!/DEBUG       ! CHA 20200903 BUG: tested NCJID, must be the already open id.
+              ! Tentative id. if already open
+              OLDNCID=NCJID
+              ! If all variables in the same file
+              IF ( NCJID .EQ. 0 )  OLDNCID = NCIDS(1,1,1)
+              CALL W3NCINQ3( OLDNCID, DIM3NAME, DIMID3, DIMLN(ITD-1), &
                              VCHCK=DIM3VAR )
               IF ( DIMID3 .EQ. -1 ) THEN
                 ! If DIM3NAME is defined in the netCDF but doesn't match
@@ -3694,7 +3690,7 @@
               OLDNCID = NCIDS(1,1,1)
             ELSE
               ! the variable in a separate file
-              OLDNCID = NCIDS(IFI,IFJ,IFP) ! When a partition, IFP is IPART+1
+              OLDNCID = NCIDS(IFI,IFJ,IFP) ! IFP may be an index of a partition
             END IF
 
 
@@ -3755,18 +3751,24 @@
               ! Set the size of the 'level' dim
               DIMLN(1)=1
 
-              ! If NOT unstructure mesh (i.e. regular grid)
-              IF (GTYPE.NE.UNGTYPE) THEN      
-                ! If spherical coordinate
-                IF (FLAGLL) THEN 
-                  VARNM(NFIELD+1)='Longitude'
-                  VARNM(NFIELD+2)='Latitude'
-                ! If cartesian coordinate
-                ELSE
-                  VARNM(NFIELD+1)='x'
-                  VARNM(NFIELD+2)='y'
-                END IF
-              END IF   
+              ! C. Hansen 20200907: grid coordinates VARNM(NFIELD+1,NFIELD+2)
+              ! are *not* used (were they used some time before?)
+              ! ! If NOT unstructure mesh (i.e. regular grid)
+              ! IF (GTYPE.NE.UNGTYPE) THEN      
+              !   ! If spherical coordinate
+              !   IF (FLAGLL) THEN 
+              !     VARNM(NFIELD+1)='Longitude'
+              !     VARNM(NFIELD+2)='Latitude'
+              !   ! If cartesian coordinate
+              !   ELSE
+              !     VARNM(NFIELD+1)='x'
+              !     VARNM(NFIELD+2)='y'
+              !   END IF
+              ! END IF   
+              ! 
+              ! 
+              ! 
+              ! 
 
 ! 2.5.1 Creates the NetCDF file 
               CALL W3CRNC(FNAMENC,NCID,DIMID,DIMLN,VARID, &
@@ -4312,8 +4314,8 @@
 
             ! If it is the first field of the file in mode together
             ! or NOT together or variable with a third dimension
-            ! ChrisBunney: Also - check IPART=TABIPART in case first
-            ! requested output is a partitioned field (C Hansen: IFP.EQ.1).
+            ! ChrisBunney: Also - check IPART=TABIPART (-> C Hansen: IFP.EQ.1)
+            ! in case first requested output is a partitioned field.
             IF ( ( IFI.EQ.I1 .AND. IFJ.EQ.J1 .AND. IFP.EQ.1 ) .OR. FLSEP ) THEN
               IRET=NF90_PUT_VAR(NCID,VARID(ITD-1),OUTJULDAY,(/NTIM/))
               ! ITD = 4 + EXTRADIM was set in Sect. 2.3.4
@@ -4467,9 +4469,9 @@
           ! Repeat if there are extra partitions or subfields for the
           ! group (IFI,IFJ)
           END DO ! WHILE IFP .LE. NFP
-!
-        END DO  ! IFI=1, NOGRP
-      END DO  ! IFJ=1, NGRPP
+!      
+        END DO  ! IFJ=1, NGRPP
+      END DO  ! IFI=1, NOGRP
 !
 ! Clean up
       DEALLOCATE(X1, X2, XX, XY)
