@@ -3611,7 +3611,7 @@
             
             ! By default the variable has no third dimension:
             EXTRADIM = 0
-            ! C. Hansen, note: EXTRADIM is defined aritmetically, but after
+            ! C. Hansen, note: EXTRADIM is defined arithmetically, but after
             ! introducing indices ITD and TDIM above, it is considered a boolean
             ! except for the subroutine W3CRNC.
             
