@@ -791,7 +791,7 @@
 !
       CHARACTER*9             :: DIM3NAME = '         '
 !     ! C Hansen: ! FLDIR is obsolete
-      LOGICAL                 :: FLFRQ, FLDIR, FEXIST, FREMOVE ! , FLDIR
+      LOGICAL                 :: FLFRQ, FEXIST, FREMOVE ! , FLDIR
       LOGICAL                 :: FLSEP, NEW3D, FIRST_TOGETHER
       LOGICAL                 :: CUSTOMFRQ=.FALSE.
 !/T      LOGICAL                 :: LTEMP(NGRPP)
@@ -4377,7 +4377,7 @@
                   X1(:,:) = XXK(:,:,IK)
                   X2(:,:) = XYK(:,:,IK)
                 ELSE
-                  ! Implementation of a eventual field with NFIELD==3 and
+                  ! Implementation of an eventual variable with NFIELD==3 and
                   ! EXTRADIM==1 has to be completed here
                   WRITE(NDSE,*) ' *** WAVEWATCH III ERROR IN OUNF :'
                   WRITE(NDSE,*) ' Program missing for NFIELD==3 with a third dim'
@@ -4675,7 +4675,7 @@
 !
       CHARACTER                         :: ATTNAME*120,ATTVAL*120
 
-! C. Hansen, future proposal: EXTRADIM is used aritmetically, but might
+! C. Hansen, future proposal: EXTRADIM is used arithmetically, but might
 ! be considered a boolean by introducing indices ITD and ITV:
 ! ITD=4+EXTRADIM (index of time in DIMID)
 ! ITV=3+EXTRADIM (index of time in VARID)
