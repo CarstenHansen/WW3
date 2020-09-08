@@ -3796,7 +3796,6 @@
 !/XSTO              ELSE IF ( TRIM(DIM3NAME) .EQ. 'zk' ) THEN
 !/XSTO                ! May assert that for 'zk': NZO == I2F-I1F+1
 !/XSTO                ! Set values of the dimensionless depths
-!/XSTO                ALLOCATE(DIM3VAR(NZO)) ! Will be deallocated after write
 !/XSTO                ! The dimensionless depths are distributed as expA(i-1)-1:
 !/XSTO                ! DIM3VAR(IZ)  = XZK**(IZ-1) - 1.
 !/XSTO                ! The exponential base XZK is defined so that the deepest
