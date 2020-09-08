@@ -32,9 +32,9 @@
 !/    12-Sep-2018 : Added extra partitioned fields      ( version 6.06 )
 !/    25-Sep-2018 : Add WBT parameter                   ( version 6.06 )
 !/    28-Mar-2019 : Bugfix to NBIPART check.            ( version 6.07 )
-!/    28-Jan-2020 : XSTO option: Stokes drift profile   ( version 7.?? )
+!/    28-Jan-2020 : XSTO option: Stokes drift profile   ( version 7.XX )
 !/                  for extended spectral tail
-!/    28-Jan-2020 : MFIT+XSTO options: Stokes drift     ( version 7.?? )
+!/    28-Jan-2020 : MFIT+XSTO options: Stokes drift     ( version 7.XX )
 !/                  profile parametric fit
 !/    15-Jan-2020 : Extend handling of 3'rd dimension   ( version 7.XX )
 !/    18-Jun-2020 : Support for 360-day calendar.       ( version 7.08 )
@@ -829,7 +829,7 @@
 !
       CHARACTER*9             :: DIM3NAME = '         '
 !     ! C Hansen: ! FLDIR is obsolete
-      LOGICAL                 :: FLFRQ, FLDIR, FEXIST, FREMOVE ! , FLDIR
+      LOGICAL                 :: FLFRQ, FEXIST, FREMOVE ! , FLDIR
       LOGICAL                 :: FLSEP, NEW3D, FIRST_TOGETHER
       LOGICAL                 :: CUSTOMFRQ=.FALSE.
 !/T      LOGICAL                 :: LTEMP(NGRPP)
@@ -3638,7 +3638,6 @@
 !/MFIT                                UXSP(:,4+NZO), MAPSF, XY )
 !/MFIT                  varnc(1)='U_S(Z) = Up(Z) + Ud(Z); U_S(0) = S0 * abs(MK)'
 !/MFIT                  varnc(2)='Up(Z) = Up(0) exp( -AM (Z Kz)^PM )'
-!/MFIT                  deallocate ( M2K )
 !/MFIT                ELSE
 !/MFIT                  ! "Sd": Deep fit "Sd" already normalized by abs(M2K)
 !/MFIT                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,1),       &
@@ -3914,7 +3913,7 @@
             
             ! By default the variable has no third dimension:
             EXTRADIM = 0
-            ! C. Hansen, note: EXTRADIM is defined aritmetically, but after
+            ! C. Hansen, note: EXTRADIM is defined arithmetically, but after
             ! introducing indices ITD and TDIM above, it is considered a boolean
             ! except for the subroutine W3CRNC.
             
@@ -3954,7 +3953,6 @@
 !/XSTO              ELSE IF ( TRIM(DIM3NAME) .EQ. 'zk' ) THEN
 !/XSTO                ! May assert that for 'zk': NZO == I2F-I1F+1
 !/XSTO                ! Set values of the dimensionless depths
-!/XSTO                ALLOCATE(DIM3VAR(NZO)) ! Will be deallocated after write
 !/XSTO                ! The dimensionless depths are distributed as expA(i-1)-1:
 !/XSTO                ! DIM3VAR(IZ)  = XZK**(IZ-1) - 1.
 !/XSTO                ! The exponential base XZK is defined so that the deepest
@@ -4706,7 +4704,7 @@
                   X1(:,:) = XXK(:,:,IK)
                   X2(:,:) = XYK(:,:,IK)
                 ELSE
-                  ! Implementation of a eventual field with NFIELD==3 and
+                  ! Implementation of an eventual variable with NFIELD==3 and
                   ! EXTRADIM==1 has to be completed here
                   WRITE(NDSE,*) ' *** WAVEWATCH III ERROR IN OUNF :'
                   WRITE(NDSE,*) ' Program missing for NFIELD==3 with a third dim'
