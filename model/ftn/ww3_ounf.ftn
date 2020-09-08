@@ -831,7 +831,7 @@
 !
       CHARACTER*9             :: DIM3NAME = '         '
 !     ! C Hansen: ! FLDIR is obsolete
-      LOGICAL                 :: FLFRQ, FLDIR, FEXIST, FREMOVE ! , FLDIR
+      LOGICAL                 :: FLFRQ, FEXIST, FREMOVE ! , FLDIR
       LOGICAL                 :: FLSEP, NEW3D, FIRST_TOGETHER
       LOGICAL                 :: CUSTOMFRQ=.FALSE.
 !/T      LOGICAL                 :: LTEMP(NGRPP)
