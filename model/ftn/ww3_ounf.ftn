@@ -160,6 +160,7 @@
                                  IOUT, S3, IRET, HASNC4,               &
                                  NBIPART, CNTIPART, NCVARTYPE, IPART,  &
                                  RTDNX, RTDNY
+      INTEGER                 :: NFPMAX = 3 ! Depends on the hard-coded max
       INTEGER                 :: TOUT(2), TDUM(2), STOPDATE(8)
 !
       INTEGER, ALLOCATABLE    :: TABIPART(:), NCIDS(:,:,:)
@@ -385,7 +386,6 @@
       ! Alternative processing of TABIPART to capture requests 
       ! greater than NOSWLL (C.Bunney):
       ALLOCATE(TABIPART(NOSWLL + 1))
-      ALLOCATE(NCIDS(NOGRP,NGRPP,NOSWLL + 1))
       NBIPART=0
       DO I=1,30
         IF(STRINGIPART(I:I) .EQ. ' ') CYCLE
@@ -400,6 +400,10 @@
         ENDIF
         TABIPART(NBIPART) = IPART
       ENDDO
+      
+      NFPMAX = MAX(NBIPART,NFPMAX)
+      ALLOCATE(NCIDS(NOGRP,NGRPP,NFPMAX))
+      
 !
       IF ( NCTYPE.LT.3 .OR. NCTYPE.GT.4 ) THEN
         WRITE (NDSE,1010) NCTYPE
@@ -522,13 +526,13 @@
       IF (NOGE(4).GE.1 .AND. .NOT.TOGETHER) THEN
         IFI = 4
         DO IFJ=1, NOGE(IFI)
-          DO IPART=1,NOSWLL
-            IF (NCIDS(IFI,IFJ,IPART+1).NE.0) THEN
-              IRET = NF90_REDEF(NCIDS(IFI,IFJ,IPART+1))
+          DO IPART=2,NFPMAX
+            IF (NCIDS(IFI,IFJ,IPART).NE.0) THEN
+              IRET = NF90_REDEF(NCIDS(IFI,IFJ,IPART))
               CALL CHECK_ERR(IRET)
-              IRET=NF90_PUT_ATT(NCIDS(IFI,IFJ,IPART+1),NF90_GLOBAL,'stop_date',STRSTOPDATE)
+              IRET=NF90_PUT_ATT(NCIDS(IFI,IFJ,IPART),NF90_GLOBAL,'stop_date',STRSTOPDATE)
               CALL CHECK_ERR(IRET)
-              IRET=NF90_CLOSE(NCIDS(IFI,IFJ,IPART+1))
+              IRET=NF90_CLOSE(NCIDS(IFI,IFJ,IPART))
               CALL CHECK_ERR(IRET)
             END IF ! NCIDS
           END DO ! IPART
@@ -738,7 +742,7 @@
       CHARACTER(30)           :: FILEPREFIX
       LOGICAL, INTENT(IN)     :: TOGETHER
       LOGICAL, INTENT(IN)     :: FLG2D(NOGRP,NGRPP)
-      INTEGER, INTENT(INOUT) :: NCIDS(NOGRP,NGRPP,NOSWLL + 1), S3
+      INTEGER, INTENT(INOUT)  :: NCIDS(NOGRP,NGRPP,NFPMAX), S3
       CHARACTER*30,INTENT(IN) :: STRSTOPDATE
 !/
 !/ ------------------------------------------------------------------- /
@@ -3475,7 +3479,9 @@
             IF (I1.EQ.0 .AND. .NOT. FLSEP) I1=IFI
             IF (J1.EQ.0 .AND. .NOT. FLSEP) J1=IFJ
 
-            ! NCJID: ID of a requested joint netCDF file (NOT for swell part.)
+            ! NCJID: ID of a joint netCDF file if that is requested
+            !        This will overrule a True value of FLSEP for this field
+            !        This is not applied for swell partitions with INDEXIPART>1
             NCJID = 0
             IF ( IFP .GT. 1 .AND. FLSEP .AND. INDEXIPART .EQ. 1 ) &
               NCJID = NCIDS(IFI, IFJ, 1) ! is already open
@@ -4788,6 +4794,11 @@
 
           ! Repeat if there are extra partitions or subfields for the
           ! group (IFI,IFJ)
+          IF ( NFP .GT. NFPMAX ) THEN
+            ! This must never occur for the user
+            WRITE(NDSE,*) 'Hardcoded configuration error: NFP > NFPMAX'
+            CALL EXTCDE(1)
+            END IF
           END DO ! WHILE IFP .LE. NFP
 !      
         END DO  ! IFJ=1, NGRPP
