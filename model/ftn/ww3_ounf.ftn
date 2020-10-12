@@ -89,6 +89,38 @@
 !     Checks on input, checks in W3IOxx.
 !
 !  7. Remarks :
+!      
+!     A note on the logical flag FLJOIN and loop over a number of sub-parameters.
+!
+!     Currently the maximum number of sub-parameters in the code is NSPMAX=2.
+!          
+!     FLJOIN is a flag indicating if a sub-parameter should be put together in
+!     a joint netCDF file. It is set to False in the case of a spectral field
+!     over three dimensions, x, y, and frequency ('f'), for which is a
+!     configuration flag FLFRQ is True.
+!
+!     A field parameter may contain more than one sub-parameters. Two examples of
+!     this are the parameter 'P2S' (IFI,IFJ=6,7), which contains two scalar
+!     sub-parameters 'p2s' and 'pp2s', and the parameter 'BED' (IFI,IFJ=7,3),
+!     which  contains two sub-parameters, a scalar 'bed' and a vector
+!     ('ripplex', 'rippley').
+!
+!     A flag FLJOIN may be set to True for individual sub-parameters in the
+!     hardcoded configuration, and in case the overall input (namelist) parameter
+!     NML_FIELD%SAMEFILE is False the sub-parameter will be put together with the
+!     first sub-parameter under the common parameter.
+!    
+!     To manage this, a counter ISP=1,NSP is applied in a loop over these
+!     sub-parameters. In addition ISP also acts as a counter over swell
+!     partitions. Any sub-parameter with ISP >= 2, which has a configured True
+!     value of FLJOIN, is put in the same file as the parameter with ISP == 1,
+!     even if TOGETHER is .FALSE. A message 'Writing the new record ...' is
+!     written to standard output for each sub-parameter.
+!
+!     Note that FLJOIN is NOT set to True for swell partitions
+!      
+!     A parameter with ISP == 1 can be forced to a separate file by setting
+!     FLJOIN = .FALSE., but forcing FLJOIN to True only makes sense for ISP > 1.
 !
 !  8. Structure :
 !
@@ -160,6 +192,7 @@
                                  IOUT, S3, IRET, HASNC4,               &
                                  NBIPART, CNTIPART, NCVARTYPE, IPART,  &
                                  RTDNX, RTDNY
+      INTEGER                 :: NSPMAX = 2 ! Max number of sub-parameters
       INTEGER                 :: TOUT(2), TDUM(2), STOPDATE(8)
 !
       INTEGER, ALLOCATABLE    :: TABIPART(:), NCIDS(:,:,:)
@@ -385,7 +418,6 @@
       ! Alternative processing of TABIPART to capture requests 
       ! greater than NOSWLL (C.Bunney):
       ALLOCATE(TABIPART(NOSWLL + 1))
-      ALLOCATE(NCIDS(NOGRP,NGRPP,NOSWLL + 1))
       NBIPART=0
       DO I=1,30
         IF(STRINGIPART(I:I) .EQ. ' ') CYCLE
@@ -400,6 +432,11 @@
         ENDIF
         TABIPART(NBIPART) = IPART
       ENDDO
+
+      ! Max of requested partitions or configured sub-parameters
+      NSPMAX = MAX(NBIPART,NSPMAX)
+      ALLOCATE(NCIDS(NOGRP,NGRPP,NSPMAX))
+      
 !
       IF ( NCTYPE.LT.3 .OR. NCTYPE.GT.4 ) THEN
         WRITE (NDSE,1010) NCTYPE
@@ -504,63 +541,40 @@
       END DO
 
 
-! 5.2 Closes the netCDF file
-      IF (TOGETHER .AND. NCIDS(1,1,1).NE.0) THEN
-        IRET = NF90_REDEF(NCIDS(1,1,1))
-        CALL CHECK_ERR(IRET)
-        IRET=NF90_PUT_ATT(NCIDS(1,1,1),NF90_GLOBAL,'stop_date',STRSTOPDATE)
-        CALL CHECK_ERR(IRET)
-        IRET=NF90_CLOSE(NCIDS(1,1,1))
-        CALL CHECK_ERR(IRET)
-      END IF
-!
+! 5.2 Closes the netCDF files
       DO IFI=1, NOGRP
+        IF ( ALL(NCIDS(IFI,:,1).EQ.0) ) CYCLE
         DO IFJ=1, NGRPP
-          IF ( FLG2D(IFI,IFJ) ) THEN
-            IF ( FLOGRD(IFI,IFJ) ) THEN
-              IF (.NOT. TOGETHER) THEN
-                IF (NCIDS(IFI,IFJ,1).NE.0) THEN
-                  IRET = NF90_REDEF(NCIDS(IFI,IFJ,1))
-                  CALL CHECK_ERR(IRET)
-                  IRET=NF90_PUT_ATT(NCIDS(IFI,IFJ,1),NF90_GLOBAL,'stop_date',STRSTOPDATE)
-                  CALL CHECK_ERR(IRET)
-                  IRET=NF90_CLOSE(NCIDS(IFI,IFJ,1))
-                  CALL CHECK_ERR(IRET)
-                END IF ! NCIDS
-                ! close partition files (except part 0 which is already closed by (IFI,IFJ,1)
-                IF ((IFI.EQ.4).AND.(IFJ.LE.NOGE(IFI))) THEN
-                  DO IPART=1,NOSWLL
-                    IF (NCIDS(IFI,IFJ,IPART+1).NE.0) THEN
-                      IRET = NF90_REDEF(NCIDS(IFI,IFJ,IPART+1))
-                      CALL CHECK_ERR(IRET)
-                      IRET=NF90_PUT_ATT(NCIDS(IFI,IFJ,IPART+1),NF90_GLOBAL,'stop_date',STRSTOPDATE)
-                      CALL CHECK_ERR(IRET)
-
-                      IRET=NF90_CLOSE(NCIDS(IFI,IFJ,IPART+1))
-                      CALL CHECK_ERR(IRET)
-                    END IF ! NCIDS
-                  END DO ! IPART
-                END IF ! partition
-              ! else if together
-              ELSE
-                ! close frequency file
-                IF ( ((IFI.EQ.6).AND.(IFJ.EQ.8)) .OR.                 &
-                     ((IFI.EQ.6).AND.(IFJ.EQ.9)) .OR.                 &
-                     (IFI.EQ.3) ) THEN
-                  IF (NCIDS(IFI,IFJ,1).NE.0) THEN
-                    IRET = NF90_REDEF(NCIDS(IFI,IFJ,1))
-                    CALL CHECK_ERR(IRET)
-                    IRET=NF90_PUT_ATT(NCIDS(IFI,IFJ,1),NF90_GLOBAL,'stop_date',STRSTOPDATE)
-                    CALL CHECK_ERR(IRET)
-                    IRET=NF90_CLOSE(NCIDS(IFI,IFJ,1))
-                    CALL CHECK_ERR(IRET)
-                  END IF ! NCIDS
-                END IF ! IFI
-              END IF ! TOGETHER
-            END IF ! FLOGRD
-          END IF ! FLG2D
+          IF (NCIDS(IFI,IFJ,1).NE.0) THEN
+            IRET = NF90_REDEF(NCIDS(IFI,IFJ,1))
+            CALL CHECK_ERR(IRET)
+            IRET=NF90_PUT_ATT(NCIDS(IFI,IFJ,1),NF90_GLOBAL,'stop_date',STRSTOPDATE)
+            CALL CHECK_ERR(IRET)
+            IRET=NF90_CLOSE(NCIDS(IFI,IFJ,1))
+            CALL CHECK_ERR(IRET)
+          END IF ! NCIDS
+          IF ( ALL(NCIDS(IFI,IFJ+1:NGRPP,1).EQ.0) ) EXIT
         END DO ! IFJ
+        
       END DO ! IFI
+!
+      ! close partition files (except part 0 which is already closed by (IFI,IFJ,1)
+      IF ( NOGE(4).GE.1 .AND. .NOT.TOGETHER) THEN
+        IFI = 4
+        DO IFJ=1, NOGE(IFI)
+          IF ( ALL(NCIDS(IFI,IFJ,2:NBIPART).EQ.0 ) ) CYCLE
+          DO IPART=2,NBIPART
+            IF (NCIDS(IFI,IFJ,IPART).NE.0) THEN
+              IRET = NF90_REDEF(NCIDS(IFI,IFJ,IPART))
+              CALL CHECK_ERR(IRET)
+              IRET=NF90_PUT_ATT(NCIDS(IFI,IFJ,IPART),NF90_GLOBAL,'stop_date',STRSTOPDATE)
+              CALL CHECK_ERR(IRET)
+              IRET=NF90_CLOSE(NCIDS(IFI,IFJ,IPART))
+              CALL CHECK_ERR(IRET)
+            END IF ! NCIDS
+          END DO ! IPART
+        END DO ! IFJ
+      END IF ! NOGE(4).GE.1 .AND. .NOT.TOGETHER
 
 !
       GOTO 888
@@ -699,8 +713,7 @@
 !
 !     Internal parameters
 !     ----------------------------------------------------------------
-!       FLTWO   Log.  Flags for two-dimensional field X Y.
-!       FLDIR   Log.  Flags for two-dimensional, directional field.
+!       ! C Hansen: Removed obsolete flags FLTWO FLDIR
 !       FLFRQ   Log.  Flags for frequency array (3D field)
 !       X1, X2, XX, XY
 !               R.A.  Output fields
@@ -764,7 +777,7 @@
       CHARACTER(30)           :: FILEPREFIX
       LOGICAL, INTENT(IN)     :: TOGETHER
       LOGICAL, INTENT(IN)     :: FLG2D(NOGRP,NGRPP)
-      INTEGER, INTENT(INOUT) :: NCIDS(NOGRP,NGRPP,NOSWLL + 1), S3
+      INTEGER, INTENT(INOUT)  :: NCIDS(NOGRP,NGRPP,NSPMAX), S3
       CHARACTER*30,INTENT(IN) :: STRSTOPDATE
 !/
 !/ ------------------------------------------------------------------- /
@@ -776,6 +789,7 @@
                                  MAPSTAOUT, NDSDAT, VMIN, VMAX,        &
                                  NFIELD, N, IRET, IK, EXTRADIM, IVAR,  &
                                  IVAR1, IDVAROUT, NCVARTYPE
+      INTEGER                 :: ISP, NSP
       INTEGER                 :: DIMID(6), VARID(300), START(4),       &
                                  COUNT(4), DIMLN(6),START1D(2),        &
                                  COUNT1D(2), DIMFIELD(3),              &
@@ -805,17 +819,21 @@
       DOUBLE PRECISION        :: OUTJULDAY
       DOUBLE PRECISION        :: SXD, SYD, X0D, Y0D
 !
-      CHARACTER*80            :: VARNM(8),VARNL(8)
-      CHARACTER*120           :: VARNS(8),VARNG(8), VARND(8), STR2
-      CHARACTER*512           :: VARNC(8), PARTCOM
+      ! C. Hansen 20200907: Grid coordinates VARNM(NFIELD+1:NFIELD+2) are
+      !                     *not* used in present version
+      CHARACTER*80            :: VARNM(3),VARNL(3)
+      CHARACTER*120           :: VARNS(3),VARNG(3), VARND(3), STR2
+      CHARACTER*512           :: VARNC(3), PARTCOM
       CHARACTER*30            :: UNITVAR(3),FORMAT1
       CHARACTER*30            :: STRSTARTDATE
       CHARACTER               :: FNAMENC*50,                           &
-                                 ENAME*10,FORMF*11, UNITS*24, UNITS2*24
+                                 ENAME*10, UNITS*24
+      ! C. Hansen, removed obsolete CHARACTER FORMF*11 and UNITS2*24
       CHARACTER, SAVE         :: OLDTIMEID*16 = '0000000000000000'
       CHARACTER, SAVE         :: TIMEID*16 = '0000000000000000'
 !
-      LOGICAL                 :: FLFRQ, FLDIR, FEXIST, FREMOVE
+      LOGICAL                 :: FLFRQ, FEXIST
+      LOGICAL                 :: FLJOIN, FIRST_TOGETHER
       LOGICAL                 :: CUSTOMFRQ=.FALSE.
 !/T      LOGICAL                 :: LTEMP(NGRPP)
 !/RTD ! RTDL == False for a standard lat-lon grid. Will be set to True if the
@@ -941,6 +959,15 @@
         WRITE(PARTCOM, '("PTM_",I1,"_Unknown")') PTMETH
       ENDIF
 
+      ! Set a flag when a new time stamp in files
+      IF ( INDEX(TIMEID,OLDTIMEID) .EQ. 0 ) THEN
+         ! The first parameter in a file TOGETHER. Will be set FALSE for
+         ! following parameters in the file
+         FIRST_TOGETHER = .TRUE.
+      ELSE
+         FIRST_TOGETHER = .FALSE.
+      END IF
+
 !/SMC!
 !/SMC!---  Update MAPSMC for SMC type 2 output. This needs to be
 !/SMC!     done at each timestep as MAPSTA could change if there
@@ -948,40 +975,65 @@
 !/SMC!
 !/SMC      IF(SMCTYPE .EQ. 2) CALL MAPSTA_SMC()
 !
+      
 !--- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-! 2.  Loop over output fields.
+! 2.  Loop over output parameters.
 !
 
-      ! Instanciates the field and group indexes
+      ! Instanciates the parameter and group indexes
       I1=0
       J1=0
 !
       DO IFI=1, NOGRP
         DO IFJ=1, NGRPP
+
+          IF ( .NOT. FLG2D(IFI,IFJ) ) CYCLE
+          ! Here, the flag for the variable IFI of the group IFJ is .TRUE.
           ENAME='      '
-          ! If the flag for the variable IFI of the group IFJ is .TRUE.
-          IF ( FLG2D(IFI,IFJ) ) THEN
-            ! Instanciates the partition array
-            INDEXIPART=1
-            IPART=TABIPART(INDEXIPART)
-            VARNS(:)=''
+          ! Instanciates the partition array
+          INDEXIPART=1
+          ! IPART=TABIPART(INDEXIPART)
+          VARNS(:)=''
 
+          ! NSP: Number of swell partitions or sub-parameters under (IFI,IFJ).
+          ! NSP will be incremented by one for each partition or sub-parameter
+          NSP = 1 
+          ISP = 0
+          DO WHILE ( ISP .LT. NSP )
+            ISP = ISP + 1
 
-!  Loop over IPART for partition variables
-555         CONTINUE
+            ! Increment NSP by one if a following partition is requested
+            ! (Loops over IPART for partition variables)
+            ! ChrisBunney: Don't loop IPART for last two entries in section 4
+            ! (16: total wind sea fraction, 17: number of parts) as these fields
+            ! do not have partitions.
+            IF (IFI .EQ. 4 .AND. IFJ .LE. NOGE(IFI) - 2) THEN
+              IPART=TABIPART(INDEXIPART)
+              DO WHILE (INDEXIPART.LT.NBIPART)
+                INDEXIPART=INDEXIPART+1
+                IF (TABIPART(INDEXIPART).EQ.-1) CYCLE
+                NSP = NSP + 1
+                EXIT
+              END DO
+             END IF
 
-            ! Initializes the index of field and group at the first flag FLG2D at .TRUE.
-            IF (I1.EQ.0) I1=IFI
-            IF (J1.EQ.0) J1=IFJ
-            FORMF  = '(1X,32I5)'
-!/T            WRITE (NDST,9020) IDOUT(IFI,IFJ)
+!/T            IF ( INDEXIPART .GT. 0 ) THEN
+!/T              WRITE (NDST,9021) IDOUT(IFI,IFJ), IPART
+!/T            ELSE IF ( ISP .GT. 1 ) THEN
+!/T              WRITE (NDST,9021) IDOUT(IFI,IFJ), ISP
+!/T            ELSE
+!/T              WRITE (NDST,9020) IDOUT(IFI,IFJ)
+!/T            END IF
 !
 ! 2.1 Set output arrays and parameters
 !
-            ! Initializes the flags for freq and direction dimensions
+            ! Initializes the flag for freq dimension
             FLFRQ = .FALSE.
-            FLDIR = .FALSE.
-            UNITS2='SAME'
+!
+            ! Initializes a flag that the parameters should go together in the
+            ! same file if the user input parameter NML_FIELD%SAMEFILE is True
+            FLJOIN = TOGETHER
+!            
             IF (NCVARTYPEI.EQ.3) NCVARTYPE=2
 !
             IF ( IFI .EQ. 1 .AND. IFJ .EQ. 1 ) THEN
@@ -2740,34 +2792,53 @@
               VMAX =  9900
 !
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 7 ) THEN
-              NFIELD=2
-              FSC    = 0.01
-              ENAME  = '.p2s'
-              UNITS  = 'm4'
-              UNITS2 = 's-1'
-              VARNM(1)='fp2s'
-              VARNM(2)='pp2s'
-              VARNL(1)='power spectral density of equivalent surface pressure'
-              VARNL(2)='peak period of power spectral density of equivalent surface pressure'
-              VARNS(1)='power_spectral_density_of_equivalent_surface_pressure'
-              VARNS(2)='peak_period_of_power_spectral_density_of_equivalent_surface_pressure'
-              VARNG(1)='power_spectral_density_of_equivalent_surface_pressure'
-              VARNG(2)='peak_period_of_power_spectral_density_of_equivalent_surface_pressure'
-              VARNC(1)=''
-              VARNC(2)=''
-              VARND(1)=''
-              VARND(2)=''
-              VMIN = -15000 
-              VMAX = 32000
-              IF( SMCGRD ) THEN
-!/SMC                CALL W3S2XY_SMC( PRMS(1:NSEA), XX )
-!/SMC                CALL W3S2XY_SMC( TPMS(1:NSEA), XY )
-              ELSE
-                CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PRMS(1:NSEA)      &
-                                                        , MAPSF, XX )
-                CALL W3S2XY ( NSEA, NSEA, NX+1, NY, TPMS(1:NSEA)      &
-                                                        , MAPSF, XY )
-              ENDIF ! SMCGRD
+              ! This is an example of placing more than one parameter in the
+              ! same file even if TOGETHER is set as .FALSE. This is managed
+              ! by joining sub-parameters into into a common
+              ! NCID = NCIDS(IFI, IFJ, 1)
+              NSP = 2 ! Number of sub-parameters in loop over ISP=1,NSP
+!
+              IF ( ISP .EQ. 1 ) THEN
+                NFIELD = 1
+                ENAME  = '.p2s'
+                UNITS  = 'm4'
+                FSC    = 0.01
+                VARNM(1)='fp2s'
+                VARNL(1)='power spectral density of equivalent surface pressure'
+                VARNG(1)='power_spectral_density_of_equivalent_surface_pressure'
+                VARNS(1)='power_spectral_density_of_equivalent_surface_pressure'
+                VARNC(1)=''
+                VARND(1)=''
+                VMIN = -15000 
+                VMAX = 32000
+                IF( SMCGRD ) THEN
+!/SMC                  CALL W3S2XY_SMC( PRMS(1:NSEA), X1 )
+                ELSE
+                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PRMS(1:NSEA), MAPSF, X1 )
+                ENDIF ! SMCGRD
+!
+              ELSE ! ISP==2
+                ! This sub-parameter goes to the netCDF file id. NCIDS(IFI,IFJ,1)
+                FLJOIN = .TRUE.
+                NFIELD = 1
+                ENAME  = '.pp2s'
+                UNITS  = 's-1'
+                FSC    = 0.01
+                VARNM(1)='pp2s'
+                VARNL(1)='peak period of power spectral density of equivalent surface pressure'
+                VARNG(1)='peak_period_of_power_spectral_density_of_equivalent_surface_pressure'
+                VARNS(1)='peak_period_of_power_spectral_density_of_equivalent_surface_pressure'
+                VARNC(1)=''
+                VARND(1)=''
+                VMIN = -15000 
+                VMAX = 32000
+                IF( SMCGRD ) THEN
+!/SMC                  CALL W3S2XY_SMC( TPMS(1:NSEA), X1 )
+                ELSE
+                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, TPMS(1:NSEA), MAPSF, X1 )
+                ENDIF ! SMCGRD
+!
+              END IF ! ISP
 !
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 8 ) THEN
               ! Information for spectral distribution of surface Stokes drift (2nd file)
@@ -3033,37 +3104,53 @@
               VMAX = 18000
 !
             ELSE IF ( IFI .EQ. 7 .AND. IFJ .EQ. 3 ) THEN
-              FSC    = 0.001
-              UNITS  = 'm'
-              ENAME  = '.bed'
+              NSP = 2 ! Number of sub-parameters in loop over ISP=1,NSP
+!
+              IF ( ISP .EQ. 1 ) THEN              
+                NFIELD=1
+                FSC    = 0.001
+                UNITS  = 'm'
+!
+                ENAME  = '.bed'
+                VARNM(1)='bed'
+                VARNL(1)='bottom roughness'
+                VARNS(1)='sea_floor_roughness_length'
+                VARNG(1)='bottom_roughness'
+                VARNC(1)='SHOWEX bottom friction with movable bed effects'
+                VARND(1)=''
+                CALL W3S2XY ( NSEA, NSEA, NX+1, NY, BEDFORMS(1:NSEA,1)    &
+                                                          , MAPSF, X1 )
+                VMIN = 0
+                VMAX = 32000
+              ELSE ! if ( ISP == 2 )
+                ! This sub-parameter goes to the netCDF file id. NCIDS(IFI,IFJ,1)
+                FLJOIN = .TRUE.
+                NFIELD=2
+                FSC    = 0.001
+                UNITS  = 'm'
+!
+                ENAME  = '.ripple'
+                ! SHOWEX potential 'ripple length' vector BEDFORM(2),BEDFORM(3)
+                ! of SUBROUTINE W3SBT4
 !/RTD              ! Rotate x,y vector back to standard pole
 !/RTD              IF ( FLAGUNR ) CALL W3XYRTN(NSEA, BEDFORMS(1:NSEA,2), &
 !/RTD                                           BEDFORMS(1:NSEA,3), AnglD)
-              CALL W3S2XY ( NSEA, NSEA, NX+1, NY, BEDFORMS(1:NSEA,1)    &
-                                                        , MAPSF, X1 )
-              CALL W3S2XY ( NSEA, NSEA, NX+1, NY, BEDFORMS(1:NSEA,2)    &
-                                                        , MAPSF, X2 )
-              CALL W3S2XY ( NSEA, NSEA, NX+1, NY, BEDFORMS(1:NSEA,3)    &
-                                                        , MAPSF, XY )
-              NFIELD=3
-              VARNM(1)='bed'
-              VARNM(2)='ripplex'
-              VARNM(3)='rippley'
-              VARNL(1)='bottom roughness'
-              VARNL(2)='eastward sea bottom ripple wavelength'
-              VARNL(3)='northward sea bottom ripple wavelength'
-              VARNS(1)='sea bottom roughness length'
-              VARNS(2)='eastward_ripple_wavelength'
-              VARNS(3)='northward_ripple_wavelength'
-              VARNG(1)='ripple_wavelength'
-              VARNG(2)='eastward_ripple_wavelength'
-              VARNG(3)='northward_ripple_wavelength'
-              VARNC(1)='ripple_length=sqrt(ripplex**2+rippley**2)'
-              VARNC(2)='ripple_length=sqrt(ripplex**2+rippley**2)'
-              VARNC(3)='ripple_length=sqrt(ripplex**2+rippley**2)'
-              VARND(1)=''
-              VARND(2)=''
-              VARND(3)=''
+                CALL W3S2XY ( NSEA, NSEA, NX+1, NY, BEDFORMS(1:NSEA,2)    &
+                                                          , MAPSF, XX )
+                CALL W3S2XY ( NSEA, NSEA, NX+1, NY, BEDFORMS(1:NSEA,3)    &
+                                                          , MAPSF, XY )
+                VARNM(1)='ripplex'
+                VARNM(2)='rippley'
+                VARNL(1)='eastward sea bottom ripple wavelength'
+                VARNL(2)='northward sea bottom ripple wavelength'
+                VARNS(1)='eastward_ripple_wavelength'
+                VARNS(2)='northward_ripple_wavelength'
+                VARNG(1)='eastward_ripple_wavelength'
+                VARNG(2)='northward_ripple_wavelength'
+                VARNC(1)='ripple_length=sqrt(ripplex**2+rippley**2)'
+                VARNC(2)='ripple_length=sqrt(ripplex**2+rippley**2)'
+                VARND(1)=''
+                VARND(2)=''
 !/RTD              ! Override standard direction comment
 !/RTD              IF ( FLAGUNR ) THEN
 !/RTD                VARND(2) = 'True North'
@@ -3072,8 +3159,9 @@
 !/RTD                VARND(2) = 'Rotated Pole Grid North'
 !/RTD                VARND(3) = 'Rotated Pole Grid North'
 !/RTD              END IF
-              VMIN = 0
-              VMAX = 30000
+                VMIN = -32000
+                VMAX = 32000
+              END IF
 !
             ELSE IF ( IFI .EQ. 7 .AND. IFJ .EQ. 4 ) THEN
               FSC    = 0.1
@@ -3369,7 +3457,6 @@
 
             ! Defines a differents for the second variable if specified
             UNITVAR(:)=UNITS
-            IF (UNITS2.NE.'SAME') UNITVAR(2)=UNITS2
 
 
 ! 2.2 Make map
@@ -3402,23 +3489,62 @@
 
 ! 2.3 Setups the output type 4 ( NetCDF file )
 
-            S2=LEN_TRIM(ENAME)
+      ! Subsections:
+      ! 2.3.1 Flag FLJOIN for the variable to be together or in a separate netCDF
+      ! 2.3.2 Set variable name substring (ENAME) in the name of a new file
+      ! 2.3.3 Initialize dimensions etc.
+
+! 2.3.1 Flag FLJOIN for the variable to be together or in a separate netCDF file
+
+            ! A sub-parameter with ISP == 1 may be forced to a separate file by
+            ! setting FLJOIN = .FALSE., but no 'samefile' exists if TOGETHER is
+            ! .FALSE., and in that case FLJOIN cannot be True.
+            IF ( ISP .EQ. 1 ) FLJOIN = ( FLJOIN .AND. TOGETHER )
+
+            ! FLJOIN combined with the value of FLFRQ (default .FALSE.)
+            FLJOIN = ( FLJOIN .AND. ( .NOT. FLFRQ ) )
+
+            ! This means that for ISP .EQ. 1 the FLJOIN is equivalent to
+            ! ( TOGETHER .AND. (.NOT. FLFRQ) )
+            !
+            ! From here FLJOIN == .FALSE. implies that the variable
+            ! goes to a separate netCDF file. If ISP==1 and FLJOIN
+            ! is True, the variable goes to a common netCDF id. NCIDS(1,1,1)
+
+            ! For swell partitions it is assumed that FLJOIN cannot be
+            ! configured as True unless TOGETHER is True 
+            
+            ! The index of variable and group at the first write to a file
+            ! in mode together
+            IF (I1.EQ.0 .AND. FLJOIN) I1=IFI
+            IF (J1.EQ.0 .AND. FLJOIN) J1=IFJ
+
+! 2.3.2 Set variable name substring (ENAME) in the name (FNAMENC) of a new file
+
             S1=LEN_TRIM(FILEPREFIX)+S4
             FNAMENC(S1+1:50)='       '
             FNAMENC(S1+1:S1+1) = '_'
 
             ! If flag TOGETHER and not variable with freq dim &
             ! (ef, p2l, ...), no variable name in file name
-            IF (TOGETHER.AND.(.NOT.FLFRQ)) THEN 
+            ! .AND. ISP .EQ. 1
+            IF ( FLJOIN .AND. TOGETHER ) THEN
               S2=0
             ! If NOT flag TOGETHER or variable with freq dim &
             ! (ef, p2l, ...), add variable name in file name
             ELSE
+              S2=LEN_TRIM(ENAME)
               FNAMENC(S1+2:S1+S2) = ENAME(2:S2)
             ENDIF
             ! Defines the netcdf extension
             FNAMENC(S1+S2+1:S1+S2+3) = '.nc'
             FNAMENC(S1+S2+4:S1+S2+6) = '   '
+            
+            ! We always set the file name here in order to check
+            ! if a file of that name exists
+
+! 2.3.3 Initialize dimensions etc.
+
             ! If the flag frequency is .TRUE., defines the fourth dimension
             IF (FLFRQ) THEN 
               UNITVAR(:)=UNITS
@@ -3456,37 +3582,61 @@
             IVAR1=3+EXTRADIM+(COORDTYPE-1)+MAPSTAOUT
 
 
+! 2.4 Manage netCDF file id
+
+      ! Subsections:
+      ! 2.4.1 Save the id of the previous file
+      ! 2.4.2 Remove the new file (if not created by the run)
+      ! 2.4.3 Finalize the previous file (if a new one will be created)
+
 ! 2.4.1 Save the id of the previous file
 
-            IF (TOGETHER.AND.(.NOT.FLFRQ)) THEN
+            FEXIST = .FALSE.
+            ! The netCDF file already exists if a sub-parameter (with ISP>1) is
+            ! requested to go with the first sub-parameter (ISP==1) to a
+            ! common file (and not to its own separate file).
+            ! FLJOIN must be explicitely True in the configuration of the
+            ! individual (sub-)parameter in order to override a False value of
+            ! TOGETHER
+            !
+            IF ( .NOT. FLJOIN ) THEN
+              ! the variable in a separate file
+              OLDNCID = NCIDS(IFI,IFJ,ISP) ! ISP may be an index of a partition
+            ELSE IF (ISP .EQ. 1 .OR. INDEXIPART .NE. 1 .OR. TOGETHER) THEN
+              ! all variables in the same file
               OLDNCID = NCIDS(1,1,1)
             ELSE
-              OLDNCID = NCIDS(IFI,IFJ,IPART+1)
+              ! A False value of TOGETHER overridden for individual sub-parameter
+              FEXIST = .TRUE.
+              OLDNCID = NCIDS(IFI, IFJ, 1)
             END IF
 
 
 ! 2.4.2 Remove the new file (if not created by the run)
 
-            INQUIRE(FILE=FNAMENC, EXIST=FEXIST)
-            IF (FEXIST) THEN
-              FREMOVE = .FALSE.
+            ! Still, a False value of FEXIST means we don't know if a file
+            ! named FNAMENC exists. If it is created by another run, remove it.
+            IF (.NOT. FEXIST) THEN
+              INQUIRE(FILE=FNAMENC, EXIST=FEXIST)
               ! time splitted condition
-              IF (INDEX(TIMEID,OLDTIMEID).EQ.0) THEN
-                ! all variables in the samefile
-                IF (TOGETHER.AND.(.NOT.FLFRQ).AND.NCID.EQ.0) FREMOVE = .TRUE.
-                ! a file per variable
-                IF (.NOT.TOGETHER.OR.FLFRQ) FREMOVE = .TRUE.
-              END IF
-
-              IF (FREMOVE) THEN
+              IF (FEXIST .AND. INDEX(TIMEID,OLDTIMEID).EQ.0 .AND. &
+                ! a file per variable, or the variable is the first in a new file
+                  ( .NOT. FLJOIN .OR. FIRST_TOGETHER ) )  THEN
                 OPEN(UNIT=1234, IOSTAT=IRET, FILE=FNAMENC, STATUS='old')
                 IF (IRET == 0) CLOSE(1234, STATUS='delete')
                 FEXIST=.FALSE.
-              ELSE
-                NCID = OLDNCID
-              END IF
-            END IF
+              END IF            
+            END IF            
 
+            ! Set FIRST_TOGETHER FALSE for following parameters in the file
+            IF ( FLJOIN .AND. FIRST_TOGETHER ) FIRST_TOGETHER = .FALSE.
+            
+            ! From here, a False value of FEXIST implies that a new file will be
+            ! created. If FEXIST is True the file is open with OLDNCID > 0.
+            
+            IF (FEXIST) NCID = OLDNCID
+
+            
 ! 2.4.3 Finalize the previous file (if a new one will be created)
 
             IF (.NOT.FEXIST) THEN 
@@ -3505,25 +3655,27 @@
 
             IF (.NOT.FEXIST) THEN 
 
-              ! Initializes the time dimension length
+              ! Set the size of the 'level' dim
               DIMLN(1)=1
 
-              ! If NOT unstructure mesh (i.e. regular grid)
-              IF (GTYPE.NE.UNGTYPE) THEN      
-                ! If spherical coordinate
-                IF (FLAGLL) THEN 
-                  VARNM(NFIELD+1)='Longitude'
-                  VARNM(NFIELD+2)='Latitude'
-                ! If cartesian coordinate
-                ELSE
-                  VARNM(NFIELD+1)='x'
-                  VARNM(NFIELD+2)='y'
-                END IF
-              END IF   
-
-
-
-
+              ! C. Hansen 20200907: grid coordinates VARNM(NFIELD+1,NFIELD+2)
+              ! are *not* used (were they used some time before?)
+              ! ! If NOT unstructure mesh (i.e. regular grid)
+              ! IF (GTYPE.NE.UNGTYPE) THEN      
+              !   ! If spherical coordinate
+              !   IF (FLAGLL) THEN 
+              !     VARNM(NFIELD+1)='Longitude'
+              !     VARNM(NFIELD+2)='Latitude'
+              !   ! If cartesian coordinate
+              !   ELSE
+              !     VARNM(NFIELD+1)='x'
+              !     VARNM(NFIELD+2)='y'
+              !   END IF
+              ! END IF   
+              ! 
+              ! 
+              ! 
+              ! 
 
               ! Initializes the time iteration counter n
               N=1
@@ -3534,10 +3686,10 @@
 
               ! Saves the NCID to keep the file opened to write all the variables
               ! and open/close at each time step
-              IF (TOGETHER.AND.(.NOT.FLFRQ)) THEN
+              IF ( FLJOIN ) THEN
                 NCIDS(1,1,1)=NCID
               ELSE
-                NCIDS(IFI,IFJ,IPART+1)=NCID
+                NCIDS(IFI,IFJ,ISP)=NCID
               END IF
 
               ! If curvilinear grid, instanciates lat / lon
@@ -4014,10 +4166,10 @@
 
               ! If it is the first field of the file in mode together
               ! or NOT together or variable with freq dim (ef or p2l)
-              ! ChrisBunney: Also - check IPART=TABIPART in case first
-              ! requested output is a partitioned field.
-              IF((TOGETHER .AND. IFI.EQ.I1 .AND. IFJ.EQ.J1 .AND. IPART.EQ.TABIPART(1))  &
-                 .OR.(.NOT.TOGETHER).OR.FLFRQ) n=n+1
+              ! ChrisBunney: Also - check IPART=TABIPART (-> C Hansen: ISP.EQ.1)
+              ! in case first requested output is a partitioned field.
+              IF((IFI.EQ.I1 .AND. IFJ.EQ.J1 .AND. ISP.EQ.1)  &
+                 .OR. ( .NOT. FLJOIN ) ) n=n+1
 
 ! 2.6.3 Defines or gets the variables identifiers
 
@@ -4135,7 +4287,7 @@
                 CALL CHECK_ERR(IRET)            
               END IF !   N.EQ.1
             END IF  ! IERR.EQ.0
-              
+
 ! 2.6.4 Defines the current time step and index
      
             CALL T2D(TIME,CURDATE,IERR)
@@ -4144,8 +4296,6 @@
                     'Writing new record ', ENAME(2:) ,'number ',N,                  & 
                     ' for ',CURDATE(1),':',CURDATE(2),':',CURDATE(3),'T',CURDATE(5),&
                     ':',CURDATE(6),':',CURDATE(7),' in file ',TRIM(FNAMENC)
-
-
 
             ! Defines starting point and size of arrays to be written
             START(1)=1
@@ -4165,8 +4315,8 @@
             COUNT1D(2)=1
 
             ! Puts time in NetCDF file
-            IF((IFI.EQ.I1.AND.IFJ.EQ.J1.AND.TOGETHER)  &
-               .OR.(.NOT.TOGETHER).OR.FLFRQ) THEN
+            IF ( (IFI.EQ.I1 .AND. IFJ.EQ.J1 .AND. ISP.EQ.1) &
+                 .OR. ( .NOT. FLJOIN ) ) THEN
               IVAR1=3+EXTRADIM+(COORDTYPE-1)+MAPSTAOUT
               IRET=NF90_PUT_VAR(NCID,VARID(3+EXTRADIM),OUTJULDAY,(/N/))
               CALL CHECK_ERR(IRET)
@@ -4680,26 +4830,17 @@
             ! updates the variable index
             IVAR1=IVAR1+NFIELD
 
-
-            ! Loops over IPART for partition variables
-            ! ChrisBunney: Don't loop IPART for last two entries in section 4
-            ! (16: total wind sea fraction, 17: number of parts) as these fields
-            ! do not have partitions.
-            IF (IFI .EQ. 4 .AND. IFJ .LE. NOGE(IFI) - 2) THEN
-560           CONTINUE
-              IF (INDEXIPART.LT.NBIPART) THEN
-                INDEXIPART=INDEXIPART+1
-                IF (TABIPART(INDEXIPART).EQ.-1) GOTO 560      
-                IPART=TABIPART(INDEXIPART)   
-                GOTO 555
-              END IF
-            ELSE
-              INDEXIPART=1
+          ! Repeat if there are extra partitions or sub-parameters for the
+          ! parameter (IFI,IFJ)
+          IF ( NSP .GT. NSPMAX ) THEN
+            ! This must never occur for the user
+            WRITE(NDSE,*) 'Hardcoded configuration error: NSP > NSPMAX'
+            CALL EXTCDE(1)
             END IF
+          END DO ! WHILE ISP .LE. NSP
 !      
-          END IF  ! FLG2D(IFI,IFJ)
-        END DO  ! IFI=1, NOGRP
-      END DO  ! IFJ=1, NGRPP
+        END DO  ! IFJ=1, NGRPP
+      END DO  ! IFI=1, NOGRP
 !
 ! Clean up
       DEALLOCATE(X1, X2, XX, XY, XK, XXK, XYK)
@@ -4791,7 +4932,6 @@
 ! Define dimensions
 !
       IRET = NF90_DEF_DIM(NCID, 'level', DIMLN(1), DIMID(1))
-
 !
 ! Regular structured case
 !
