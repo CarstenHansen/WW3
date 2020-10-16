@@ -189,19 +189,20 @@
 !/MFIT!
 !/MFIT!  FCOO Stokes drift parametric fit ('MFIT') NetCDF variable names
 !/MFIT!      
-!/MFIT      character(len=3), dimension(6) :: MFIT_varname = &
-!/MFIT              (/ "S0 ", "Sd ", "AM ", "PM ", "AMd", "SIC" /)
+!/MFIT      character(len=3), dimension(7) :: MFIT_varname = &
+!/MFIT              (/ "S0 ", "Sd ", "AM ", "PM ", "AMd", "SIC", "PMd" /)
 !/MFIT!
-!/MFIT      character(len=39), dimension(6) :: MFIT_longname = &
+!/MFIT      character(len=39), dimension(7) :: MFIT_longname = &
 !/MFIT              (/ "Surface Stokes-drift / abs(MK)         ", &
 !/MFIT                 "Deep part Stokes-drift / abs(MK)       ", &
 !/MFIT                 "MFIT parameter AM                      ", &
 !/MFIT                 "MFIT parameter PM                      ", &
 !/MFIT                 "MFIT parameter AMd                     ", &
-!/MFIT                 "Quality measure ITSIC                  "/)
+!/MFIT                 "Quality measure ITSIC                  ", &
+!/MFIT                 "MFIT parameter PMd                     "/)
 !/MFIT!
 !/MFIT      LOGICAL                 :: SVP=.TRUE.
-!/MFIT      character(len=10)       :: cmt_PMd = 'PMd = 0.40'
+!/MFIT      character(len=10)       :: cmt_PMd = 'PMd = 1.30'
 !/
 !/ ------------------------------------------------------------------- /
 !/
@@ -3060,7 +3061,7 @@
 !/XSTO      !       than about 0.0005.
 !/XSTO          IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
 !/XSTO          FSC  = 0.0002
-!/XSTO          VMIN = 1
+!/XSTO          VMIN = 0
 !/XSTO          VMAX = 32766              
 !/XSTO          UNITS  = 'm-1'
 !/XSTO          ENAME  = '.ksc'
@@ -3080,15 +3081,45 @@
 !/XSTO!/MFIT    VARNC(1)='Profile depths Z = zk / Kz'
 !/XSTO          VARND(1)=''
 !/XSTO!
-!/XSTO        ELSE IF ( IFP .EQ. 2 ) THEN
+!/XSTO        ELSE IF ( IFP .EQ. 3 ) THEN
 !/XSTO          ! Vertically integrated Stokes drift == wave pseudo momentum
 !/XSTO          ! For an XSTO spectral tail
 !/XSTO          ! This variable is nearly the same as TUS, the
 !/XSTO          ! 'Stokes transport', but with the XSTO extended tail
 !/XSTO          ENAME  = '.xsm'
-!/XSTO!/MFIT          ! Multiply by 2*ksc
-!/XSTO!/MFIT          UXSP(1:NSEA,2) = UXSP(1:NSEA,2)*UXSP(1:NSEA,1)*2
-!/XSTO!/MFIT          UXSP(1:NSEA,3) = UXSP(1:NSEA,3)*UXSP(1:NSEA,1)*2
+!/XSTO!/MFIT    ! Multiply by 2*ksc
+!/XSTO!/MFIT    UXSP(1:NSEA,2) = UXSP(1:NSEA,2)*UXSP(1:NSEA,1)*2.
+!/XSTO!/MFIT    UXSP(1:NSEA,3) = UXSP(1:NSEA,3)*UXSP(1:NSEA,1)*2.
+!/XSTO!/MFIT    ! Stokes drift parts at surface to be normalized by abs(2MK)+MK0
+!/XSTO!/MFIT    allocate ( M2K(NSEA), stat=IRET )
+!/XSTO!/MFIT    M2K(1:NSEA) = SQRT( UXSP(1:NSEA,2) * UXSP(1:NSEA,2)   &
+!/XSTO!/MFIT                      + UXSP(1:NSEA,3) * UXSP(1:NSEA,3) ) &
+!/XSTO!/MFIT                  + 0.01           
+!/XSTO!/MFIT    UXSP(1:NSEA,4) = UXSP(1:NSEA,4)/M2K(1:NSEA)
+!/XSTO!/MFIT    UXSP(1:NSEA,4+NZO) = UXSP(1:NSEA,4+NZO)/M2K(1:NSEA)
+!/XSTO!/MFIT    ! "Sd": Deep fit surface drift normalized by abs(2MK)+MK0
+!/XSTO!/MFIT    IF (NCVARTYPEI.LE.3) THEN
+!/XSTO!/MFIT      ! Apply a lower limiter to |M2K| if short int output
+!/XSTO!/MFIT      WHERE ( ABS(UXSP(:,4)) > 30. .OR. ABS(UXSP(:,4+NZO)) > 30.)
+!/XSTO!/MFIT        UXSP(:,4) = UXSP(:,4)*M2K(:)
+!/XSTO!/MFIT        UXSP(:,4+NZO) = UXSP(:,4+NZO)*M2K(:)
+!/XSTO!/MFIT        ! Mis-use UXSP(:,1) as a dummy first for the original M2K(:)
+!/XSTO!/MFIT        UXSP(:,1) = M2K(:)-0.01+0.0001
+!/XSTO!/MFIT        ! 2MK + MK0 id now enlarged to:
+!/XSTO!/MFIT        M2K(:) = M2K(:)*MAX( ABS(UXSP(:,4)), ABS(UXSP(:,4+NZO)) )/30.
+!/XSTO!/MFIT        ! Then, UXSP(:,1) is a dummy for the enlargement of M2K
+!/XSTO!/MFIT        UXSP(:,1) = (M2K(:)-0.01)/UXSP(:,1)
+!/XSTO!/MFIT        UXSP(:,2) = UXSP(:,2)*UXSP(:,1)
+!/XSTO!/MFIT        UXSP(:,3) = UXSP(:,3)*UXSP(:,1)
+!/XSTO!/MFIT        ! One of the surface drift components / (abs(2MK)+MK0) is 30:
+!/XSTO!/MFIT        UXSP(:,4) = UXSP(:,4)/M2K(:)
+!/XSTO!/MFIT        UXSP(:,4+NZO) = UXSP(:,4+NZO)/M2K(:)
+!/XSTO!/MFIT      ENDWHERE
+!/XSTO!/MFIT    ENDIF
+!/XSTO!/MFIT    ! "Sd": Deep fit surface drift normalized by abs(2MK)+MK0
+!/XSTO!/MFIT    USERO(1:NSEA,1) = USERO(1:NSEA,1)/M2K(1:NSEA)
+!/XSTO!/MFIT    USERO(1:NSEA,2) = USERO(1:NSEA,2)/M2K(1:NSEA)              
+!/XSTO!/MFIT    deallocate ( M2K )              
 !/XSTO!/RTD          ! Rotate x,y vector back to standard pole
 !/XSTO!/RTD          IF ( FLAGUNR ) CALL W3XYRTN(NSEA, UXSP(1:NSEA,2), &
 !/XSTO!/RTD                                      UXSP(1:NSEA,3), AnglD)
@@ -3145,7 +3176,7 @@
 !/XSTO!/RTD            VARND(2) = 'Rotated Pole Grid North'
 !/XSTO!/RTD    END IF
 !/XSTO!
-!/XSTO        ELSE IF ( IFP .EQ. 3 ) THEN
+!/XSTO        ELSE IF ( IFP .EQ. 2 ) THEN
 !/XSTO          ! Vertical profile of Stokes drift
 !/XSTO          ! For an XSTO spectral tail
 !/XSTO          DIM3NAME='zk'
@@ -3587,7 +3618,7 @@
 !
 !/MFIT            ELSE IF ( IFI .EQ. 10 .AND. IFJ .EQ. 1 ) THEN
 !/MFIT              ! The six subfields (NFP=6) are joined in the netCDF file
-!/MFIT              NFP = 6 ! Number of subfields loop over IFP=1,NFP
+!/MFIT              NFP = 7 ! Number of subfields loop over IFP=1,NFP
 !/MFIT              FSC    = 0.001
 !/MFIT              UNITS  = '1'
 !/MFIT              varnc(1)='Extended tail Stokes profile parametric fit'
@@ -3600,8 +3631,8 @@
 !/MFIT              ENAME = '.' // MFIT_varname(IFP)
 !/MFIT!
 !/MFIT!  These have been declared in the program header:
-!/MFIT!  MFIT_varname(1:6) = (/"S0 ","Sd ","AM ","PM ","AMd", "SIC"/)
-!/MFIT!  MFIT_longname(1:6) = ( ... )
+!/MFIT!  MFIT_varname(1:7) = (/"S0 ","Sd ","AM ","PM ","AMd", "SIC"/)
+!/MFIT!  MFIT_longname(1:7) = ( ... )
 !/MFIT!
 !/MFIT              IF ( IFP .LE. 2 ) THEN
 !/MFIT                ! 2D Vectors "S0", "Sd"
@@ -3616,38 +3647,25 @@
 !/RTD!/MFIT               CALL W3XYRTN(NSEA, USERO(:,1), USERO(:,2), AnglD)
 !/RTD!/MFIT           END IF
 !/MFIT                IF ( IFP .EQ. 1 ) THEN
-!/MFIT                  ! Stokes drift at surface to be normalized by abs(M2K)
-!/MFIT                  ! Has already been multiplied by 2K = 2. * UXSP(1:NSEA,1)
-!/MFIT                  allocate ( M2K(NSEA), stat=IRET )
-!/MFIT                  M2K(1:NSEA) = SQRT( UXSP(1:NSEA,2) * UXSP(1:NSEA,2)   &
-!/MFIT                                    + UXSP(1:NSEA,3) * UXSP(1:NSEA,3) )
-!/MFIT                  UXSP(:,4)=UXSP(:,4)/M2K(:)
-!/MFIT                  UXSP(:,4+NZO)=UXSP(:,4+NZO)/M2K(:)
-!/MFIT                  IF (NCVARTYPEI.EQ.3) THEN
-!/MFIT                    ! Apply a lower limiter to |M2K| if short int output
-!/MFIT                    WHERE ( ABS(UXSP(:,4)) > 30. &
-!/MFIT                           .OR. ABS(UXSP(:,4+NZO)) > 30.)
-!/MFIT                        M2K(:) = M2K(:)*30 / &
-!/MFIT                            MAX( ABS(UXSP(:,4)), ABS(UXSP(:,4+NZO)) )
-!/MFIT                        UXSP(:,4) = UXSP(:,4)*M2K(:)
-!/MFIT                        UXSP(:,4+NZO) = UXSP(:,4+NZO)*M2K(:)
-!/MFIT                    ENDWHERE
-!/MFIT                  ENDIF
-!/MFIT                  deallocate ( M2K )
-!/MFIT!
-!/MFIT                  ! "S0": Surface drift normalized by abs(M2K)
+!/MFIT                  ! "S0": Surface drift normalized by abs(2MK)+MK0
+!/MFIT                  ! Normalization was done during output of MKX, MKY
 !/MFIT                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY,                   &
 !/MFIT                                UXSP(:,4), MAPSF, XX )
 !/MFIT                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY,                   &
 !/MFIT                                UXSP(:,4+NZO), MAPSF, XY )
-!/MFIT                  varnc(1)='U_S(Z) = Up(Z) + Ud(Z); U_S(0) = S0 * abs(MK)'
+!/MFIT                  varnc(1)='U_S(Z) = Up(Z) + Ud(Z); '                   &
+!/MFIT                        // 'U_S(0) = S0 * abs(MK+0.01)'
 !/MFIT                  varnc(2)='Up(Z) = Up(0) exp( -AM (Z Kz)^PM )'
 !/MFIT                ELSE
-!/MFIT                  ! "Sd": Deep fit "Sd" already normalized by abs(M2K)
-!/MFIT                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,1),       &
-!/MFIT                                                           MAPSF, XX )
-!/MFIT                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,2),       &
-!/MFIT                                                           MAPSF, XY )
+!/MFIT                  ! "Sd": Deep fit surface drift normalized by abs(2MK)+MK0
+!/MFIT                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY,                   &
+!/MFIT                                USERO(:,1), MAPSF, XX )
+!/MFIT                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY,                   &
+!/MFIT                                USERO(:,2), MAPSF, XY )
+!/MFIT                  varnc(1)='Ud(Z) = Ud(0) exp( -AMd (Z Kz)^PMd ); ' &
+!/MFIT                           //cmt_PMd
+!/MFIT                  varnc(2)='Ud(0) = Sd * abs(MK+0.01)'
+!/MFIT
 !/MFIT                END IF                      
 !/MFIT!
 !/MFIT                varnm(1) = trim(MFIT_varname(IFP))//'X'
@@ -3656,8 +3674,6 @@
 !/MFIT                varnl(2) = 'Northward '//trim(MFIT_longname(IFP))
 !/MFIT                varng(2)=''
 !/MFIT                varns(2)=''
-!/MFIT                varnc(1)='Ud(Z) = Ud(0) exp( -AMd (Z Kz)^PMd ); '//cmt_PMd
-!/MFIT                varnc(2)='Ud(0) = Sd * abs(MK)'
 !/RTD!/MFIT!
 !/RTD!/MFIT           ! In rotated grid, Override standard direction comment
 !/RTD!/MFIT           IF ( FLAGUNR ) THEN
@@ -3671,7 +3687,7 @@
 !/MFIT              END IF ! ( IFP .LE. 2 )
 !/MFIT!
 !/MFIT              IF ( IFP .GE. 3 ) THEN
-!/MFIT                ! AM, PM, AMd, SIC, for IFP in (3,4,5,6)
+!/MFIT                ! AM, PM, AMd, SIC, for IFP in (3,4,5,6,7)
 !/MFIT                NFIELD=1
 !/MFIT                vmin = 0
 !/MFIT                IF ( IFP .EQ. 6 ) then
