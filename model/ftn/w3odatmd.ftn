@@ -587,7 +587,7 @@
       INTEGER                 :: I, NLOW, J
 !/S      INTEGER, SAVE           :: IENT = 0
       CHARACTER(LEN=20)       :: STRING
-!/MFIT      INTEGER                 :: NOEXSTK = 7
+!/MFIT      INTEGER                 :: NOEXSTK = 8
 !/
 !/S      CALL STRACE (IENT, 'W3NOUT')
 !

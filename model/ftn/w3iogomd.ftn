@@ -266,7 +266,7 @@
 !/MFIT!  NZO = 1 (for profile fit only), or
 !/XSTO!  NZO = XSND (for full profile)
 !/XSTO!  unless NZO is 0 (no Stokes profile output).
-!/MFIT!  For profile fit, also USERO(JSEA,1:6) are set by CALC_MFIT()
+!/MFIT!  For profile fit, also USERO(JSEA,1:7) are set by CALC_MFIT()
 !/XSTO      IF ( XSND .LE. 0 ) THEN
 !/XSTO        IF (FLGRD(6,13).OR.FLGR2(6,13)) THEN
 !/XSTO          WRITE(NDSEN,1009) 'XSP','XSTO'
@@ -1114,7 +1114,7 @@
          CASE('U2')
            FLG2D(10,2)=.TRUE.
 !/MFIT         CASE('MFIT')
-!/MFIT           FLG2D(10,1)=.TRUE. ! NOEXTR == 7 but no flag for USERO(2:6)
+!/MFIT           FLG2D(10,1)=.TRUE. ! NOEXTR is 8, but no flag for USERO(2:8)
 !/COU           CASE('DRY')
          CASE DEFAULT
            IF ( IAPROC .EQ. NAPOUT ) WRITE (NDSEN,1004) TRIM(TESTSTR)
@@ -1996,7 +1996,7 @@
 !/XSTO!  NZO is either 0 (no Stokes profile output), or
 !/MFIT!  NZO = 1 (for profile fit only), or
 !/XSTO!  NZO = XSND (for full profile).
-!/MFIT!  For profile fitting, also USERO(JSEA,1:6) are set by CALC_MFIT()
+!/MFIT!  For profile fitting, also USERO(JSEA,1:7) are set by CALC_MFIT()
 !/XSTO!  CALC_XSTOKES(A) has its own loop over JSEA and thus called
 !/XSTO!  after the present loop
           END IF
@@ -3248,11 +3248,15 @@
 !
                   ELSE IF ( IFI .EQ. 10 ) THEN
 !/MFIT              IF ( IFJ .EQ. 1 ) THEN
-!/MFIT                WRITE ( NDSOG ) USERO(1:NSEA,1:6)
+!/MFIT !               write (ndst,*) '  Writing mfit params to file'      
+!/MFIT                WRITE ( NDSOG ) USERO(1:NSEA,1:NOEXTR-1)
+!/MFIT !               write (ndst,*) '  Done mfit params to file'      
 !/MFIT                IF ( .NOT. FLOGRD(6,13) ) WRITE ( NDSOG ) UXSP(1:NSEA,1:5)
 !/MFIT                ! Only the integral and surface variables
 !/MFIT                ! We presume that UXSP(:,3+2*NZO) point to XUXSP(:,5)
-!/MFIT              ELSE
+!/MFIT            ELSE IF ( IFJ .EQ. 2 ) THEN
+!/MFIT              WRITE ( NDSOG ) USERO(1:NSEA,NOEXTR)
+!/MFIT            ELSE IF ( .FALSE. ) THEN
                     WRITE ( NDSOG ) USERO(1:NSEA,IFJ)
 !/MFIT              END IF
 !
@@ -3575,11 +3579,14 @@
                   ELSE IF ( IFI .EQ. 10 ) THEN
 !/MFIT                    IF ( IFJ .EQ. 1 ) THEN
 !/MFIT                      READ ( NDSOG,END=801,ERR=802,IOSTAT=IERR)      &
-!/MFIT                                                        USERO(1:NSEA,1:6)
+!/MFIT                                                  USERO(1:NSEA,1:NOEXTR-1)
 !/MFIT                      IF ( .NOT. FLOGRD(6,13) )                      &
 !/MFIT                        READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)     &
-!/MFIT                                                        UXSP(1:NSEA,1:5)
-!/MFIT                    ELSE
+!/MFIT                                                  UXSP(1:NSEA,1:5)
+!/MFIT                    ELSE IF ( IFJ .EQ. 2 ) THEN
+!/MFIT                        READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)     &
+!/MFIT                                                  USERO(1:NSEA,NOEXTR)
+!/MFIT                    ELSE IF ( .FALSE. ) THEN
                     READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)         &
                                                       USERO(1:NSEA,IFJ)
 !/MFIT                      END IF

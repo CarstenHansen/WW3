@@ -201,8 +201,11 @@
 !/MFIT                 "Quality measure ITSIC                  ", &
 !/MFIT                 "MFIT parameter PMd                     "/)
 !/MFIT!
-!/MFIT      LOGICAL                 :: SVP=.TRUE.
+!/MFIT      LOGICAL                 :: SVP = .TRUE.
 !/MFIT      character(len=10)       :: cmt_PMd = 'PMd = 1.30'
+!/MFIT      character(len=10)       :: sMK0 = '0.01'
+!/MFIT      ! real                    :: MK02 = 0.00001 ! small limiter to M2K**2
+!/MFIT      real                    :: MK0 = 0.003333 ! small limiter to M2K
 !/
 !/ ------------------------------------------------------------------- /
 !/
@@ -837,7 +840,7 @@
       LOGICAL                 :: CUSTOMFRQ=.FALSE.
 !/T      LOGICAL                 :: LTEMP(NGRPP)
 
-!/MFIT      REAL, ALLOCATABLE       :: M2K(:)
+!/MFIT      REAL, ALLOCATABLE    :: M2K(:), MKfac(:) ! AA(:),BB(:),sgx(:),sgy(:)
 
 !/RTD ! RTDL == False for a standard lat-lon grid. Will be set to True if the
 !/RTD ! grid is rotated
@@ -3092,33 +3095,48 @@
 !/XSTO!/MFIT    UXSP(1:NSEA,3) = UXSP(1:NSEA,3)*UXSP(1:NSEA,1)*2.
 !/XSTO!/MFIT    ! Stokes drift parts at surface to be normalized by abs(2MK)+MK0
 !/XSTO!/MFIT    allocate ( M2K(NSEA), stat=IRET )
-!/XSTO!/MFIT    M2K(1:NSEA) = SQRT( UXSP(1:NSEA,2) * UXSP(1:NSEA,2)   &
-!/XSTO!/MFIT                      + UXSP(1:NSEA,3) * UXSP(1:NSEA,3) ) &
-!/XSTO!/MFIT                  + 0.01           
-!/XSTO!/MFIT    UXSP(1:NSEA,4) = UXSP(1:NSEA,4)/M2K(1:NSEA)
-!/XSTO!/MFIT    UXSP(1:NSEA,4+NZO) = UXSP(1:NSEA,4+NZO)/M2K(1:NSEA)
-!/XSTO!/MFIT    ! "Sd": Deep fit surface drift normalized by abs(2MK)+MK0
+!/XSTO!/MFIT    ! Avoid small value of M2K in square root
+!/XSTO!/MFIT    where ( UXSP(:,2) * UXSP(:,2) + UXSP(:,3) * UXSP(:,3) < 1.09e-9 )
+!/XSTO!/MFIT      UXSP(:,2) = 2.34e-5
+!/XSTO!/MFIT      UXSP(:,3) = 2.34e-5
+!/XSTO!/MFIT      end where
+!/XSTO!/MFIT    M2K(:) = sqrt(UXSP(:,2) * UXSP(:,2) + UXSP(:,3) * UXSP(:,3) )
+!/XSTO!/MFIT    ! Avoid division by small values of M2K
+!/XSTO!/MFIT    allocate ( MKfac(NSEA), stat=IRET )
+!/XSTO!/MFIT    MKfac = 1.
+!/XSTO!/MFIT    IF (NCVARTYPEI.GT.3) MK0 = 3.3e-5 !  0.033 mm/s
+!/XSTO!/MFIT    where ( M2K < MK0 ) MKfac = MK0/M2K
+!/XSTO!/MFIT    where ( MKfac .gt. 1. )
+!/XSTO!/MFIT      UXSP(:,2) = UXSP(:,2) * MKfac
+!/XSTO!/MFIT      UXSP(:,3) = UXSP(:,3) * MKfac
+!/XSTO!/MFIT      M2K = MK0
+!/XSTO!/MFIT    end where
+!/XSTO!/MFIT    ! "S0": 'Upper' fit surface drift normalized by abs(2MK)+MK0
+!/XSTO!/MFIT    UXSP(:,4) = UXSP(:,4)/M2K(:)
+!/XSTO!/MFIT    UXSP(:,4+NZO) = UXSP(:,4+NZO)/M2K(:)
+!/XSTO!/MFIT    ! "Sd": 'Deep' fit surface drift normalized by abs(2MK)
+!/XSTO!/MFIT    USERO(1:NSEA,1) = USERO(1:NSEA,1)/M2K(:)
+!/XSTO!/MFIT    USERO(1:NSEA,2) = USERO(1:NSEA,2)/M2K(:)
 !/XSTO!/MFIT    IF (NCVARTYPEI.LE.3) THEN
-!/XSTO!/MFIT      ! Apply a lower limiter to |M2K| if short int output
-!/XSTO!/MFIT      WHERE ( ABS(UXSP(:,4)) > 30. .OR. ABS(UXSP(:,4+NZO)) > 30.)
-!/XSTO!/MFIT        UXSP(:,4) = UXSP(:,4)*M2K(:)
-!/XSTO!/MFIT        UXSP(:,4+NZO) = UXSP(:,4+NZO)*M2K(:)
-!/XSTO!/MFIT        ! Mis-use UXSP(:,1) as a dummy first for the original M2K(:)
-!/XSTO!/MFIT        UXSP(:,1) = M2K(:)-0.01+0.0001
-!/XSTO!/MFIT        ! 2MK + MK0 id now enlarged to:
-!/XSTO!/MFIT        M2K(:) = M2K(:)*MAX( ABS(UXSP(:,4)), ABS(UXSP(:,4+NZO)) )/30.
-!/XSTO!/MFIT        ! Then, UXSP(:,1) is a dummy for the enlargement of M2K
-!/XSTO!/MFIT        UXSP(:,1) = (M2K(:)-0.01)/UXSP(:,1)
-!/XSTO!/MFIT        UXSP(:,2) = UXSP(:,2)*UXSP(:,1)
-!/XSTO!/MFIT        UXSP(:,3) = UXSP(:,3)*UXSP(:,1)
-!/XSTO!/MFIT        ! One of the surface drift components / (abs(2MK)+MK0) is 30:
-!/XSTO!/MFIT        UXSP(:,4) = UXSP(:,4)/M2K(:)
-!/XSTO!/MFIT        UXSP(:,4+NZO) = UXSP(:,4+NZO)/M2K(:)
+!/XSTO!/MFIT      ! Apply a lower limiter to |M2K| if large short int output
+!/XSTO!/MFIT      MKfac = 1.
+!/XSTO!/MFIT      WHERE ( ABS(UXSP(:,4)) > 30. .OR. ABS(UXSP(:,4+NZO)) > 30. &
+!/XSTO!/MFIT        .OR. ABS(USERO(1:NSEA,1))>30. .OR. ABS(USERO(1:NSEA,2))>30.)&
+!/XSTO!/MFIT        ! 2MK should be enlarged by a factor (stored in M2K):
+!/XSTO!/MFIT        MKfac = MAX( ABS(UXSP(:,4)), ABS(UXSP(:,4+NZO)), &
+!/XSTO!/MFIT                     ABS(USERO(1:NSEA,1)), ABS(USERO(1:NSEA,2)) ) &
+!/XSTO!/MFIT                    / 30.
+!/XSTO!/MFIT      WHERE (MKfac .ne. 1. )
+!/XSTO!/MFIT        UXSP(:,2) = UXSP(:,2)*MKfac
+!/XSTO!/MFIT        UXSP(:,3) = UXSP(:,3)*MKfac
+!/XSTO!/MFIT        ! One of the surface drift components / abs(2MK) is 30:
+!/XSTO!/MFIT        UXSP(:,4) = UXSP(:,4)/MKfac
+!/XSTO!/MFIT        UXSP(:,4+NZO) = UXSP(:,4+NZO)/MKfac
+!/XSTO!/MFIT        USERO(1:NSEA,1) = USERO(1:NSEA,1)/MKfac
+!/XSTO!/MFIT        USERO(1:NSEA,2) = USERO(1:NSEA,2)/MKfac
 !/XSTO!/MFIT      ENDWHERE
 !/XSTO!/MFIT    ENDIF
-!/XSTO!/MFIT    ! "Sd": Deep fit surface drift normalized by abs(2MK)+MK0
-!/XSTO!/MFIT    USERO(1:NSEA,1) = USERO(1:NSEA,1)/M2K(1:NSEA)
-!/XSTO!/MFIT    USERO(1:NSEA,2) = USERO(1:NSEA,2)/M2K(1:NSEA)              
+!/XSTO!/MFIT    deallocate ( MKfac ) 
 !/XSTO!/MFIT    deallocate ( M2K )              
 !/XSTO!/RTD          ! Rotate x,y vector back to standard pole
 !/XSTO!/RTD          IF ( FLAGUNR ) CALL W3XYRTN(NSEA, UXSP(1:NSEA,2), &
@@ -3161,10 +3179,8 @@
 !/XSTO!/MFIT          END IF
 !/XSTO          VARNG(1)=''
 !/XSTO          VARNG(2)=''
-!/XSTO          VARNC(1)='K = ksc'
-!/XSTO          VARNC(2)='K = ksc'
-!/XSTO!/MFIT          VARNC(1)=''
-!/XSTO!/MFIT          VARNC(2)=''
+!/XSTO          VARNC(1)=''
+!/XSTO          VARNC(2)=''
 !/XSTO          VARND(1)=''
 !/XSTO          VARND(2)=''
 !/XSTO!/RTD          ! Override standard direction comment
@@ -3664,7 +3680,7 @@
 !/MFIT                                USERO(:,2), MAPSF, XY )
 !/MFIT                  varnc(1)='Ud(Z) = Ud(0) exp( -AMd (Z Kz)^PMd ); ' &
 !/MFIT                           //cmt_PMd
-!/MFIT                  varnc(2)='Ud(0) = Sd * abs(MK+0.01)'
+!/MFIT                    varnc(2)='Ud(0) = Sd * abs(MK)'
 !/MFIT
 !/MFIT                END IF                      
 !/MFIT!
