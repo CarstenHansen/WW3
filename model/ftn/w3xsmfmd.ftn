@@ -437,7 +437,7 @@
       ! Look-up parameters to determine profile coefficients AM, PM
 
       real, allocatable           :: DZK_S(:), log_KZ(:)
-      integer                     :: XSNDeep, XSNUpper, NA = 0
+      integer                     :: XSNDeep, XSNUpper, Zdi, NA = 0
       real                        :: delAMlu
       
       real, allocatable           :: AMdlu(:,:)
@@ -625,10 +625,10 @@
       AMs = 2.5; PMs = 0.57
 
       ! Overall min/max values in MH_fit
-      PMIN = 0.2  ! PM
+      PMIN = 0.1  ! PM
       PMAX = 2.0  ! PM
       AMIN = 0.2  ! AM
-      AMAX = 6.0  ! AM        
+      AMAX = 8.0  ! AM        
       PMINd = 0.5  ! PMd
       PMAXd = 2.4  ! PMd
       AMINd = 0.4  ! AMd        
@@ -748,6 +748,13 @@
       ! Dummy value at surface
       log_KZ(1) = 0.
 
+      ! Max depth index for initial deep fit is for KZ = 1.0
+      !Zdi = int(log(2.0)/log(XKZ)) + 1
+      ! Max depth index for initial deep fit is for KZ = 1.5
+      Zdi = int(log(2.5)/log(XKZ)) + 1
+      ! Max depth index for initial deep fit is 
+      ! Zdi = XSND - 3
+
       end subroutine MHfit_init
       
 
@@ -779,17 +786,18 @@
       real, intent(out)        :: AM, PM, AMd, PMd, UdX, UdY
       real, intent(inout)      :: ITSIC
       
-      complex                  :: MK, Ud, U0, Up, unit, Ups, tmc
-      real                     :: IPp, IPd, tmp, Udl, Upr, Mpr, IP2_min
+      complex                  :: MK, Ud, U0, Up, unit, Us, Ut
+        
+      real                     :: IPp, IPd, tmp, Udl, Upr, Mpr, IP2_min, mlU
       real, allocatable, save  :: Pd(:), Pp(:), Umr(:)
-      integer                  :: lenSt, iter, numPos, ii, im, nneg,  &
-                                  ISEA, IZ, iKD
+      integer                  :: lenSt, iter, numPos, ii, im, nneg
+      integer                  :: ISEA, IZ, iKD, Zt
       complex                  :: Upi(5),Udi(5)
       real                     :: IPpi(5),AMi(5),PMi(5),AMdi(5),PMdi(5),IPdi(5)
       real                     :: qci(5), msi(5)
-      logical                  :: wi(5), warning_issued
+      logical                  :: wi(5), warning_issued, capped
       real                     :: fi, fiU, Umr_min, Umd_min, dIP, dIP_min
-      real                     :: si, cit, sm, qcr, qcd
+      real                     :: si, cit, sm, qcr, qcd, rms_U
       real                     :: IPm, IP
       integer                  :: NA, niter
       character(len=5)         :: fit_kind
@@ -816,24 +824,60 @@
         lenSt = IZ
         exit
         end do
-
-!/    Factorize the normalized M*K in an 'primary part' and a 'deep part' as
-!/    MK = Ud * IPd + Up * IPp, where
-!/    U0 = Ud + Up, and where IPd, IPp are normalized profile shapes
-      ! TODO: Consider a look-up table and function calls IPd=IPds(KsD)
-      !       and IPp=IPps(KsD)
-      IPd = IP_calc(KsD, AMd, PMd)
-      IPp = IP_calc(KsD, AM, PM)
-
-      ! Avoid uncertainty due to division by a near-zero-value of U0
+      
+      !   Avoid uncertainty due to division by a near-zero-value of U0
       if ( abs(U0) < 0.0001 ) U0 = -0.0001/(abs(MK)+0.0001) * MK
       
-!/    Substitution yields a vector expression in one unknown part Up,
-!/    MK = (U0-Up)* IPd + Up * IPp,  or
-      Up = ( U0 * IPd - MK ) / (IPd - IPp)
-!/      The 'deep part' of the surface drift is the remainder
-      Ud = U0 - Up
+      ! Longest vector deviation from surface value and its depth index
+      Zt = lenSt
+      call S_span(Us,Zt)
+      if ( Zt > Zdi .or. lenSt - Zt <= 3 ) Zt = lenSt
+      
+      ! If there is a turning depth, estimate the deep fit parameters
+      ! Given PMd = PMds, estimate Ud and AMd
+      if ( Zt /= lenSt ) then
 
+        ! Deep profile direction:
+        Ut = cmplx(U_S(Zt+1), V_S(Zt+1))
+        ! Projection on the direction of Ut
+        unit = Ut / abs(Ut)
+        Umr(Zt:lenSt) = U_S(Zt:lenSt) * real(unit) + V_S(Zt:lenSt) * aimag(unit)
+        Umr(Zt:lenSt) = Umr(Zt:lenSt)/abs(Ut)
+        Umr_min = 0.01
+        do ii = Zt,lenSt
+          if  (Umr(ii) < Umr_min ) exit
+          end do
+        if (ii == lenSt) then
+          numPos = ii
+        else
+          numPos = ii - 1
+          end if
+        
+        call lin_reg(-log(Umr(Zt:numPos)),ZK_S(Zt:numPos)**PMd,AMd,mlU,AMINd,AMAXd)
+        Ud = Ut * exp(-mlU)
+        
+!/      The 'upper part' of the surface drift is the remainder
+        Up = U0 - Ud
+        
+      end if
+      
+      IPd = IP_calc(KsD, AMd, PMd)
+
+      if ( Zt == lenSt ) then
+!/      Factorize the normalized M*K in an 'primary part' and a 'deep part' as
+!/      MK = Ud * IPd + Up * IPp, where
+!/      U0 = Ud + Up, and where IPd, IPp are normalized profile shapes
+        ! TODO: Consider a look-up table and function calls IPd=IPds(KsD)
+        !       and IPp=IPps(KsD)
+        IPp = IP_calc(KsD, AM, PM)
+
+!/      Substitution yields a vector expression in one unknown part Up,
+!/      MK = (U0-Up)* IPd + Up * IPp,  or
+        Up = ( U0 * IPd - MK ) / (IPd - IPp)
+!/        The 'deep part' of the surface drift is the remainder
+        Ud = U0 - Up
+        end if
+      
       ! Handling of small drift
       if ( abs(U0) < 0.003 .and. abs(MK) < 0.003 ) then
         ! Neglect the details when very weak Stokes drift
@@ -857,7 +901,7 @@
 
       warning_issued = .false.
       
-!/ Iterations:
+!/ Cycles:
 
       ! A minimum of 1 fitting cycle + a half cycle is required:
       ! Cycle 1: fit AM,PM -> update Ud,Up -> fit AMd,PMd -> update Up,Ud 
@@ -894,9 +938,6 @@
 !/          given from the parametric deep parameters of the previous iteration.
 !/          Note that Pd(z=0) = 1 and Umr(z=0) = Up
 
-        ! Limiter to the magnitude of Ud. Require |Up| >= 2 * |Ud|
-        call Ud_cap(Ud,Up,U0)
-
         ! Projection Ud * unit of vector Ud on direction of Up
         unit = Up/abs(Up)
         Umr = U_S * real(unit) + V_S * aimag(unit)
@@ -921,22 +962,28 @@
 !       Match to MK the surface vectors for deep- and primary-profile parts
         dIP = IPd/IPp - 1. 
         if ( abs(dIP) > dIP_min ) then
-           ! MK = (U0-Ud)* IPp + Ud * IPd, which means that
-           Ud = ( MK/IPp - U0 ) / dIP
-           Up = U0 - Ud
-          else
-            ! Either MK = (U0-Ud)* IPp + Ud * IPd = U0*IPp + eps
-            !      or     MK = Ud * IPd + eps
-            ! We choose MK = U0*IPp + eps and approximate eps=0.
-            Up = U0
-            Ud = 0.
-            end if
-          
-        if ( abs(Ud) == 0. ) cycle ! Repeat steps 1, 2 (even for iter=niter+1)
-
-        ! Finalize the iteration loop if iter >= niter + 1 half step
-        if ( iter > niter ) exit
+          ! Finalize the iteration loop if iter >= niter + 1 half step
+          if ( iter > niter .and. .not. capped ) exit
         
+          ! MK = (U0-Ud)* IPp + Ud * IPd, which means that
+          Ud = ( MK/IPp - U0 ) / dIP
+          Up = U0 - Ud
+          ! Limiter to the magnitude of Ud. Require |Up| >= 2 * |Ud|
+          ! This is with the purpose of preserving positive values to
+          ! some depth of the 1-d profile Umr below
+          ! call Ud_cap(Ud,Up,U0)
+        
+        else
+          ! Either MK = (U0-Ud)* IPp + Ud * IPd = U0*IPp + eps
+          !      or     MK = Ud * IPd + eps
+          ! We choose MK = U0*IPp + eps and approximate eps=0.
+          Up = U0
+          Ud = 0.
+          if ( iter > niter+1) exit
+          capped = .False.
+          cycle ! Repeat steps 1, 2 (even for iter=niter+2)
+          end if
+          
 !/  step 3: Determine AMd as the best fit of the secondary, 'deep',
 !/          profile given the surface drift partition Ud
 
@@ -944,11 +991,6 @@
             
         ! Find  Umr(z)= proj_d(Um) - proj_d(Up)*Pp
         ! projected on the direction of Ud
-        
-        ! Limiter to the magnitude of Ud. Require |Up| >= 2 * |Ud|
-        ! This is with the purpose of preserving positive values to
-        ! some depth of the 1-d profile Umr
-        call Ud_cap(Ud,Up,U0)
         
         Udl = abs(Ud)
         unit = Ud /  Udl
@@ -980,6 +1022,11 @@
           ! bound PMd=PMds
           call fit_proj(AMd,PMd,log_KZ,Umr,lenSt,qcd,fit_kind,PMds)
           end if
+          
+        if ( iter > niter ) then ! if capped
+           Pd = exp ( - AMd * ZK_S ** PMd )
+           exit
+        end if
         
         ! Apply a low limiter to AMd
         AMd = max(AMd, AMINd)
@@ -994,7 +1041,7 @@
           ! Get a precise value of IPd for the new AMd
           PMd = PMds
           IPd = IP_calc( KsD, AMd, PMd)
-          if ( iter == niter-1 .and. xsmf_verbose  > 0 )  write (ndsv,*) &
+          if ( iter == niter .and. xsmf_verbose  > 0 )  write (ndsv,*) &
             'ISEA=', ISEA, Amd, ' == AMd = AMd_lookup(',KsD,', ',IP2_min,')'
           
           end if
@@ -1009,6 +1056,11 @@
           Up = ( U0 - MK/IPd ) / dIP
           Ud = U0 - Up
           Pd = exp ( - AMd * ZK_S ** PMd )
+          ! Limiter to the magnitude of Ud. Require |Up| >= 2 * |Ud|
+          ! This is with the purpose of preserving positive values to
+          ! some depth of the 1-d profile Umr in the refinement
+
+          if (iter <= niter ) call Ud_cap(Ud,Up,U0,Us,capped=capped)
         else
           Up = U0
           Ud = 0.
@@ -1024,7 +1076,7 @@
 !  Scatter index of the final fit
       sm  = calc_msd( Up, Ud, Pp, Pd, lenSt)
 
-      niter=iter
+      niter = iter - 1
       
       if ( xsmf_verbose > 2 &
            .or. ( xsmf_verbose  > 1 .and. warning_issued ) ) then
@@ -1032,20 +1084,18 @@
         write (NDSV,*), U0, Ud, AM, PM, IPp, AMd, IPd, si
 
         write (NDSV,*), '    MK =  ', MK
-        write (NDSV,*), '    Upi = ', Upi(1:iter) , Up
-        write (NDSV,*), '   IPpi = ', IPpi(1:iter), IPp
-        write (NDSV,*), '    AMi = ', AMi(1:iter) , AM
-        write (NDSV,*), '    PMi = ', PMi(1:iter) , PM
-        write (NDSV,*), '   AMdi = ', AMdi(1:iter), AM
-        write (NDSV,*), '    si = ', sqrt( msi(1:iter) ) / (abs(MK)+0.001) * 0.5
+        write (NDSV,*), '    Upi = ', Upi(1:niter) , Up
+        write (NDSV,*), '   IPpi = ', IPpi(1:niter), IPp
+        write (NDSV,*), '    AMi = ', AMi(1:niter) , AM
+        write (NDSV,*), '    PMi = ', PMi(1:niter) , PM
+        write (NDSV,*), '   AMdi = ', AMdi(1:niter), AM
+        write (NDSV,*), '    si = ', sqrt( msi(1:niter) ) / (abs(MK)+0.001) * 0.5
         end if
         
-      niter = iter - 1
-      
-      if ( iter > 1 ) then
+      if ( niter > 0 ) then
        
-        do ii=1,iter
-          im = iter+1
+        im = niter+1
+        do ii=1,niter
           if ( msi(ii) > sm - 0.01 ) cycle ! Ignore insignificant difference
           write (NDSV,*) '  WARNING in w3xsmfmd, ISEA=', ISEA, &
                 ': msi(',im,')/msi(',ii,')=',sm,'/',msi(ii)
@@ -1054,7 +1104,7 @@
           sm = msi(ii)
           end do
         
-        if ( im <= iter ) then
+        if ( im <= niter ) then
           AM  = AMi(im)
           PM  = PMi(im)
           AMd = AMdi(im)
@@ -1066,7 +1116,7 @@
           IPd = IPdi(im)
           warning_issued = wi(im)
         
-          niter = im - 1          
+          niter = im          
           end if          
         end if
       
@@ -1074,20 +1124,23 @@
           
       UdX = real(Ud)
       UdY = aimag(Ud)
-
-      ! Convergence of integral profile:
-      cit = abs ( 1. - ( Up * IPp + Ud * IPd ) / ( abs ( MK) + 0.001 ))
       
-      ! Scatter index of the fit; si = mean(|(U_S - U_mod)^2|)/|2MK|
-      si = sqrt( sm ) / ( abs(MK)+ 0.001 ) * 0.5
+      ! sqrt(|U_S^2|)
+      rms_U = sqrt( sum(U_S(1:lenSt)**2 + V_S(1:lenSt)**2+1.e-6)/max(1,lenSt) )
+      
+      ! Check of the match to MK of the surface vectors:
+      cit = abs ( MK - ( Up * IPp + Ud * IPd ) ) / ( abs(MK) + 0.01 )
+      
+      ! Scatter index of the fit; si = sqrt(|(U_S - U_fit)^2|)/sqrt(|U_S|^2)
+      si = sqrt( sm ) / rms_U
 
       niter = max(niter,1)
-      si = min(si, 0.49)
-      if ( qcr > 0.5 ) si = si + 0.5
+      si = min(si, 0.99)
+      qcr =  min(qcr, 0.9)
       
       ITSIC = niter * 1000. &
-                   + min(990., int(max(0., 100*si))*10.) &
-                   + min(9., 10.*cit)
+                   + int(qcr*100.) &
+                   + int(100.*si)
 
       if ( xsmf_verbose == 0 .and. .not. warning_issued ) return
 
@@ -1138,7 +1191,7 @@
 
       real, allocatable, save     :: loglog_ref(:), log_Um(:)
       integer, allocatable, save  :: fqc(:)
-      real                        :: log_Up, log_AM, log_Um_min, logAM0
+      real                        :: log_Up, log_AM, log_Um_min, logAM0, amx, amn
       integer                     :: ii
 
       integer                     :: XSNDe, numDe
@@ -1220,7 +1273,14 @@
         fqc = 1
         end where
       ! where ( log_Um > e*log_ref )
-        
+
+      if ( index(fit_kind,'deep') > 0 ) then
+        amx = PMAXd
+        amn = PMINd
+      else
+        amx = PMAX
+        amn = PMIN
+        end if
       ! Linear regression fit
       if (xsmf_verbose > 2 ) write (NDSV,*), '  lin_reg () ... '
       if ( present(A0) ) then
@@ -1232,8 +1292,8 @@
          call lin_reg0( log_Um(2:numDe), log_KZ(2:numDe), P0, log_AM)
       else
          ! Linear regression best fit PM, log_AM
-         call lin_reg( log_Um(2:numDe), log_KZ(2:numDe), PM, log_AM)
-       end if
+         call lin_reg( log_Um(2:numDe), log_KZ(2:numDe), PM, log_AM, amn, amx)
+        end if
 
       ! Number of depths that do not go into the fitting. Returned in Um_min
       Um_min = real(sum(fqc(2:numD)))
@@ -1292,17 +1352,21 @@
           
           ! Limiters to PM
           if ( index(fit_kind,'deep') == 0 &
-               .and. ( 2.*PM > PMAX+PMs .or. 2.*PM < PMs+PMIN) ) then
+               ! .and. ( 2.*PM > PMAX+PMs .or. 2.*PM < PMs+PMIN) ) then
+               .and. ( 2.*PM > PMAX+PMs .or. 2.*PM < 3.*PMIN) ) then
             if (2.*PM > PMAX+PMs) then
               tmp = PMAX-PMs
               PM = PMAX - tmp/(2.*(PM-PMs)/tmp + 1.)
             else
-              tmp = PMs-PMIN
-              PM = PMIN + tmp/(2.*(PMs-PM)/tmp + 1.)
+              tmp = PMIN
+              PM = PMIN * (1. + 1./(5.-2.*PM/PMIN))              
+              !tmp = PMs-PMIN !PMIN
+              !PM = PMIN + tmp/(2.*(PMs-PM)/tmp + 1.)
               end if
             tmp = Umr_min
             ! Best fit value of AM given the new PM
             call fit_expr(numPos,log_KZ,Umr,AM,PM,tmp,fit_kind,PM)
+            return
             end if
 
           end if ! numPos < 4
@@ -1325,36 +1389,66 @@
       end subroutine fit_proj
 
       
-      subroutine Ud_cap(Ud,Up,U0)
+      subroutine Ud_cap(Ud,Up,U0,Us,capped)
         ! Limiter to the magnitude of Ud. We presume that U0 = Up + Ud
         implicit none
         complex, intent(inout)  :: Ud,Up
-        complex, intent(in)     :: U0
+        complex, intent(in)     :: U0,Us
+        logical,optional,intent(out) :: capped
         real                    :: tmp
-        complex                 :: unit
-        
-        if ( 2.*abs(Ud) > abs(Up) ) then
+        complex                 :: Uds, unit
+        logical                 :: iscapped
+
+        iscapped = .False.
+        Uds = Ud+Us-U0
+        !if ( 2.*abs(Ud) > abs(Up) ) then
+        if ( abs(Uds) > abs(Us) ) then
           ! We presume U0 = Up + Ud
-          unit = U0/abs(U0)
-          ! Projection of Ud in the direction of U0
-          tmp = real(Ud) * real(unit) + aimag(Ud) * aimag(unit)
+          unit = Us/abs(Us)
+          ! Projection of Ud+Us-U0 in the direction of Us
+          tmp = real(Uds) * real(unit) + aimag(Uds) * aimag(unit)
           
           if ( tmp < 0. ) then
-            ! Shift Ud in the direction of U0 so that it's projection
-            ! on U0 becomes 0.0
-            Ud = Ud - (tmp/abs(U0))*U0
+            ! Shift Ud in the direction of Us so that Ud and Us become
+            ! perpendicular. If |Uds|>|Us| reduce to |Us|
+            Uds = Uds - (tmp/abs(Us))*Us
+            Ud = Uds*min(1.,abs(Us)/abs(Uds)) - (Us-U0)
             Up = U0 - Ud
-          else if ( abs(Ud) > abs(Up) ) then
+            iscapped = .True.
+          
+          else ! if ( abs(Ud) > abs(Up) ) then
             ! Shift Ud in the direction of -U0 so that it's projection
-            ! on U0 becomes 0.5*U0
-            Ud = Ud - (tmp/abs(U0) - 0.5)*U0
+            ! on U0 becomes 0.5*U0. If |Uds|>|Us| reduce to |Us| 
+            Uds = Uds - (tmp/abs(Us) - 0.5)*Us
+            Ud = Uds*min(1.,abs(Us)/abs(Uds)) - (Us-U0)
             Up = U0 - Ud
+            iscapped = .True.
           end if
         end if
+        if ( present(capped) ) capped = iscapped
       end subroutine Ud_cap
 
+      subroutine S_span(Ut,Zt)
+        implicit none
+        complex, intent(out)    :: Ut
+        integer, intent(inout)  :: Zt
+        real                    :: us0,vs0,d20,d21
+        integer                 :: ii
+        us0 = U_S(1)
+        vs0 = V_S(1)
+        d20 = 0.
+        do ii = 2, Zt
+           d21 = (U_S(ii)-us0)**2 + (V_S(ii)-vs0)**2
+           if ( d20 > d21 ) exit
+           d20 = d21
+           end do
+        if ( d20 /= d21 ) Zt = ii - 1
+        ! Zt = maxloc( (us0-U_S(2:Zt))**2 + (vs0-V_S(2:Zt))**2 )(1) + 1
+        Ut = cmplx( us0-U_S(Zt), vs0-V_S(Zt) )
 
-      real function calc_msd( Up, Ud, Pp, Pd,  lenSt)
+      end subroutine S_span
+
+      real function calc_msd( Up, Ud, Pp, Pd, lenSt)
 
       ! Mean of squares of modulus deviation between a profile U_S, V_S
       ! and a parametric fit Up * Pp + Ud * Pd
@@ -1432,19 +1526,17 @@
       end subroutine lin_reg1
 
 
-      subroutine lin_reg( yy, xx, aa, bb )
+      subroutine lin_reg( yy, xx, aa, bb, amn, amx )
       ! Find the slope (aa) and y-intercept (bb) of
       ! yf = aa * xx + bb, where ||yy - yf|| is a minimum
 
       IMPLICIT NONE
       real, intent(in)            :: yy(:), xx(:)
+      real, intent(in)            :: amn, amx
       real, intent(out)           :: aa, bb
-      real :: sumx, sumy, xave, yave, ad, ax, amx, amn
+      real :: sumx, sumy, xave, yave, ad, ax
 
       integer :: KD_num, ii, lenArr
-      
-      amx = max(PMAX,PMAXd)
-      amn = min(PMIN,PMINd)
       
       lenArr =  float(size(yy))
 
