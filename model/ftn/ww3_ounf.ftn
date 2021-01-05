@@ -1,4 +1,5 @@
 #include "w3macros.h"
+#define CHECK_ERR(I) CHECK_ERROR(I, __LINE__)
 !/ ------------------------------------------------------------------- /
       PROGRAM W3OUNF
 !/
@@ -7,7 +8,7 @@
 !/                  |           F. Ardhuin              |
 !/                  |           M. Accensi              |
 !/                  |                        FORTRAN 90 |
-!/                  | Last update :         28-Mar-2019 |
+!/                  | Last update :         07-Oct-2019 |
 !/                  +-----------------------------------+
 !/
 !/    17-Mar-2010 : Creation                            ( version 3.14_SHOM )
@@ -32,8 +33,13 @@
 !/    12-Sep-2018 : Added extra partitioned fields      ( version 6.06 )
 !/    25-Sep-2018 : Add WBT parameter                   ( version 6.06 )
 !/    28-Mar-2019 : Bugfix to NBIPART check.            ( version 6.07 )
-!/    15-Jan-2020 : Extend handling of 3'rd dimension   ( version 7.XX )
 !/    18-Jun-2020 : Support for 360-day calendar.       ( version 7.08 )
+!/    07-Oct-2019 : RTD option with standard lat-lon
+!/                  grid when nesting to rotated grid   ( version 7.11 )
+!/    03-Nov-2020 : Moved NetCDF metadata to separate   ( version 7.12 )
+!/                  module.
+!/    09-Dec-2020 : Set fixed values for VARID indices  ( version 7.12 )
+!/    15-Jan-2021 : Extend handling of 3'rd dimension   ( version 7.XX )
 !/
 !/    Copyright 2009-2013 National Weather Service (NWS),
 !/       National Oceanic and Atmospheric Administration.  All rights
@@ -89,6 +95,29 @@
 !
 !  7. Remarks :
 !
+!     The VARID array stores netCDF variable IDs for all variables in
+!     file. The first 20 elements are reserved for dimension/auxiliary
+!     variables as defined below:
+!
+!       Index     Variable
+!       =====     ========
+!         1       Lon
+!         2       Lat
+!         3       Time
+!         4       Tri (UGRD)
+!         5       SMC CX (SMC)
+!         6       SMC CY (SMC)
+!         7       Standard longitude (SMC/RTD)
+!         8       Standard latitude (SMC/RTD)
+!         9       Coordinate reference system (upcoming feature / RTD)
+!        10       Freq (extradim)
+!        11       Forecast period (upcoming feature)
+!        12       Forecast reference time (upcoming feature)
+!        13-19    [Reserved for future use]
+!        20       MAPSTA
+!
+!    Indices 21 - 300 are for storage of field output variable IDs.
+!
 !  8. Structure :
 !
 !     See source code.
@@ -138,6 +167,11 @@
                           UNDEF, FLOGRD, FNMPRE, NOSWLL, NOGE
 !
       USE W3NMLOUNFMD
+!
+      USE W3OUNFMETAMD, ONLY: INIT_META, TEARDOWN_META, GETMETA,       &
+                              WRITE_META, WRITE_GLOBAL_META,           &
+                              META_T, NCVARTYPE
+!
       USE NETCDF
 
 !/SMC      USE W3SMCOMD
@@ -157,8 +191,9 @@
                                  IOTEST, NOUT,                         &
                                  IFI, IFJ, NCTYPE, IX1, IXN, IY1, IYN, &
                                  IOUT, S3, IRET, HASNC4,               &
-                                 NBIPART, CNTIPART, NCVARTYPE, IPART,  &
+                                 NBIPART, CNTIPART, NCVARTYPEI, IPART, &
                                  RTDNX, RTDNY
+      INTEGER                 :: NFPMAX = 3 ! Depends on the hard-coded max
       INTEGER                 :: TOUT(2), TDUM(2), STOPDATE(8)
 !
       INTEGER, ALLOCATABLE    :: TABIPART(:), NCIDS(:,:,:)
@@ -325,6 +360,8 @@
 
       END IF ! .NOT. FLGNML
 
+      ! Keep track of original NCVARTYPE, as it may change
+      NCVARTYPEI = NCVARTYPE
 !
 
 ! 4.1 Time setup
@@ -384,7 +421,6 @@
       ! Alternative processing of TABIPART to capture requests 
       ! greater than NOSWLL (C.Bunney):
       ALLOCATE(TABIPART(NOSWLL + 1))
-      ALLOCATE(NCIDS(NOGRP,NGRPP,NOSWLL + 1))
       NBIPART=0
       DO I=1,30
         IF(STRINGIPART(I:I) .EQ. ' ') CYCLE
@@ -399,6 +435,10 @@
         ENDIF
         TABIPART(NBIPART) = IPART
       ENDDO
+      
+      NFPMAX = MAX(NBIPART,NFPMAX)
+      ALLOCATE(NCIDS(NOGRP,NGRPP,NFPMAX))
+      
 !
       IF ( NCTYPE.LT.3 .OR. NCTYPE.GT.4 ) THEN
         WRITE (NDSE,1010) NCTYPE
@@ -457,6 +497,9 @@
 
       VECTOR = .TRUE.
 !
+! 4.4 Initialise meta-data
+      CALL INIT_META()
+!
 !--- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ! 5.  Time management.
 !
@@ -490,7 +533,7 @@
 
 ! 5.1.2  Processes the variable value for the time step IOUT
         CALL W3EXNC ( NX, NY, IX1, IXN, IY1, IYN, NSEA, FILEPREFIX,   &
-                      E3DF, P2MSF, US3DF, USSPF, NCTYPE, TOGETHER, NCVARTYPE,&
+                      E3DF, P2MSF, US3DF, USSPF, NCTYPE, TOGETHER, NCVARTYPEI,&
                       FLG2D, NCIDS, S3, STRSTOPDATE )
 
 ! 5.1.3 Defines the stop date
@@ -501,6 +544,8 @@
         CALL TICK21 ( TOUT , DTREQ )
         IF ( IOUT .GE. NOUT ) EXIT
       END DO
+
+      CALL TEARDOWN_META()
 
 
 ! 5.2 Closes the netCDF file
@@ -521,13 +566,13 @@
       IF (NOGE(4).GE.1 .AND. .NOT.TOGETHER) THEN
         IFI = 4
         DO IFJ=1, NOGE(IFI)
-          DO IPART=1,NOSWLL
-            IF (NCIDS(IFI,IFJ,IPART+1).NE.0) THEN
-              IRET = NF90_REDEF(NCIDS(IFI,IFJ,IPART+1))
+          DO IPART=2,NFPMAX
+            IF (NCIDS(IFI,IFJ,IPART).NE.0) THEN
+              IRET = NF90_REDEF(NCIDS(IFI,IFJ,IPART))
               CALL CHECK_ERR(IRET)
-              IRET=NF90_PUT_ATT(NCIDS(IFI,IFJ,IPART+1),NF90_GLOBAL,'stop_date',STRSTOPDATE)
+              IRET=NF90_PUT_ATT(NCIDS(IFI,IFJ,IPART),NF90_GLOBAL,'stop_date',STRSTOPDATE)
               CALL CHECK_ERR(IRET)
-              IRET=NF90_CLOSE(NCIDS(IFI,IFJ,IPART+1))
+              IRET=NF90_CLOSE(NCIDS(IFI,IFJ,IPART))
               CALL CHECK_ERR(IRET)
             END IF ! NCIDS
           END DO ! IPART
@@ -654,6 +699,9 @@
 !/    30-Apr-2014 : Correct group3 freq dim.            ( version 5.00 )
 !/    23-May-2014 : Adding ice fluxes to W3SRCE         ( version 5.01 )
 !/    14-Oct-2014 : Keep the output files opened        ( version 5.01 )
+!/    03-Nov-2020 : NetCDF metadata moved to separate   ( version 7.12 )
+!/                  module.
+!/    09-Dec-2020 : Set fixed values for VARID indices  ( version 7.12 )
 !/
 !  1. Purpose :
 !
@@ -720,6 +768,10 @@
 !/RTD      USE W3SERVMD, ONLY : W3THRTN, W3XYRTN, W3EQTOLL
       USE W3ARRYMD, ONLY : OUTA2I, PRTBLK
       USE W3GDATMD, ONLY : SIG, GTYPE, FLAGLL, MAPSTA, MAPST2
+      USE W3GDATMD, ONLY : NK, UNGTYPE, MAPSF, NTRI, CLGTYPE, RLGTYPE, &
+                           XGRD, YGRD, SX, SY, X0, Y0, XYB, TRIGP, USSP_WN
+!/RTD ! Rotated pole data from the mod_def file
+!/RTD      USE W3GDATMD, ONLY : POLAT, POLON, FLAGUNR, AnglD
 !/T      USE W3ODATMD, ONLY : NDST
       USE NETCDF
       IMPLICIT NONE
@@ -734,7 +786,7 @@
       CHARACTER(30)           :: FILEPREFIX
       LOGICAL, INTENT(IN)     :: TOGETHER
       LOGICAL, INTENT(IN)     :: FLG2D(NOGRP,NGRPP)
-      INTEGER, INTENT(INOUT)  :: NCIDS(NOGRP,NGRPP,NOSWLL + 1), S3
+      INTEGER, INTENT(INOUT)  :: NCIDS(NOGRP,NGRPP,NFPMAX), S3
       CHARACTER*30,INTENT(IN) :: STRSTOPDATE
 !/
 !/ ------------------------------------------------------------------- /
@@ -744,11 +796,11 @@
                                  I1, J1, IPART, INDEXIPART
       INTEGER, SAVE           :: NTIM = 1
       INTEGER                 :: S1, S2, S4, S5, NCID, OLDNCID,        & 
-                                 MAPSTAOUT, NDSDAT, VMIN, VMAX,        &
-                                 NFIELD, IRET, IK, EXTRADIM, IVAR,     &
-                                 IVAR1, NCVARTYPE
+                                 MAPSTAOUT, NDSDAT,                    &
+                                 NFIELD, IRET, IK, EXTRADIM, IVAR,  &
+                                 IVAR1, IDVAROUT, NCVARTYPE
       INTEGER                 :: NCJID, IFP, NFP
-      INTEGER                 :: N3, TDIM, ITD, VARID3, DIMID3
+      INTEGER                 :: N3, TDIM, EDIM, DIMID3
       INTEGER                 :: DIMID(6), VARID(300), START(4),       &
                                  COUNT(4), DIMLN(6), DIMFIELD(4),      &
                                  STARTDATE(8), CURDATE(8), REFDATE(8)
@@ -763,7 +815,7 @@
       INTEGER(KIND=2), ALLOCATABLE    :: MX1(:,:), MXX(:,:), &
                                          MXY(:,:), MAPOUT(:,:)
 !
-      REAL                    :: FSC, FSC3, CABS, UABS, MFILLR
+      REAL                    :: CABS, UABS, MFILLR
 !/BT4   REAL, PARAMETER            :: LOG2=LOG(2.)
 !
       REAL,DIMENSION(:),  ALLOCATABLE    :: LON, LAT, DIM3VAR
@@ -775,17 +827,15 @@
 !
       DOUBLE PRECISION        :: OUTJULDAY
       DOUBLE PRECISION        :: SXD, SYD, X0D, Y0D
-!
-      ! C. Hansen 20200907: grid coordinates VARNM(NFIELD+1,NFIELD+2,...)
-      ! are *not* used (were they used some time before?)
-      CHARACTER*80            :: VARNM(3),VARNL(3)
-      CHARACTER*120           :: VARNS(3),VARNG(3), VARND(3), STR2
-      CHARACTER*512           :: VARNC(3), PARTCOM
-      CHARACTER*30            :: UNITVAR(3),FORMAT1
+!      
+      CHARACTER*120           :: STR2
+      CHARACTER*512           :: PARTCOM
+      !CHARACTER*30            :: UNITVAR(3),FORMAT1
+      CHARACTER*30            :: FORMAT1
       CHARACTER*30            :: STRSTARTDATE
-      ! C Hansen: Commented out obsolete UNITS2 and FORMF
-      CHARACTER               :: FNAMENC*50,                           &
-                                 ENAME*10, UNITS*24 ! ,FORMF*11, UNITS2*24
+      CHARACTER               :: FNAMENC*50
+      ! C Hansen: Commented out obsolete FORMF
+      ! CHARACTER               :: FORMF*11
       CHARACTER, SAVE         :: OLDTIMEID*16 = '0000000000000000'
       CHARACTER, SAVE         :: TIMEID*16 = '0000000000000000'
 !
@@ -795,13 +845,21 @@
       LOGICAL                 :: FLSEP, NEW3D, FIRST_TOGETHER
       LOGICAL                 :: CUSTOMFRQ=.FALSE.
 !/T      LOGICAL                 :: LTEMP(NGRPP)
+!/RTD ! RTDL == False for a standard lat-lon grid. Will be set to True if the
+!/RTD ! grid is rotated
+!/RTD      LOGICAL                 :: RTDL = .FALSE.
 
+      TYPE(META_T)            :: META(3)
+      !TYPE(META_T)            :: META
 !/
 !/ ------------------------------------------------------------------- /
 !/
 !
 !/S      CALL STRACE (IENT, 'W3EXNC')
 !
+!/RTD ! Is the grid really rotated
+!/RTD      IF ( Polat < 90. ) RTDL = .True.
+!/RTD !
 !/T      DO IFI=1, NOGRP 
 !/T        LTEMP  = FLG2D(IFI,:)
 !/T        WRITE (NDST,9000) IFI, LTEMP
@@ -816,12 +874,15 @@
       N3 = 0
       ! If spectral output is requested, then
       ! let N3 = NK: the largest possible number of frequencies
-      IF ( FLG2D(6,8) .OR. FLG2D(6,9) .OR. FLG2D(6,12) ) N3 = NK
-      ! All fields in group 3 are spectral
-      DO IFJ=1, NGRPP
-        IF ( N3 .EQ. NK ) EXIT
-        IF ( FLG2D(3,IFJ)  ) N3 = NK
-      END DO
+      IF ( FLG2D(6,8) .OR. FLG2D(6,9) .OR. FLG2D(6,12) ) THEN
+        N3 = NK
+      ELSE
+        ! All fields in group 3 are spectral
+        DO IFJ=1, NGRPP
+          IF ( N3 .EQ. NK ) EXIT
+          IF ( FLG2D(3,IFJ)  ) N3 = NK
+        END DO
+      END IF
 
       ! Allocate output storage. This is required with the introduction
       ! of the SMC grid output as the regridded output grid dimensions could
@@ -900,25 +961,7 @@
       FNAMENC(1:S1)=FILEPREFIX(1:S1)
       FNAMENC(S1+1:S1+S4) = TIMEID(1:S4)
 
-! 1.3 Create partitioning method comment string:
-      IF ( PTMETH .EQ. 1 ) THEN
-        PARTCOM = "Wind sea and swells defined using topographic " //  &
-                  "partitions and partition wave-age cut-off "     //  &
-                  "(WWIII default scheme)"
-      ELSE IF ( PTMETH .EQ. 2 ) THEN
-        PARTCOM = "Wind sea and swells defined using topographic " //  &
-                  "partitions and spectral wave-age cut-off"
-      ELSE IF ( PTMETH .EQ. 3 ) THEN
-        PARTCOM = "Wave components defined using topographic "     //  &
-                  "partitions only"
-      ELSE IF ( PTMETH .EQ. 4 ) THEN
-        PARTCOM = "Wind sea and swell defined using spectral wave-age cut-off"
-      ELSE IF ( PTMETH .EQ. 5 ) THEN
-        WRITE(PARTCOM, '("Wave components defined using ",F5.3,'   //  &
-                  '"Hz spectral frequency cutoff")') PTFCUT
-      ELSE
-        WRITE(PARTCOM, '("PTM_",I1,"_Unknown")') PTMETH
-      ENDIF
+      !
 
 ! 1.4 Increment the time step or set a flag when an new time stamp in files
 
@@ -952,12 +995,8 @@
         DO IFJ=1, NGRPP
 
           IF ( .NOT. FLG2D(IFI,IFJ) ) CYCLE
-          ! Here, the flag for the field IFI of the group IFJ is .TRUE.
-          ENAME='      '
           ! Instanciates the partition array
           INDEXIPART=1
-          ! IPART=TABIPART(INDEXIPART)
-          VARNS(:)=''
 
           ! NFP: Number of partitions or sub-fields under each fields flag.
           ! Is to be incremented by one for each partition or extra subfield
@@ -996,35 +1035,21 @@
             ! Initializes the flags for optional 3'rd dimension
             FLFRQ = .FALSE.
             DIM3NAME = ''
-            ! C Hansen: Comment out obsolete UNITS2 and FLDIR
+            ! C Hansen: Comment out obsolete FLDIR
             ! FLDIR = .FALSE.
-            ! UNITS2='SAME'
             IF (NCVARTYPEI.EQ.3) NCVARTYPE=2
 !
+            ! Depth
             IF ( IFI .EQ. 1 .AND. IFJ .EQ. 1 ) THEN
-              FSC    = 0.5
-              UNITS  = 'm'
-              NFIELD = 1
-              ENAME  = '.dpt'
               IF( SMCGRD ) THEN
 !/SMC                 CALL W3S2XY_SMC( DW(1:NSEA), X1 )
               ELSE ! IF(SMCGRD)
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, DW(1:NSEA)     &
                                                             , MAPSF, X1 )
               ENDIF
-              VARNM(1)='dpt'
-              VARNL(1)='depth'
-              VARNS(1)='depth'
-              VARNG(1)='depth'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = -90000 
-              VMAX = 140000
-!
+
+            ! Surface current
             ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 2 ) THEN
-              FSC    = 0.01
-              ENAME  = '.cur'
-              UNITS  = 'm s-1'
               !! Note - CX and CY read in from .ww3 file are X-Y vectors
 !/RTD              ! Rotate x,y vector back to standard pole
 !/RTD              IF ( FLAGUNR ) CALL W3XYRTN(NSEA, CX(1:NSEA), CY(1:NSEA), AnglD)
@@ -1037,51 +1062,10 @@
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, CY(1:NSEA)        &
                                                         , MAPSF, XY )
               ENDIF
-              !! Commented out unnecessary statements below for time being
-              !! CX,CY are in north-east convention and X1,X2
-              !! are not actually written out below
-              !DO ISEA=1, NSEA
-              !  CABS   = SQRT(CX(ISEA)**2+CY(ISEA)**2)
-              !  IF ( CABS .GT. 0.05 ) THEN
-              !    CY(ISEA) = MOD ( 630. -                         &
-              !              RADE*ATAN2(CY(ISEA),CX(ISEA)) , 360. )
-              !  ELSE
-              !    CY(ISEA) = UNDEF
-              !    END IF
-              !  CX(ISEA) = CABS
-              !  END DO
-              !CALL W3S2XY ( NSEA, NSEA, NX+1, NY, CX(1:NSEA)        &
-              !                                          , MAPSF, X1 )
-              !CALL W3S2XY ( NSEA, NSEA, NX+1, NY, CY(1:NSEA)        &
-              !                                          , MAPSF, X2 )
               NFIELD=2
-              VARNM(1)='ucur'
-              VARNM(2)='vcur'
-              VARNL(1)='eastward current'
-              VARNL(2)='northward current'
-              VARNS(1)='eastward_sea_water_velocity'
-              VARNS(2)='northward_sea_water_velocity'
-              VARNG(1)='eastward_sea_water_velocity'
-              VARNG(2)='northward_sea_water_velocity'
-              VARNC(1)='cur=sqrt(U**2+V**2)'
-              VARNC(2)='cur=sqrt(U**2+V**2)'
-              VARND(1)=''
-              VARND(2)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD                VARND(2) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD                VARND(2) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = -990
-              VMAX =  990
 !
+            ! Wind
             ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 3 ) THEN
-              FSC    = 0.1
-              ENAME  = '.wnd'
-              UNITS  = 'm s-1'
               !! Note - UA and UD read in from .ww3 file are UX,UY
 !/RTD              ! Rotate x,y vector back to standard pole
 !/RTD              IF ( FLAGUNR ) CALL W3XYRTN(NSEA, UA(1:NSEA), UD(1:NSEA), AnglD)
@@ -1095,307 +1079,111 @@
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, UD(1:NSEA)        &
                                                         , MAPSF, XY )
               ENDIF
-              !! Commented out unnecessary statements below for time being
-              !! UA,UD are  in north-east convention and X1,X2
-              !! are not actually written out below
-              !DO ISEA=1, NSEA
-              !  UABS   = SQRT(UA(ISEA)**2+UD(ISEA)**2)
-              !  IF ( UABS .GT. 1.0 ) THEN
-              !    UD(ISEA) = MOD ( 630. -                         &
-              !              RADE*ATAN2(UD(ISEA),UA(ISEA)) , 360. )
-              !  ELSE
-              !    UD(ISEA) = UNDEF
-              !    END IF
-              !  UA(ISEA) = UABS
-              !END DO
-              !CALL W3S2XY ( NSEA, NSEA, NX+1, NY, UA(1:NSEA)        &
-              !                                          , MAPSF, X1 )
-              !CALL W3S2XY ( NSEA, NSEA, NX+1, NY, UD(1:NSEA)        &
-              !                                          , MAPSF, X2 )
               NFIELD=2
-              VARNM(1)='uwnd'
-              VARNM(2)='vwnd'
-              VARNL(1)='eastward_wind'
-              VARNL(2)='northward_wind'
-              VARNS(1)='eastward_wind'
-              VARNS(2)='northward_wind'
-              VARNG(1)='eastward_wind'
-              VARNG(2)='northward_wind'
-              VARNC(1)='wind=sqrt(U10**2+V10**2)'
-              VARNC(2)='wind=sqrt(U10**2+V10**2)'
-              VARND(1)=''
-              VARND(2)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD                VARND(2) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD                VARND(2) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = -990
-              VMAX =  990
 !
+            ! Air-sea temperature difference
             ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 4 ) THEN
-              FSC    = 0.1
-              ENAME  = '.ast'
-              UNITS  = 'K'
               IF( SMCGRD ) THEN
 !/SMC                 CALL W3S2XY_SMC(AS(1:NSEA), X1)
               ELSE ! IF(SMCGRD)
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, AS(1:NSEA)        &
                                                         , MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              VARNM(1)='ast'
-              VARNL(1)='air sea temperature difference'
-              VARNS(1)='air_sea_temperature_difference'
-              VARNG(1)='air_sea_temperature_difference'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0    
-              VMAX = 4000
 !
+            ! Sea surface height above sea level
             ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 5 ) THEN
-              FSC    = 0.01
-              UNITS  = 'm'
-              ENAME  = '.wlv'
               IF( SMCGRD ) THEN
 !/SMC                 CALL W3S2XY_SMC(WLV, X1)
               ELSE ! IF(SMCGRD)
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, WLV   , MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              VARNM(1)='wlv'
-              VARNL(1)='sea surface height above sea level'
-              VARNS(1)='sea_surface_height_above_sea_level'
-              VARNG(1)='sea_surface_height_above_sea_level'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 10000
 !
+            ! Sea ice area fraction
             ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 6 ) THEN
-              FSC    = 0.001
-              UNITS  = '1'
-              ENAME  = '.ice'
-              
               IF( SMCGRD ) THEN
 !/SMC                 CALL W3S2XY_SMC(ICE, X1)
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, ICE(1:NSEA), MAPSF, X1 )
               ENDIF
 
-              NFIELD=1
-              VARNM(1)='ice'
-              VARNL(1)='sea ice area fraction'
-              VARNS(1)='sea_ice_area_fraction'
-              VARNG(1)='sea_ice_area_fraction'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 1000
-!
+            ! Icebergs_damping
             ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 7 ) THEN
-              FSC    = 0.0001
-              UNITS  = 'km-1'
-              ENAME  = '.ibg'
-
               IF( SMCGRD ) THEN
 !/SMC                 CALL W3S2XY_SMC(BERG, X1)
               ELSE
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, BERG   , MAPSF, X1 )
               ENDIF
               WHERE ( X1.NE.UNDEF) X1 = X1*0.1
-              NFIELD=1
-              VARNM(1)='ibg'
-              VARNL(1)='icebergs_damping'
-              VARNS(1)='icebergs_induced_attenuation_scale_for_waves'
-              VARNG(1)='icebergs_damping'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 32000
 !
+!/BT4 ! Krumbein phi scale
 !/BT4 ELSE IF ( IFI .EQ. 1 .AND. IFJ .EQ. 8 ) THEN
-!/BT4              FSC    = 0.001
-!/BT4              UNITS  = 'Krumbein phi scale'
-!/BT4              ENAME  = '.d50'
 !/BT4              CALL W3S2XY ( NSEA, NSEA, NX+1, NY, SED_D50   , MAPSF, X1 )
 !/BT4              WHERE ( X1.NE.UNDEF) X1 = -LOG(X1/0.001)/LOG2    
 !/BT4              NFIELD=1
-!/BT4              VARNM(1)='d50'
-!/BT4              VARNL(1)='grain_size'
-!/BT4              VARNS(1)='sediment_grain_size'
-!/BT4              VARNG(1)='sediment_grain_size'
-!/BT4              VARNC(1)=''
-!/BT4              VARND(1)=''
-!/BT4              VMIN = -10000
-!/BT4              VMAX = 32000
 !
+!/IS2 ! Ice thickness
 !/IS2 ELSE IF (IFI .EQ. 1 .AND. IFJ .EQ. 9 ) THEN
-!/IS2              FSC = 0.001
-!/IS2              UNITS = 'm'
-!/IS2              ENAME = '.ic1'
 !/IS2              CALL W3S2XY (NSEA, NSEA, NX+1, NY, ICEH(1:NSEA), MAPSF, X1 )
 !/IS2              NFIELD=1
-!/IS2              VARNM(1)='ic1'
-!/IS2              VARNL(1)='ice thickness'
-!/IS2              VARNS(1)='ice_thickness'
-!/IS2              VARNG(1)='ice_thickness'
-!/IS2              VARNC(1)=''
-!/IS2              VARND(1)=''
-!/IS2              VMIN = 0
-!/IS2              VMAX = 30000
 !
-!
+!/IS2 ! Maximum ice floe diameter
 !/IS2 ELSE IF (IFI .EQ. 1 .AND. IFJ .EQ. 10 ) THEN
-!/IS2              FSC = 0.05
-!/IS2              UNITS = 'm'
-!/IS2              ENAME = '.ic5'
 !/IS2              CALL W3S2XY (NSEA, NSEA, NX+1, NY, ICEF(1:NSEA), MAPSF, X1 )
 !/IS2              NFIELD=1
-!/IS2              VARNM(1)='ic5'
-!/IS2              VARNL(1)='maximum floe diameter'
-!/IS2              VARNS(1)='maximum_ice_floe_diameter'
-!/IS2              VARNG(1)='maximum_ice_floe_diameter'
-!/IS2              VARNC(1)=''
-!/IS2              VARND(1)=''
-!/IS2              VMIN = 0
-!/IS2              VMAX = 30000
 
+            ! Significant wave height
             ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 1 ) THEN
-!
-              NFIELD=1
               IF (NCVARTYPEI.EQ.3) NCVARTYPE=2
-              FSC    = 0.002
-              UNITS  = 'm'
-              ENAME  = '.hs'
               IF( SMCGRD ) THEN
 !/SMC                 CALL W3S2XY_SMC( HS, X1 )
               ELSE
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, HS    , MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              VARNM(1)='hs'
-              VARNL(1)='significant height of wind and swell waves'
-              VARNS(1)='sea_surface_wave_significant_height' 
-              VARNG(1)='significant_wave_height'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 32000
 
+            ! Mean wave length
             ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 2 ) THEN
-              FSC    = 1.
-              UNITS  = 'm'
-              ENAME  = '.lm'
-
               IF( SMCGRD ) THEN
 !/SMC                 CALL W3S2XY_SMC(WLM, X1 )
               ELSE
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, WLM, MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              VARNM(1)='lm'
-              VARNL(1)='mean wave length'
-              VARNS(1)='mean_wave_length' 
-              VARNG(1)='mean_wave_length' 
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 3200
 !
+            ! Mean period T02
             ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 3 ) THEN
-              FSC    = 0.01
-              UNITS  = 's'
-              ENAME  = '.t02'
-
               IF( SMCGRD ) THEN
 !/SMC                 CALL W3S2XY_SMC( T02, X1 )
               ELSE
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, T02, MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              VARNM(1)='t02'
-              VARNL(1)='mean period T02'
-              VARNS(1)='sea_surface_wind_wave_mean_period_from_variance_' // &
-                       'spectral_density_second_frequency_moment'
-              VARNG(1)='mean_period_t02'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 5000
 !
+            ! Mean period T0m1
             ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 4 ) THEN
-              FSC    = 0.01
-              UNITS  = 's'
-              ENAME  = '.t0m1'
-
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( T0M1, X1 )
               ELSE
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, T0M1, MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              VARNM(1)='t0m1'
-              VARNL(1)='mean period T0m1'
-              VARNS(1)='sea_surface_wind_wave_mean_period_from_variance' // &
-                       '_spectral_density_inverse_frequency_moment'
-              VARNG(1)='mean_period_t0m1'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 5000
 !
+            ! Mean period T01
             ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 5 ) THEN
-              FSC    = 0.01
-              UNITS  = 's'
-              ENAME  = '.t01'
-              
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( T01, X1 )
               ELSE
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, T01   , MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              VARNM(1)='t01'
-              VARNL(1)='mean period T01'
-              VARNS(1)='sea_surface_wind_wave_mean_period_from_variance' // &
-                       '_spectral_density_first_frequency_moment' 
-              VARNG(1)='mean_period_t01'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 5000
 !
+            ! Wave peak frequency
             ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 6 ) THEN
-              FSC    = 0.001
-              UNITS  = 's-1'
-              ENAME  = '.fp'
-
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC(FP0, X1)
               ELSE
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, FP0   , MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              VARNM(1)='fp'
-              VARNL(1)='wave peak frequency'
-              VARNS(1)='sea_surface_wave_peak_frequency'
-              VARNG(1)='dominant_wave_frequency'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 10000
 !
+            ! Wave mean direction
             ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 7 ) THEN
-              FSC    = 0.1
-              UNITS  = 'degree'
-              ENAME  = '.dir'
 !/RTD              ! Rotate direction back to standard pole
 !/RTD              IF ( FLAGUNR ) CALL W3THRTN(NSEA, THM, AnglD, .FALSE.)
-
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( THM, X1, .TRUE. )
               ELSE
@@ -1406,49 +1194,19 @@
                    END DO
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, THM, MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              VARNM(1)='dir'
-              VARNL(1)='wave mean direction'
-              VARNS(1)='sea_surface_wave_from_direction'
-              VARNG(1)='wave_from_direction'
-              VARNC(1)=''
-              VARND(1)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = 0
-              VMAX = 3600
 !
+            ! Directional spread
             ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 8 ) THEN
-              FSC    = 0.1
-              UNITS  = 'degree'
-              ENAME  = '.spr'
-
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( THS, X1 )
               ELSE
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, THS   , MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              VARNM(1)='spr'
-              VARNL(1)='directional spread'
-              VARNS(1)='sea_surface_wave_directional_spread'
-              VARNG(1)='directional_spread'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 900
 !
+            ! Peak direction
             ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 9 ) THEN
-              FSC    = 1.
-              UNITS  = 'degree'
-              ENAME  = '.dp'
 !/RTD              ! Rotate direction back to standard pole
 !/RTD              IF ( FLAGUNR ) CALL W3THRTN(NSEA, THP0, AnglD, .FALSE.)
-
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( THP0, X1, .TRUE. )
               ELSE
@@ -1459,196 +1217,75 @@
                    END DO
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, THP0  , MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              VARNM(1)='dp'
-              VARNL(1)='peak direction'
-              VARNS(1)='sea_surface_wave_peak_direction'
-              VARNG(1)='dominant_wave_direction'
-              VARNC(1)=''
-              VARND(1)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = 0 
-              VMAX = 360
 !
+            ! Infragravity wave height
             ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 10 ) THEN
-              FSC    = 0.0002
-              UNITS  = 'm'
-              ENAME  = '.hig'
-
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( HSIG, X1 )
               ELSE
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, HSIG, MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              VARNM(1)='hig'
-              VARNL(1)='infragravity_wave_height'
-              VARNS(1)='sea_surface_wave_infragravity_significant_height' 
-              VARNG(1)='infragravity_significant_wave_height' 
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 5000
 !
+            ! Expected maximum sea surface elevation
             ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 11 ) THEN
-              FSC    = 0.002
-              UNITS  = 'm'
-              ENAME  = '.mxe'
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( STMAXE, X1 )
               ELSE
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, STMAXE, MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              VARNM(1)='stmaxe'
-              VARNL(1)='expected maximum sea surface elevation (nonlinear,2nd order)'
-              VARNS(1)='expected maximum sea surface elevation (nonlinear,2nd order)'
-              VARNG(1)='expected maximum sea surface elevation (nonlinear,2nd order)'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 32000
 !
+            ! Standard deviation of maximum sea surface elevation
             ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 12 ) THEN
-              FSC    = 0.002
-              UNITS  = 'm'
-              ENAME  = '.mxes'
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( STMAXD, X1 )
               ELSE
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, STMAXD, MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              VARNM(1)='stmaxd'
-              VARNL(1)='standard deviation of maximum sea surface elevation (nonlinear,2nd order)'
-              VARNS(1)='std of expected maximum sea surface elevation (nonlinear,2nd order)'
-              VARNG(1)='standard deviation of maximum sea surface elevation (nonlinear,2nd order)'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 32000
 !
+            ! Expected maximum wave height 
             ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 13 ) THEN
-              FSC    = 0.002
-              UNITS  = 'm'
-              ENAME  = '.mxh'
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( HMAXE, X1 )
               ELSE
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, HMAXE, MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              VARNM(1)='hmaxe'
-              VARNL(1)='expected maximum wave height (linear, 1st order)'
-              VARNS(1)='expected maximum wave height (linear, 1st order)'
-              VARNG(1)='expected maximum wave height (linear, 1st order)'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 32000
 !
+            ! Expected maximum wave height from crest
             ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 14 ) THEN
-              FSC    = 0.002
-              UNITS  = 'm'
-              ENAME  = '.mxhc'
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( HCMAXE, X1 )
               ELSE
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, HCMAXE, MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              VARNM(1)='hcmaxe'
-              VARNL(1)='expected maximum wave height from crest (linear, 1st order)'
-              VARNS(1)='expected maximum wave height from crest (linear, 1st order)'
-              VARNG(1)='expected maximum wave height from crest (linear, 1st order)'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 32000
 !
+            ! STD of maximum wave height
             ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 15 ) THEN
-              FSC    = 0.002
-              UNITS  = 'm'
-              ENAME  = '.sdmh'
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( HMAXD, X1 )
               ELSE
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, HMAXD, MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              VARNM(1)='hmaxd'
-              VARNL(1)='STD of maximum wave height (linear, 1st order)'
-              VARNS(1)='STD of maximum wave height (linear, 1st order)'
-              VARNG(1)='STD of maximum wave height (linear, 1st order)'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 32000
 !
+            ! STD of maximum wave height from crest
             ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 16 ) THEN
-              FSC    = 0.002
-              UNITS  = 'm'
-              ENAME  = '.sdmhc'
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( HCMAXD, X1 )
               ELSE
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, HCMAXD, MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              VARNM(1)='hcmaxd'
-              VARNL(1)='STD of maximum wave height from crest (linear, 1st order)'
-              VARNS(1)='STD of maximum wave height from crest (linear, 1st order)'
-              VARNG(1)='STD of maximum wave height from crest (linear, 1st order)'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 32000
 !
+            ! Dominant wave breaking probability
             ELSE IF ( IFI .EQ. 2 .AND. IFJ .EQ. 17 ) THEN
-              FSC    = 0.001
-              UNITS  = '1'
-              ENAME  = '.wbt'
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( WBT, X1 )
               ELSE
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, WBT, MAPSF, X1 )
               END IF
-              NFIELD=1
-              VARNM(1)='wbt'
-              VARNL(1)='domiant wave breaking probability'
-              VARNS(1)='domiant_wave_breaking_probability'
-              VARNG(1)='domiant_wave_breaking_probability'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 1000
 !
+            ! Wave elevation spectrum
             ELSE IF ( IFI .EQ. 3 .AND. IFJ .EQ. 1 ) THEN
               ! Information for spectral
               FLFRQ  = .TRUE.
-              NFIELD = 1
-              VARNM(1)='ef'
-              VARNL(1)='wave_elevation_spectrum'
-              VARNG(1)=VARNS(1)
-              VARNC(1)=''
-              VARND(1)=''
-              IF (NCVARTYPE.LE.3) THEN 
-                UNITS  = 'log10(m2 s+1E-12)'
-                VARNS(1)='base_ten_logarithm_of_power_spectral_density_of_surface_elevation'
-                FSC     = 0.0004
-              ELSE
-                UNITS  = 'm2 s'
-                VARNS(1)='power_spectral_density_of_surface_elevation'
-                FSC     = 1.
-                END IF
-              ENAME  = '.ef'
-              VARNG(1)=VARNS(1)
-              VARNG(1)=VARNS(1)
               I1F=E3DF(2,1)
               I2F=E3DF(3,1)
               DO IK=I1F,I2F
@@ -1660,28 +1297,11 @@
                 IF (NCVARTYPE.EQ.2) WHERE ( XX.GE.0.) XX = ALOG10(XX+1E-12)
                 XK(:,:,IK)=XX
                 END DO
-              VMIN = -30000
-              VMAX = 32000
 !
+            ! Mean wave direction frequency spectrum
             ELSE IF ( IFI .EQ. 3 .AND. IFJ .EQ. 2 ) THEN
               ! Information for spectral
               FLFRQ  = .TRUE.
-              NFIELD = 1
-              FSC     = 0.1
-              VARNM(1)='th1m'
-              VARNL(1)='mean wave direction frequency spectrum'
-              VARNS(1)='sea_surface_wave_from_direction_frequency_spectrum'
-              VARNG(1)=VARNS(1)
-              VARNC(1)=''
-              VARND(1)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              UNITS  = 'degree'
-              ENAME  = '.th1m'
               I1F=E3DF(2,2)
               I2F=E3DF(3,2)
               DO IK=I1F,I2F
@@ -1694,22 +1314,11 @@
                 ENDIF
                 XK(:,:,IK)=XX
                 END DO
-              VMIN = 0 
-              VMAX = 3600
 !
+            ! Spreading frequency spectrum
             ELSE IF ( IFI .EQ. 3 .AND. IFJ .EQ. 3 ) THEN
               ! Information for spectral
               FLFRQ  = .TRUE.
-              NFIELD = 1
-              FSC     = 0.01
-              VARNM(1)='sth1m'
-              VARNL(1)='spreading frequency spectrum'
-              VARNS(1)='sea_surface_wave_spreading_spectrum'
-              VARNG(1)=VARNS(1)
-              VARNC(1)=''
-              VARND(1)=''
-              UNITS  = 'degree'
-              ENAME  = '.sth1m'
               I1F=E3DF(2,3)
               I2F=E3DF(3,3)
               DO IK=I1F,I2F
@@ -1720,28 +1329,11 @@
                 ENDIF
                 XK(:,:,IK)=XX
                 END DO
-              VMIN = 0 
-              VMAX = 9000
 !
+            ! Second mean wave direction frequency spectrum
             ELSE IF ( IFI .EQ. 3 .AND. IFJ .EQ. 4 ) THEN
               ! Information for spectral
               FLFRQ  = .TRUE.
-              NFIELD = 1
-              FSC     = 0.1
-              VARNM(1)='th2m'
-              VARNL(1)='second mean wave direction frequency spectrum'
-              VARNS(1)='sea_surface_wave_from_direction_frequency_spectrum_from_second_moments'
-              VARNG(1)=VARNS(1)
-              VARNC(1)=''
-              VARND(1)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              UNITS  = 'degree'
-              ENAME  = '.th2m'
               I1F=E3DF(2,4)
               I2F=E3DF(3,4)
               DO IK=I1F,I2F
@@ -1754,22 +1346,11 @@
                 ENDIF
                 XK(:,:,IK)=XX
                 END DO
-              VMIN = 0 
-              VMAX = 3600
 !
+            ! Second spreading frequency spectrum
             ELSE IF ( IFI .EQ. 3 .AND. IFJ .EQ. 5 ) THEN
               ! Information for spectral
               FLFRQ  = .TRUE.
-              NFIELD = 1
-              FSC     = 0.01
-              VARNM(1)='sth2m'
-              VARNL(1)='second spreading frequency spectrum'
-              VARNS(1)='sea_surface_wave_spreading_spectrum_from_second_moments'
-              VARNG(1)=VARNS(1)
-              VARNC(1)=''
-              VARND(1)=''
-              UNITS  = 'degree'
-              ENAME  = '.sth2m'
               I1F=E3DF(2,5)
               I2F=E3DF(3,5)
               DO IK=I1F,I2F
@@ -1780,15 +1361,11 @@
                 ENDIF
                 XK(:,:,IK)=XX
                 END DO
-              VMIN = 0 
-              VMAX = 9000
 !
+            ! Wave numbers
             ELSE IF ( IFI .EQ. 3 .AND. IFJ .EQ. 6 ) THEN
               ! Information for spectral
               FLFRQ  = .TRUE.
-              FSC    = 0.001
-              UNITS  = 'm-1'
-              ENAME  = '.wn'
               I1F=1
               I2F=NK
               DO IK=1,NK 
@@ -1798,84 +1375,34 @@
                    CALL W3S2XY ( NSEA, NSEA, NX+1, NY, WN(IK,:), MAPSF, XX )
                 ENDIF
                 XK(:,:,IK)=XX
-                END DO
-              NFIELD=1
-              VARNM(1)='wn'
-              VARNL(1)='wave numbers'
-              VARNS(1)='wave_numbers'
-              VARNG(1)='wave_numbers'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 32000
+              END DO
 !
+            ! Partition wave significant height
             ELSE IF ( IFI .EQ. 4 .AND. IFJ .EQ. 1 ) THEN
-              FSC    = 0.002
-              UNITS  = 'm'
-              WRITE(ENAME,'(A4,I1)') '.phs',IPART
-
               IF( SMCGRD ) THEN
 !/SMC                 CALL W3S2XY_SMC( PHS(:,IPART), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PHS(:,IPART), MAPSF, X1 )
               ENDIF
-
-              NFIELD=1
-              WRITE(VARNM(1),'(A3,I1)') 'phs',IPART 
-              WRITE(VARNL(1),'(A,I1)') 'wave significant height partition ',IPART 
-              WRITE(VARNS(1),'(A,I1)') 'sea_surface_wave_significant_height_partition_',IPART 
-              WRITE(VARNG(1),'(A,I1)') 'significant_wave_height_partition_',IPART 
-              VARNC(1)=PARTCOM
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 32000
 !
+            ! Partition peak period
             ELSE IF ( IFI .EQ. 4 .AND. IFJ .EQ. 2 ) THEN
-              FSC    = 0.01
-              UNITS  = 's'
-              WRITE(ENAME,'(A4,I1)') '.ptp',IPART
-
               IF( SMCGRD ) THEN
 !/SMC                 CALL W3S2XY_SMC( PTP(:,IPART), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PTP(:,IPART), MAPSF, X1 )
               ENDIF
 
-              NFIELD=1
-              WRITE(VARNM(1),'(A3,I1)') 'ptp',IPART 
-              WRITE(VARNL(1),'(A,I1)') 'peak period partition ',IPART 
-              WRITE(VARNS(1),'(A,I1)') 'sea_surface_wave_period_at_' // &
-                                       'variance_spectral_density_maximum_partition_',IPART
-              WRITE(VARNG(1),'(A,I1)') 'dominant_wave_period_partition_',IPART
-              VARNC(1)=PARTCOM
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 10000
-!
+            ! Partition peak wave length
             ELSE IF ( IFI .EQ. 4 .AND. IFJ .EQ. 3 ) THEN
-              FSC    = 1.
-              UNITS  = 'm'
-              WRITE(ENAME,'(A4,I1)') '.plp',IPART
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( PLP(:,IPART), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PLP(:,IPART), MAPSF, X1 )
               ENDIF
-
-              NFIELD=1
-              WRITE(VARNM(1),'(A3,I1)') 'plp',IPART 
-              WRITE(VARNL(1),'(A,I1)') 'peak wave length partition ',IPART 
-              WRITE(VARNS(1),'(A,I1)') 'peak_wave_length_partition_',IPART
-              WRITE(VARNG(1),'(A,I1)') 'peak_wave_length_partition_',IPART
-              VARNC(1)=PARTCOM
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 10000
 !
+            ! Partition wave mean direction
             ELSE IF ( IFI .EQ. 4 .AND. IFJ .EQ. 4 ) THEN
-              FSC    = 0.1
-              UNITS  = 'degree'
-              WRITE(ENAME,'(A5,I1)') '.pdir',IPART
 !/RTD                ! Rotate direction back to standard pole
 !/RTD                IF ( FLAGUNR ) CALL W3THRTN(NSEA, PDIR(:,IPART), AnglD, .FALSE.)
               IF( SMCGRD ) THEN
@@ -1888,68 +1415,25 @@
                 END DO
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PDIR(:,IPART), MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              WRITE(VARNM(1),'(A4,I1)') 'pdir',IPART 
-              WRITE(VARNL(1),'(A,I1)') 'wave mean direction partition ',IPART 
-              WRITE(VARNS(1),'(A,I1)') 'sea_surface_wave_from_direction_partition_',IPART
-              WRITE(VARNG(1),'(A,I1)') 'wave_from_direction_partition_',IPART
-              VARNC(1)=PARTCOM
-              VARND(1)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = 0
-              VMAX = 3600
 !
+            ! Partition directional spread
             ELSE IF ( IFI .EQ. 4 .AND. IFJ .EQ. 5 ) THEN
-              FSC    = 0.1
-              UNITS  = 'degree'
-              WRITE(ENAME,'(A5,I1)') '.pspr',IPART
-              
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( PSI(:,IPART), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PSI(:,IPART), MAPSF, X1 )
               ENDIF
 
-              NFIELD=1
-              WRITE(VARNM(1),'(A4,I1)') 'pspr',IPART 
-              WRITE(VARNL(1),'(A,I1)') 'directional spread partition ',IPART 
-              WRITE(VARNS(1),'(A,I1)') 'sea_surface_wave_directional_spread_partition_',IPART
-              WRITE(VARNG(1),'(A,I1)') 'directional_spread_partition_',IPART
-              VARNC(1)=PARTCOM
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 900
-!
+            ! Partition wind sea fraction
             ELSE IF ( IFI .EQ. 4 .AND. IFJ .EQ. 6 ) THEN
-              FSC    = 0.001
-              UNITS  = '1'
-              WRITE(ENAME,'(A4,I1)') '.pws',IPART
-
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( PWS(:,IPART), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PWS(:,IPART), MAPSF, X1 )
               ENDIF
-
-              NFIELD=1
-              WRITE(VARNM(1),'(A3,I1)') 'pws',IPART
-              WRITE(VARNL(1),'(A,I1)') 'wind sea fraction in partition ',IPART 
-              WRITE(VARNS(1),'(A,I1)') 'wind_sea_fraction_in_partition_',IPART 
-              WRITE(VARNG(1),'(A,I1)') 'wind_sea_fraction_in_partition_',IPART
-              VARNC(1)=PARTCOM
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 1000
 !
+            ! Partition peak direction
             ELSE IF ( IFI .EQ. 4 .AND. IFJ .EQ. 7 ) THEN
-              FSC    = 0.1
-              UNITS  = 'degree'
-              WRITE(ENAME,'(A4,I1)') '.pdp',IPART
 !/RTD                ! Rotate direction back to standard pole
 !/RTD                IF ( FLAGUNR ) CALL W3THRTN(NSEA, PTHP0(:,IPART), AnglD, .FALSE.)
               IF( SMCGRD ) THEN
@@ -1962,242 +1446,90 @@
                   END DO
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PTHP0(:,IPART), MAPSF, X1 )
               END IF
-              NFIELD=1
-              WRITE(VARNM(1),'(A3,I1)') 'pdp',IPART
-              WRITE(VARNL(1),'(A,I1)') &
-                 'peak direction partition ',IPART
-              WRITE(VARNS(1),'(A,I1)') &
-                 'sea_surface_wave_peak_from_direction_partition_',IPART
-              WRITE(VARNG(1),'(A,I1)') &
-                  'dominant_wave_from_direction_partition_',IPART
-              VARNC(1)=PARTCOM
-              VARND(1)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = 0
-              VMAX = 3600
 !
+            ! Partition peakedness
             ELSE IF ( IFI .EQ. 4 .AND. IFJ .EQ. 8 ) THEN
-              FSC    = 0.01
-              UNITS  = '1'
-              WRITE(ENAME,'(A4,I1)') '.pqp',IPART
               IF( SMCGRD ) THEN
 !/SMC                 CALL W3S2XY_SMC( PQP(:,IPART), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PQP(:,IPART), MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              WRITE(VARNM(1),'(A3,I1)') 'pqp',IPART
-              WRITE(VARNL(1),'(A,I1)') 'peakedness partition ',IPART
-              WRITE(VARNS(1),'(A,I1)') &
-                  'sea_surface_wave_peakedness_partition_',IPART
-              WRITE(VARNG(1),'(A,I1)') &
-                  'wave_peakedness_partition_',IPART
-              VARNC(1)=PARTCOM
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 32000
 !
+            ! Partition peak enhancement factor
             ELSE IF ( IFI .EQ. 4 .AND. IFJ .EQ. 9 ) THEN
-              FSC    = 0.01
-              UNITS  = '1'
-              WRITE(ENAME,'(A4,I1)') '.ppe',IPART
               IF( SMCGRD ) THEN
 !/SMC                 CALL W3S2XY_SMC( PPE(:,IPART), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PPE(:,IPART), MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              WRITE(VARNM(1),'(A3,I1)') 'ppe',IPART
-              WRITE(VARNL(1),'(A,I1)') &
-                  'peak enhancement factor partition ',IPART
-              WRITE(VARNS(1),'(A,I1)') &
-                  'wave_peak_enhancement_factor_partition_',IPART
-              WRITE(VARNG(1),'(A,I1)') &
-                  'wave_peak_enhancement_factor_partition_',IPART
-              VARNC(1)='JONSWAP peak enhancement factor; ' // PARTCOM
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 32000
 !
+            ! Partition frequency width
             ELSE IF ( IFI .EQ. 4 .AND. IFJ .EQ. 10 ) THEN
-              FSC    = 0.0001
-              UNITS  = 's-1'
-              WRITE(ENAME,'(A4,I1)') '.pgw',IPART
               IF( SMCGRD ) THEN
 !/SMC                 CALL W3S2XY_SMC( PGW(:,IPART), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PGW(:,IPART), MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              WRITE(VARNM(1),'(A3,I1)') 'pgw',IPART
-              WRITE(VARNL(1),'(A,I1)') &
-                  'frequency width partition ',IPART
-              WRITE(VARNS(1),'(A,I1)') &
-                  'Gaussian_frequency_spread_partition_',IPART
-              WRITE(VARNG(1),'(A,I1)') &
-                  'Gaussian_frequency_spread_partition_',IPART
-              VARNC(1)='Gaussian least-square fit to ' // &
-                       'omni-directional spectral partition; ' // PARTCOM
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 32000
 !
+            ! Partition spectral width
             ELSE IF ( IFI .EQ. 4 .AND. IFJ .EQ. 11 ) THEN
-              FSC    = 0.0001
-              UNITS  = '1'
-              WRITE(ENAME,'(A4,I1)') '.psw',IPART
               IF( SMCGRD ) THEN
 !/SMC                 CALL W3S2XY_SMC( PSW(:,IPART), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PSW(:,IPART), MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              WRITE(VARNM(1),'(A3,I1)') 'psw',IPART
-              WRITE(VARNL(1),'(A,I1)') 'spectral width partition ',IPART
-              WRITE(VARNS(1),'(A,I1)') &
-                  'sea_surface_wave_spectral_width_partition_',IPART
-              WRITE(VARNG(1),'(A,I1)') &
-                  'wave_spectral_width_partition_',IPART
-              VARNC(1)=PARTCOM
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 32000
 !
+            ! Partition mean period Tm10
             ELSE IF ( IFI .EQ. 4 .AND. IFJ .EQ. 12 ) THEN
-              FSC    = 0.01
-              UNITS  = 's'
-              WRITE(ENAME,'(A7,I1)') '.ptm10c',IPART
               IF( SMCGRD ) THEN
 !/SMC                 CALL W3S2XY_SMC( PTM1(:,IPART), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PTM1(:,IPART), MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              WRITE(VARNM(1),'(A6,I1)') 'ptm10c',IPART
-              WRITE(VARNL(1),'(A,I1)') 'mean period Tm10 partition ',IPART
-              WRITE(VARNS(1),'(A,I1)') &
-                  'sea_surface_wave_mean_period_tm10_partition_',IPART
-              WRITE(VARNG(1),'(A,I1)') &
-                  'mean_wave_period_Tm10_partition_',IPART
-              VARNC(1)=PARTCOM
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 10000
 !
+            ! Partition mean period T01
             ELSE IF ( IFI .EQ. 4 .AND. IFJ .EQ. 13 ) THEN
-              FSC    = 0.01
-              UNITS  = 's'
-              WRITE(ENAME,'(A6,I1)') '.pt01c',IPART
               IF( SMCGRD ) THEN
 !/SMC                 CALL W3S2XY_SMC( PT1(:,IPART), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PT1(:,IPART), MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              WRITE(VARNM(1),'(A5,I1)') 'pt01c',IPART
-              WRITE(VARNL(1),'(A,I1)') 'mean period T01 partition ',IPART
-              WRITE(VARNS(1),'(A,I1)') &
-                  'sea_surface_wave_mean_period_t01_partition_',IPART
-              WRITE(VARNG(1),'(A,I1)') &
-                  'mean_wave_period_T01_partition_',IPART
-              VARNC(1)=PARTCOM
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 10000
 !
+            ! Partition mean period T02
             ELSE IF ( IFI .EQ. 4 .AND. IFJ .EQ. 14 ) THEN
-              FSC    = 0.01
-              UNITS  = 's'
-              WRITE(ENAME,'(A6,I1)') '.pt02c',IPART
               IF( SMCGRD ) THEN
 !/SMC                 CALL W3S2XY_SMC( PT2(:,IPART), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PT2(:,IPART), MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              WRITE(VARNM(1),'(A5,I1)') 'pt02c',IPART
-              WRITE(VARNL(1),'(A,I1)') 'mean period T02 partition ',IPART
-              WRITE(VARNS(1),'(A,I1)') &
-                  'sea_surface_wave_mean_period_t02_partition_',IPART
-              WRITE(VARNG(1),'(A,I1)') &
-                  'mean_wave_period_T02_partition_',IPART
-              VARNC(1)=PARTCOM
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 10000
 !
+            ! Partition energy at peak frequency
             ELSE IF ( IFI .EQ. 4 .AND. IFJ .EQ. 15 ) THEN
-              FSC    = 0.02
-              UNITS  = 'm2 s rad-1'
-              WRITE(ENAME,'(A4,I1)') '.pep',IPART
               IF( SMCGRD ) THEN
 !/SMC                 CALL W3S2XY_SMC( PEP(:,IPART), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PEP(:,IPART), MAPSF, X1 )
               ENDIF
               NFIELD=1
-              WRITE(VARNM(1),'(A3,I1)') 'pep',IPART
-              WRITE(VARNL(1),'(A,I1)') 'energy at peak frequency partition ',IPART
-              WRITE(VARNS(1),'(A,I1)') &
-                  'sea_surface_wave_energy_at_variance_spectral_density_maximum_partition_',IPART
-              WRITE(VARNG(1),'(A,I1)') &
-                  'wave_energy_at_variance_spectral_density_maximum_partition_',IPART
-              VARNC(1)=PARTCOM
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 10000
 !
+            ! Partition wind sea fraction
             ELSE IF ( IFI .EQ. 4 .AND. IFJ .EQ. 16 ) THEN
-              FSC    = 0.001
-              UNITS  = '1'
-              ENAME  = '.tws'
-
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( PWST(:), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PWST(:), MAPSF, X1 )
               ENDIF
-
-              NFIELD=1
-              VARNM(1)='tws'
-              VARNL(1)='wind sea fraction'
-              VARNS(1)='wind_sea_fraction'
-              VARNG(1)='wind_sea_fraction'
-              VARNC(1)=PARTCOM
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 1000
 !
+            ! Number of wave partitions
             ELSE IF ( IFI .EQ. 4 .AND. IFJ .EQ. 17 ) THEN
-              FSC    = 1.
-              UNITS  = '1'
-              ENAME  = '.pnr'
-
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( PNR(:), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PNR(:), MAPSF, X1 )
               ENDIF
-
-              NFIELD=1
-              VARNM(1)='pnr'
-              VARNL(1)='number of wave partitions'
-              VARNS(1)='number_of_wave_partitions'
-              VARNG(1)='number_of_wave_partitions'
-              VARNC(1)=PARTCOM
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 100
 !
+            ! Friction velocity
             ELSE IF ( IFI .EQ. 5 .AND. IFJ .EQ. 1 ) THEN
-              FSC    = 0.01
-              ENAME  = '.ust'
-              UNITS  = 'm s-1'
               !! Note - UST and USTDIR read in from .ww3 file are X-Y vectors
               DO ISEA=1, NSEA
                 UABS   = SQRT(UST(ISEA)**2+USTDIR(ISEA)**2)
@@ -2234,92 +1566,35 @@
               !CALL W3S2XY (NSEA,NSEA,NX+1,NY, UST   (1:NSEA) , MAPSF, X1 )
               !CALL W3S2XY (NSEA,NSEA,NX+1,NY, USTDIR(1:NSEA) , MAPSF, X2 )
               NFIELD=2
-              VARNM(1)='uust'
-              VARNM(2)='vust'
-              VARNL(1)='eastward friction velocity'
-              VARNL(2)='northward friction velocity'
-              VARNS(1)='eastward_friction_velocity'
-              VARNS(2)='northward_friction_velocity'
-              VARNG(1)='eastward_friction_velocity'
-              VARNG(2)='northward_friction_velocity'
-              VARNC(1)='ust=sqrt(uust**2+vust**2)'
-              VARNC(2)='ust=sqrt(uust**2+vust**2)'
-              VARND(1)=''
-              VARND(2)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD                VARND(2) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD                VARND(2) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = -9900
-              VMAX =  9900
 !
+            ! Charnock coefficient
             ELSE IF ( IFI .EQ. 5 .AND. IFJ .EQ. 2 ) THEN
-              FSC    = 1.E-5
-              UNITS  = '1'
-              ENAME  = '.cha'
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( CHARN(1:NSEA), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, CHARN(1:NSEA), MAPSF, X1 )
               ENDIF ! SMCGRD
-              NFIELD=1
-              VARNM(1)='cha'
-              VARNL(1)='charnock coefficient for surface roughness length for momentum in air'
-              VARNS(1)='charnock_coefficient_for_surface_roughness_length_for_momentum_in_air'
-              VARNG(1)='charnock_coefficient'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 32700
 !
+            ! Wave energy flux
             ELSE IF ( IFI .EQ. 5 .AND. IFJ .EQ. 3 ) THEN
-              FSC    = 0.1           !0.01
-              UNITS  = 'kW m-1'
-              ENAME  = '.cge' 
               CGE=CGE*0.001  ! from W / m to kW / m 
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( CGE(1:NSEA), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, CGE(1:NSEA), MAPSF, X1 )
               ENDIF ! SMCGRD
-              NFIELD=1
-              VARNM(1)='cge'
-              VARNL(1)='wave energy flux'
-              VARNS(1)='sea_surface_wind_wave_energy_flux'
-              VARNG(1)='wave_energy_flux'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 9990
 !
+            ! Wind to wave energy flux
             ELSE IF ( IFI .EQ. 5 .AND. IFJ .EQ. 4 ) THEN
               IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
-              FSC    = 0.1
-              UNITS  = 'W m-2'
-              ENAME  = '.faw'
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( PHIAW(1:NSEA), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PHIAW(1:NSEA) , MAPSF, X1 )
               ENDIF ! SMCGRD
-              NFIELD=1
-              VARNM(1)='faw'
-              VARNL(1)='wind to wave energy flux'
-              VARNS(1)='wind_mixing_energy_flux_into_sea_water'
-              VARNG(1)='wind_to_wave_energy_flux'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 9990
 !
+            ! Wave supported wind stress
             ELSE IF ( IFI .EQ. 5 .AND. IFJ .EQ. 5 ) THEN
-              FSC    = 0.000001
-              UNITS  = 'm2 s-2'
-              ENAME  = '.taw'
 !/RTD              ! Rotate x,y vector back to standard pole
 !/RTD              IF ( FLAGUNR ) CALL W3XYRTN(NSEA, TAUWIX(1:NSEA), TAUWIY(1:NSEA), AnglD)
               IF( SMCGRD ) THEN
@@ -2347,33 +1622,9 @@
               !CALL W3S2XY ( NSEA, NSEA, NX+1, NY, TAUWIX, MAPSF, X1 )
               !CALL W3S2XY ( NSEA, NSEA, NX+1, NY, TAUWIY, MAPSF, X2 )
               NFIELD=2
-              VARNM(1)='utaw'
-              VARNM(2)='vtaw'
-              VARNL(1)='eastward wave supported wind stress'
-              VARNL(2)='northward wave supported wind stress'
-              VARNS(1)='eastward_wave_supported_wind_stress'
-              VARNS(2)='northward_wave_supported_wind_stress'
-              VARNG(1)='eastward_wave_supported_wind_stress'
-              VARNG(2)='northward_wave_supported_wind_stress'
-              VARNC(1)='taw=sqrt(utaw**2+vtaw**2)'
-              VARNC(2)='taw=sqrt(utaw**2+vtaw**2)'
-              VARND(1)=''
-              VARND(2)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD                VARND(2) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD                VARND(2) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = -32000
-              VMAX =  32000
 !
+            ! Wave to wind stress
             ELSE IF ( IFI .EQ. 5 .AND. IFJ .EQ. 6 ) THEN
-              FSC    = 0.0001
-              ENAME  = '.twa'
-              UNITS  = 'm2 s-2'
 !/RTD              ! Rotate x,y vector back to standard pole
 !/RTD              IF ( FLAGUNR ) CALL W3XYRTN(NSEA, TAUWNX(1:NSEA), TAUWNY(1:NSEA), AnglD)
               IF( SMCGRD ) THEN
@@ -2386,135 +1637,53 @@
                                                         , MAPSF, XY )
               ENDIF ! SMCGRD
               NFIELD=2
-              VARNM(1)='utwa'
-              VARNM(2)='vtwa'
-              VARNL(1)='eastward wave to wind stress'
-              VARNL(2)='northward wave to wind stress'
-              VARNS(1)='eastward_wave_to_wind_stress'
-              VARNS(2)='northward_wave_to_wind_stress'
-              VARNG(1)='eastward_wave_to_wind_stress'
-              VARNG(2)='northward_wave_to_wind_stress'
-              VARNC(1)='twa=sqrt(utwa**2+vtwa**2)'
-              VARNC(2)='twa=sqrt(utwa**2+vtwa**2)'
-              VARND(1)=''
-              VARND(2)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD                VARND(2) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD                VARND(2) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = -32000
-              VMAX =  32000
 !
+            ! Whitecap coverage
             ELSE IF ( IFI .EQ. 5 .AND. IFJ .EQ. 7 ) THEN
-              FSC    = 0.0001
-              UNITS  = '1'
-              ENAME  = '.wcc'
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( WHITECAP(1:NSEA,1), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, WHITECAP(1:NSEA,1) &
                                                         , MAPSF, X1 )
               ENDIF ! SMCGRD
-              NFIELD=1
-              VARNM(1)='wcc'
-              VARNL(1)='whitecap coverage'         
-              VARNS(1)='whitecap_coverage'
-              VARNG(1)='whitecap_coverage'            
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 10000
 !
+            ! Whitecap foam thickness
             ELSE IF ( IFI .EQ. 5 .AND. IFJ .EQ. 8 ) THEN
-              FSC    = 0.001
-              UNITS  = 'm'
-              ENAME  = '.wcf'
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( WHITECAP(1:NSEA,2), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, WHITECAP(1:NSEA,2) &
                                                         , MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              VARNM(1)='wcf'
-              VARNL(1)='whitecap foam thickness' 
-              VARNS(1)='whitecap_foam_thickness'
-              VARNG(1)='whitecap_foam_thickness' 
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 10000
 !
+            ! Significant breaking wave height
             ELSE IF ( IFI .EQ. 5 .AND. IFJ .EQ. 9 ) THEN
-              FSC    = 0.002 
-              UNITS  = 'm'
-              ENAME  = '.wch'
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( WHITECAP(1:NSEA,3), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, WHITECAP(1:NSEA,3) &
                                                         , MAPSF, X1 )
               ENDIF ! SMCGRD
-              NFIELD=1
-              VARNM(1)='wch'
-              VARNL(1)='significant breaking wave height'
-              VARNS(1)='significant_breaking_wave_height'
-              VARNG(1)='significant_breaking_wave_height'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 32000
 !
+            ! Whitecap moment
             ELSE IF ( IFI .EQ. 5 .AND. IFJ .EQ. 10 ) THEN
-              FSC    = 0.0001
-              UNITS  = '1'
-              ENAME  = '.wcm'
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( WHITECAP(1:NSEA,4), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, WHITECAP(1:NSEA,4) &
                                                         , MAPSF, X1 )
               ENDIF ! SMCGRD
-              NFIELD=1
-              VARNM(1)='wcm'
-              VARNL(1)='whitecap moment'  
-              VARNS(1)='whitecap_moment'   
-              VARNG(1)='whitecap_moment'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 10000
 !
+            ! Wind sea mean period T0M1
             ELSE IF ( IFI .EQ. 5 .AND. IFJ .EQ. 11 ) THEN
-              FSC    = 0.002
-              UNITS  = 's'
-              ENAME  = '.fws'
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( TWS(1:NSEA), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, TWS(1:NSEA), MAPSF, X1 )
               ENDIF ! SMCGRD
-              NFIELD=1
-              VARNM(1)='fws'
-              VARNL(1)='Wind_sea_mean_period_T0M1'
-              VARNS(1)='Wind_sea_mean_period_T0M1'
-              VARNG(1)='Wind_sea_mean_period_T0M1'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 32000
 !
-! 6) Wave-ocean layer
-!
+            ! Radiation stress
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 1 ) THEN
-              FSC    = 10.
-              FSC3    = 1.
-              UNITS  = 'N m-1'
-              ENAME  = '.sxy'
 !/RTD         ! Radition stress components are always left on rotated pole
 !/RTD         ! at present - need to confirm how to de-rotate
 
@@ -2531,35 +1700,9 @@
                                                         , MAPSF, XY )
               ENDIF ! SMCGRD
               NFIELD=3
-              VARNM(1)='sxx'
-              VARNM(2)='syy'
-              VARNM(3)='sxy'
-              VARNL(1)='Radiation stress component Sxx'
-              VARNL(2)='Radiation stress component Syy'
-              VARNL(3)='Radiation stress component Sxy'
-              VARNS(1)='Radiation_stress_component_Sxx'
-              VARNS(2)='Radiation_stress_component_Syy'
-              VARNS(3)='Radiation_stress_component_Sxy'
-              VARNS(1)='radiation_stress_component_sxx'
-              VARNS(2)='radiation_stress_component_syy'
-              VARNS(3)='radiation_stress_component_sxy'
-              VARNC(1)=''
-              VARNC(2)=''
-              VARNC(3)=''
-              VARND(1)=''
-              VARND(2)=''
-              VARND(3)=''
-!/RTD              ! Override standard direction comment
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD                VARND(2) = 'Rotated Pole Grid North'
-!/RTD                VARND(3) = 'Rotated Pole Grid North'
-              VMIN = -3000
-              VMAX = 3000     
 !
+            ! Wave to ocean stress
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 2 ) THEN
-              FSC    = 0.000001
-              UNITS  = 'm2 s-2'
-              ENAME  = '.two'
 !/RTD              ! Rotate x,y vector back to standard pole
 !/RTD              IF ( FLAGUNR ) CALL W3XYRTN(NSEA, TAUOX(1:NSEA), TAUOY(1:NSEA), AnglD)
               IF( SMCGRD ) THEN
@@ -2572,54 +1715,19 @@
                                                         , MAPSF, XY )
               ENDIF ! SMCGRD
               NFIELD=2
-              VARNM(1)='utwo'
-              VARNM(2)='vtwo'
-              VARNL(1)='eastward wave to ocean stress'
-              VARNL(2)='northward wave to ocean stress'
-              VARNS(1)='eastward_wave_to_ocean_stress'
-              VARNS(2)='northward_wave_to_ocean_stress'
-              VARNG(1)='eastward_wave_to_ocean_stress'
-              VARNG(2)='northward_wave_to_ocean_stress'
-              VARNC(1)='two=sqrt(utwo**2+vtwo**2)'
-              VARNC(2)='two=sqrt(utwo**2+vtwo**2)'
-              VARND(1)=''
-              VARND(2)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD                VARND(2) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD                VARND(2) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = -32000 
-              VMAX =  32000
 !
+            ! Radiation pressure (Bernouilli Head)
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 3 ) THEN
-              FSC    = 0.1
-              UNITS  = 'm2 s-2'
-              ENAME  = '.bhd'
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( BHD(1:NSEA), X1 )
               ELSE
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, BHD(1:NSEA)  &
                                                         , MAPSF, X1 )
               ENDIF ! SMCGRD
-              NFIELD=1
-              VARNM(1)='bhd'
-              VARNL(1)='radiation pressure (Bernouilli Head)'
-              VARNS(1)='radiation_pressure'
-              VARNG(1)='radiation_pressure'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 1000
 !
+            ! Wave to ocean energy flux
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 4 ) THEN
               IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
-              FSC    = 0.1
-              UNITS  = 'W m-2'
-              ENAME  = '.foc'
               DO ISEA=1, NSEA
                  PHIOC(ISEA)=MIN(3000.,PHIOC(ISEA))
                  END DO
@@ -2629,20 +1737,9 @@
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PHIOC(1:NSEA)  &
                                                         , MAPSF, X1 )
               ENDIF ! SMCGRD
-              NFIELD=1
-              VARNM(1)='foc'
-              VARNL(1)='wave to ocean energy flux'
-              VARNS(1)='wave_to_ocean_energy_flux'
-              VARNG(1)='wave_to_ocean_energy_flux'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 9990
 !
+            ! Stokes transport
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 5 ) THEN
-              FSC    = 0.001
-              UNITS  = 'm2 s-1'
-              ENAME  = '.tus'
 !/RTD              ! Rotate x,y vector back to standard pole
 !/RTD              IF ( FLAGUNR ) CALL W3XYRTN(NSEA, TUSX(1:NSEA), TUSY(1:NSEA), AnglD)
               IF( SMCGRD ) THEN
@@ -2674,32 +1771,9 @@
               !   CALL W3S2XY ( NSEA, NSEA, NX+1, NY,TUSY,MAPSF, X2 )
               ! ENDIF ! SMCGRD
               NFIELD=2
-              VARNM(1)='utus'
-              VARNM(2)='vtus'
-              VARNL(1)='eastward stokes transport'
-              VARNL(2)='northward stokes transport'
-              VARNS(1)='eastward_stokes_transport'
-              VARNS(2)='northward_stokes_transport'
-              VARNG(1)='eastward_stokes_transport'
-              VARNG(2)='northward_stokes_transport'
-              VARNC(1)='tus=sqrt(utus**2+vtus**2)'
-              VARNC(2)='tus=sqrt(utus**2+vtus**2)'
-              VARND(1)=''
-              VARND(2)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD                VARND(2) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD                VARND(2) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = -9900 
 !
+            ! Surface stokes drift
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 6 ) THEN
-              FSC    = 0.0005
-              UNITS  = 'm s-1'
-              ENAME  = '.uss'
               DO ISEA=1, NSEA
                  USSX(ISEA)=MAX(-0.9998,MIN(0.9998,USSX(ISEA)))
                  USSY(ISEA)=MAX(-0.9998,MIN(0.9998,USSY(ISEA)))
@@ -2731,101 +1805,25 @@
               !CALL W3S2XY ( NSEA, NSEA, NX+1, NY,USSX,MAPSF, X1 )
               !CALL W3S2XY ( NSEA, NSEA, NX+1, NY,USSY,MAPSF, X2 )
               NFIELD=2
-              VARNM(1)='uuss'
-              VARNM(2)='vuss'
-              VARNL(1)='eastward surface stokes drift'
-              VARNL(2)='northward surface stokes drift'
-              VARNS(1)='eastward_surface_stokes_drift'
-              VARNS(2)='northward_surface_stokes_drift'
-              VARNG(1)='eastward_surface_stokes_drift'
-              VARNG(2)='northward_surface_stokes_drift'
-              VARNC(1)='uss=sqrt(uuss**2+vuss**2)'
-              WRITE(VARNC(2),'(A,F8.4,A,F8.4,A)') 'Frequency range ',SIG(1)*TPIINV,' to ',SIG(NK)*TPIINV,' Hz'
-              VARND(1)=''
-              VARND(2)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD                VARND(2) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD                VARND(2) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = -9900 
-              VMAX =  9900
 !
+            ! Power spectral density of equivalent surface pressure
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 7 ) THEN
-              ! C Hansen: Here is an example of placing more than one field in
-              ! the same file even if TOGETHER is set as .FALSE. This is
-              ! managed after the loop over IFP, IFI AND IFJ by setting
-              ! NCJID = NCIDS(IFI, IFJ, 1) for any field with IFP >= 2.
-              NFP = 2 ! Number of subfields loop over IFP=1,NFP
+              NFIELD=2
+              IF( SMCGRD ) THEN
+!/SMC                CALL W3S2XY_SMC( PRMS(1:NSEA), XX )
+!/SMC                CALL W3S2XY_SMC( TPMS(1:NSEA), XY )
+              ELSE
+                CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PRMS(1:NSEA)      &
+                                                        , MAPSF, XX )
+                CALL W3S2XY ( NSEA, NSEA, NX+1, NY, TPMS(1:NSEA)      &
+                                                        , MAPSF, XY )
+              ENDIF ! SMCGRD
 !
-              IF ( IFP .EQ. 1 ) THEN
-                NFIELD = 1
-                ENAME  = '.p2s'
-                UNITS  = 'm4'
-                FSC    = 0.0001
-                VARNM(1)='fp2s'
-                VARNL(1)='power spectral density of equivalent surface pressure'
-                VARNG(1)='power_spectral_density_of_equivalent_surface_pressure'
-                VARNS(1)='power_spectral_density_of_equivalent_surface_pressure'
-                VARNC(1)=''
-                VARND(1)=''
-                VMIN = -15000 
-                VMAX = 32000
-                IF( SMCGRD ) THEN
-!/SMC                  CALL W3S2XY_SMC( PRMS(1:NSEA), X1 )
-                ELSE
-                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PRMS(1:NSEA), MAPSF, X1 )
-                ENDIF ! SMCGRD
-!
-              ELSE ! IFP==2
-                NFIELD = 1
-                ENAME  = '.pp2s'
-                UNITS  = 's-1'
-                FSC    = 0.01
-                VARNM(1)='pp2s'
-                VARNL(1)='peak period of power spectral density of equivalent surface pressure'
-                VARNG(1)='peak_period_of_power_spectral_density_of_equivalent_surface_pressure'
-                VARNS(1)='peak_period_of_power_spectral_density_of_equivalent_surface_pressure'
-                VARNC(1)=''
-                VARND(1)=''
-                VMIN = -15000 
-                VMAX = 32000
-                IF( SMCGRD ) THEN
-!/SMC                  CALL W3S2XY_SMC( TPMS(1:NSEA), X1 )
-                ELSE
-                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, TPMS(1:NSEA), MAPSF, X1 )
-                ENDIF ! SMCGRD
-!
-              END IF ! IFP
-!
+            ! Spectral variance of surface stokes drift
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 8 ) THEN
               ! Information for spectral distribution of surface Stokes drift (2nd file)
               FLFRQ=.TRUE.
               NFIELD=2
-              VARNM(1)='uusf'
-              VARNM(2)='vusf'
-              VARNL(1)='eastward spectral variance of surface stokes drift'
-              VARNL(2)='northward spectral variance of surface stokes drift'
-              VARNS(1)='eastward_spectral_variance_of_surface_stokes_drift'
-              VARNS(2)='northward_spectral_variance_of_surface_stokes_drift'
-              VARNG(1)='eastward_spectral_variance_of_surface_stokes_drift'
-              VARNG(2)='northward_spectral_variance_of_surface_stokes_drift'
-              VARNC(1)='usf=sqrt(uusf**2+vusf**2)'
-              VARNC(2)='usf=sqrt(uusf**2+vusf**2)'
-              VARND(1)=''
-              VARND(2)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD                VARND(2) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD                VARND(2) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              UNITS   = 'm s-1 Hz-1'
               I1F=US3DF(2)
               I2F=US3DF(3)
               DO IK= I1F,I2F
@@ -2841,24 +1839,11 @@
                 XXK(:,:,IK)=XX
                 XYK(:,:,IK)=XY
               END DO
-              FSC    = 0.0005
-              ENAME  = '.usf'
-
-              VMIN = -9900 
-              VMAX =  9900
 !
+            ! Base10 logarithm of power spectral density of equivalent surface pressure
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ.  9 ) THEN
                 ! Information for spectral microseismic generation data (2nd file)
                 FLFRQ=.TRUE.
-                NFIELD=1
-                FSC    = 0.0004
-                VARNM(1)='p2l'
-                VARNL(1)='base ten logarithm of power spectral density of equivalent surface pressure'
-                VARNS(1)='base_ten_logarithm_of_power_spectral_density_of_equivalent_surface_pressure'
-                VARNG(1)='base_ten_logarithm_of_power_spectral_density_of_equivalent_surface_pressure'
-                VARNC(1)=''
-                VARND(1)=''
-                ENAME  = '.p2l'
                 I1F=P2MSF(2)
                 I2F=P2MSF(3)
                 DO IK=I1F,I2F
@@ -2869,21 +1854,15 @@
                   ENDIF ! SMCGRD
                   IF (NCVARTYPE.EQ.2) THEN 
                      WHERE ( XX.GE.0.) XX = ALOG10(XX*(DWAT*GRAV)**2+1E-12)
-                     UNITS  = 'log10(Pa2 m2 s+1E-12)'
                   ELSE 
                      WHERE ( XX.GE.0.) XX = XX*(DWAT*GRAV)**2
-                     UNITS  = 'Pa2 m2 s'
                   END IF
                 
                   XK(:,:,IK)=XX
-                  END DO
-              VMIN = -30000 
-              VMAX = 30000
+                END DO
 !
+            ! Wave to sea ice stress
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 10 ) THEN
-              FSC    = 0.000001
-              UNITS  = 'm2 s-2'
-              ENAME  = '.tic'
 !/RTD              ! Rotate x,y vector back to standard pole
 !/RTD              IF ( FLAGUNR ) CALL W3XYRTN(NSEA, TAUICE(1:NSEA,1), TAUICE(1:NSEA,2), AnglD)
               IF( SMCGRD ) THEN
@@ -2896,34 +1875,10 @@
                                                         , MAPSF, XY )
               ENDIF ! SMCGRD
               NFIELD=2
-              VARNM(1)='utic'
-              VARNM(2)='vtic'
-              VARNL(1)='eastward wave to sea ice stress'
-              VARNL(2)='northward wave to sea ice stress'
-              VARNS(1)='eastward_wave_to_sea_ice_stress'
-              VARNS(2)='northward_wave_to_sea_ice_stress'
-              VARNG(1)='eastward_wave_to_sea_ice_stress'
-              VARNG(2)='northward_wave_to_sea_ice_stress'
-              VARNC(1)='two=sqrt(utwo**2+vtwo**2)'
-              VARNC(2)='two=sqrt(utwo**2+vtwo**2)'
-              VARND(1)=''
-              VARND(2)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD                VARND(2) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD                VARND(2) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = -32000 
-              VMAX =  32000
 !
+            ! Wave to sea ice energy flux
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 11 ) THEN
               IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
-              FSC    = 0.1
-              UNITS  = 'W m-2'
-              ENAME  = '.fic'
               DO ISEA=1, NSEA
                  PHIOC(ISEA)=MIN(3000.,PHIOC(ISEA))
                  END DO
@@ -2933,16 +1888,8 @@
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PHICE(1:NSEA)  &
                                                         , MAPSF, X1 )
               ENDIF ! SMCGRD
-              NFIELD=1
-              VARNM(1)='fic'
-              VARNL(1)='wave to sea ice energy flux'
-              VARNS(1)='wave_to_sea_ice_energy_flux'
-              VARNG(1)='wave_to_sea_ice_energy_flux'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 9990
 
+           ! Partitioned surface stokes drift
            ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 12 ) THEN
               ! Information for spectral distribution of surface Stokes drift (2nd file)
               FLFRQ=.TRUE.
@@ -2950,27 +1897,6 @@
                  CUSTOMFRQ=.TRUE.
               ENDIF
               NFIELD=2
-              VARNM(1)='ussp'
-              VARNM(2)='vssp'
-              VARNL(1)='eastward partitioned surface stokes drift'
-              VARNL(2)='northward partitioned surface stokes drift'
-              VARNS(1)='eastward_partitioned_surface_stokes_drift'
-              VARNS(2)='northward_partitioned_surface_stokes_drift'
-              VARNG(1)='eastward_partitioned_surface_stokes_drift'
-              VARNG(2)='northward_partitioned_surface_stokes_drift'
-              VARNC(1)='usp=sqrt(ussp**2+vssp**2)'
-              VARNC(2)='usp=sqrt(ussp**2+vssp**2)'
-              VARND(1)=''
-              VARND(2)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD                VARND(2) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD                VARND(2) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              UNITS   = 'm s-1'
               I1F=1
               I2F=USSPF(2)
               DO IK= I1F,I2F
@@ -2986,15 +1912,9 @@
                 XXK(:,:,IK)=XX
                 XYK(:,:,IK)=XY
               END DO
-              FSC    = 0.0005
-              ENAME  = '.usp'
 !
-! 7) Wave-bottom layer
-!
+            ! RMS of bottom displacement amplitude
             ELSE IF ( IFI .EQ. 7 .AND. IFJ .EQ. 1 ) THEN
-              FSC    = 0.01
-              ENAME  = '.abr'
-              UNITS  = 'm'
               ! NB: ABA and ABD are the X and Y components of the bottom displacement
 !/RTD              ! Rotate x,y vector back to standard pole
 !/RTD              IF ( FLAGUNR ) CALL W3XYRTN(NSEA, ABA(1:NSEA), ABD(1:NSEA), AnglD)
@@ -3008,33 +1928,9 @@
                                                         , MAPSF, XY )
               ENDIF ! SMCGRD
               NFIELD=2
-              VARNM(1)='uabr'
-              VARNM(2)='vabr'
-              VARNL(1)='rms of bottom displacement amplitude zonal'
-              VARNL(2)='rms of bottom displacement amplitude meridional'
-              VARNS(1)='rms_of_bottom_displacement_amplitude_zonal'
-              VARNS(2)='rms_of_bottom_displacement_amplitude_meridional'
-              VARNG(1)='rms_of_bottom_displacement_amplitude_zonal'
-              VARNG(2)='rms_of_bottom_displacement_amplitude_meridional'
-              VARNC(1)='abr=sqrt(uabr**2+vabr**2)'
-              VARNC(2)='abr=sqrt(uabr**2+vabr**2)'
-              VARND(1)=''
-              VARND(2)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD                VARND(2) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD                VARND(2) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = -18000
-              VMAX = 18000
 !
+            ! RMS of bottom velocity amplitude
             ELSE IF ( IFI .EQ. 7 .AND. IFJ .EQ. 2 ) THEN
-              FSC    = 0.01
-              ENAME  = '.ubr'
-              UNITS  = 'm s-1'
               ! NB: UBA and UBD are the X and Y components of the bottom velocity
 !/RTD              ! Rotate x,y vector back to standard pole
 !/RTD              IF ( FLAGUNR ) CALL W3XYRTN(NSEA, UBA(1:NSEA), UBD(1:NSEA), AnglD)
@@ -3043,33 +1939,9 @@
               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, UBD(1:NSEA)       &
                                                         , MAPSF, XY )
               NFIELD=2
-              VARNM(1)='uubr'
-              VARNM(2)='vubr'
-              VARNL(1)='rms of bottom velocity amplitude zonal'
-              VARNL(2)='rms of bottom velocity amplitude meridional'
-              VARNS(1)='rms_of_bottom_velocity_amplitude_zonal'
-              VARNS(2)='rms_of_bottom_velocity_amplitude_meridional'
-              VARNG(1)='rms_of_bottom_velocity_amplitude_zonal'
-              VARNG(2)='rms_of_bottom_velocity_amplitude_meridional'
-              VARNC(1)='ubr=sqrt(uubr**2+vubr**2)'
-              VARNC(2)='ubr=sqrt(uubr**2+vubr**2)'
-              VARND(1)=''
-              VARND(2)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD                VARND(2) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD                VARND(2) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = -18000 
-              VMAX = 18000
 !
+            ! Bottom roughness
             ELSE IF ( IFI .EQ. 7 .AND. IFJ .EQ. 3 ) THEN
-              FSC    = 0.001
-              UNITS  = 'm'
-              ENAME  = '.bed'
 !/RTD              ! Rotate x,y vector back to standard pole
 !/RTD              IF ( FLAGUNR ) CALL W3XYRTN(NSEA, BEDFORMS(1:NSEA,2), &
 !/RTD                                           BEDFORMS(1:NSEA,3), AnglD)
@@ -3080,55 +1952,14 @@
               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, BEDFORMS(1:NSEA,3)    &
                                                         , MAPSF, XY )
               NFIELD=3
-              VARNM(1)='bed'
-              VARNM(2)='ripplex'
-              VARNM(3)='rippley'
-              VARNL(1)='bottom roughness'
-              VARNL(2)='eastward sea bottom ripple wavelength'
-              VARNL(3)='northward sea bottom ripple wavelength'
-              VARNS(1)='sea bottom roughness length'
-              VARNS(2)='eastward_ripple_wavelength'
-              VARNS(3)='northward_ripple_wavelength'
-              VARNG(1)='ripple_wavelength'
-              VARNG(2)='eastward_ripple_wavelength'
-              VARNG(3)='northward_ripple_wavelength'
-              VARNC(1)='ripple_length=sqrt(ripplex**2+rippley**2)'
-              VARNC(2)='ripple_length=sqrt(ripplex**2+rippley**2)'
-              VARNC(3)='ripple_length=sqrt(ripplex**2+rippley**2)'
-              VARND(1)=''
-              VARND(2)=''
-              VARND(3)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(2) = 'True North'
-!/RTD                VARND(3) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(2) = 'Rotated Pole Grid North'
-!/RTD                VARND(3) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = 0
-              VMAX = 30000
 !
+            ! Wave dissipation in bottom boundary layer
             ELSE IF ( IFI .EQ. 7 .AND. IFJ .EQ. 4 ) THEN
-              FSC    = 0.1
-              UNITS  = 'W m-2'
-              ENAME  = '.fbb'
               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, PHIBBL(1:NSEA)    &
                                                         , MAPSF, X1 )
-              NFIELD=1
-              VARNM(1)='fbb'
-              VARNL(1)='wave dissipation in bbl'
-              VARNS(1)='wave_energy_dissipation_in_bottom_boundary_layer'
-              VARNG(1)='wave_dissipation_in_bbl'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 9990
 !
+            ! Wave to bottom boundary layer stress
             ELSE IF ( IFI .EQ. 7 .AND. IFJ .EQ. 5 ) THEN
-              FSC    = 0.000001
-              UNITS  = 'm2 s-2'
-              ENAME  = '.tbb'
 !/RTD              ! Rotate x,y vector back to standard pole
 !/RTD              IF ( FLAGUNR ) CALL W3XYRTN(NSEA, TAUBBL(1:NSEA,1), &
 !/RTD                                           TAUBBL(1:NSEA,2), AnglD)
@@ -3137,97 +1968,25 @@
               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, TAUBBL(1:NSEA,2) &
                                                         , MAPSF, XY )
               NFIELD=2
-              VARNM(1)='utbb'
-              VARNM(2)='vtbb'
-              VARNL(1)='eastward wave to bbl stress'
-              VARNL(2)='northward wave to bbl stress'
-              VARNS(1)='eastward_wave_to_bottom_boundary_layer_stress'
-              VARNS(2)='northward_wave_to_bottom_boundary_layer_stress'
-              VARNG(1)='eastward_wave_to_bbl_stress'
-              VARNG(2)='northward_wave_to_bbl_stress'
-              VARNC(1)='tbb=sqrt(utbb**2+vtbb**2)'
-              VARNC(2)='tbb=sqrt(utbb**2+vtbb**2)'
-              VARND(1)=''
-              VARND(2)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD                VARND(2) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD                VARND(2) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = -32000 
-              VMAX =  32000
 !
+            ! Mean square slope
             ELSE IF ( IFI .EQ. 8 .AND. IFJ .EQ. 1 ) THEN
-              FSC    = 0.00001
-              ENAME  = '.mss'
-              UNITS  = '1'
 !/RTD              ! Rotate x,y vector back to standard pole
 !/RTD              IF ( FLAGUNR ) CALL W3XYRTN(NSEA, MSSX, MSSY, AnglD)
               CALL W3S2XY ( NSEA, NSEA, NX+1,NY,MSSX,MAPSF, XX )
               CALL W3S2XY ( NSEA, NSEA, NX+1,NY,MSSY,MAPSF, XY )
               NFIELD=2
-              VARNM(1)='mssu'
-              VARNM(2)='mssc'
-              VARNL(1)='downwave mean square slope'
-              VARNL(2)='crosswave mean square slope'
-              VARNS(1)='x_mean_square_slope'
-              VARNS(2)='y_mean_square_slope'
-              VARNG(1)='x_mean_square_slope'
-              VARNG(2)='y_mean_square_slope'
-              VARNC(1)='mss=mssu+mssc'
-              WRITE(VARNC(1),'(A,F8.4,A,F8.4,A)') 'Frequency range ',SIG(1)*TPIINV,' to ',SIG(NK)*TPIINV,' Hz'
-              VARND(1)=''
-              VARND(2)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD                VARND(2) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD                VARND(2) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = 0 
-              VMAX = 30000
 !
+            ! Phillips constant
             ELSE IF ( IFI .EQ. 8 .AND. IFJ .EQ. 2 ) THEN
-              FSC    = 1E-7     
-              ENAME  = '.msc'
-              UNITS  = '1'
 !/RTD              ! Rotate x,y vector back to standard pole
 !/RTD              IF ( FLAGUNR ) CALL W3XYRTN(NSEA, MSCX, MSCY, AnglD)
               CALL W3S2XY ( NSEA, NSEA, NX+1,NY,MSCX,MAPSF, XX )
               CALL W3S2XY ( NSEA, NSEA, NX+1,NY,MSCY,MAPSF, XY )
               NFIELD=2
-              VARNM(1)='mscx'
-              VARNM(2)='mscy'
-              VARNL(1)='eastward phillips constant'
-              VARNL(2)='northward phillips constant'
-              VARNS(1)='eastward_phillips_constant'
-              VARNS(2)='northward_phillips_constant'
-              VARNG(1)='eastward_phillips_constant'
-              VARNG(2)='northward_phillips_constant'
-              VARNC(1)='msc=mscx+mscy'
-              VARNC(2)='msc=mscx+mscy'
-              VARND(1)=''
-              VARND(2)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD                VARND(2) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD                VARND(2) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = 0 
-              VMAX = 30000
 !
+            ! u direction for mss
             ELSE IF ( IFI .EQ. 8 .AND. IFJ .EQ. 3 ) THEN
-              FSC    = 0.1
-              UNITS  = 'degree'
-              ENAME  = '.msd'
 !/RTD                ! Rotate direction back to standard pole
 !/RTD                IF ( FLAGUNR ) CALL W3THRTN(NSEA, MSSD, AnglD, .FALSE.)
               DO ISEA=1, NSEA
@@ -3236,26 +1995,9 @@
                   END IF
                 END DO
               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, MSSD   , MAPSF, X1 )
-              NFIELD=1
-              VARNM(1)='mssd'
-              VARNL(1)='u direction for mss'
-              VARNS(1)='sea_surface_wave_dominant_mean_square_slope_direction'
-              VARNG(1)='sea_surface_wave_dominant_mean_square_slope_direction'
-              WRITE(VARNC(1),'(A,F8.4,A,F8.4,A)') 'Frequency range ',SIG(1)*TPIINV,' to ',SIG(NK)*TPIINV,' Hz'
-              VARND(1)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = 0
-              VMAX = 3600
 !
+            ! x direction for msc
             ELSE IF ( IFI .EQ. 8 .AND. IFJ .EQ. 4 ) THEN
-              FSC    = 0.1
-              UNITS  = 'degree'
-              ENAME  = '.mcd'
 !/RTD                ! Rotate direction back to standard pole
 !/RTD                IF ( FLAGUNR ) CALL W3THRTN(NSEA, MSCD, AnglD, .FALSE.)
               DO ISEA=1, NSEA
@@ -3264,147 +2006,55 @@
                   END IF
                 END DO
               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, MSCD   , MAPSF, X1 )
-              NFIELD=1
-              VARNM(1)='mscd'
-              VARNL(1)='x direction for msc'
-              VARNS(1)='sea_surface_wave_dominant_mean_square_slope_direction_in_highest_frequency'
-              VARNG(1)='sea_surface_wave_dominant_mean_square_slope_direction_in_highest_frequency'
-              VARNC(1)=''
-              VARND(1)=''
-!/RTD              ! Override standard direction comment
-!/RTD              IF ( FLAGUNR ) THEN
-!/RTD                VARND(1) = 'True North'
-!/RTD              ELSE IF ( .NOT. FLAGUNR ) THEN
-!/RTD                VARND(1) = 'Rotated Pole Grid North'
-!/RTD              END IF
-              VMIN = 0
-              VMAX = 3600
 !
+             ! Peakedness
              ELSE IF ( IFI .EQ. 8 .AND. IFJ .EQ. 5 ) THEN
-              FSC    = 0.001
-              UNITS  = '1'
-              ENAME  = '.qp'
               IF( SMCGRD ) THEN
 !/SMC                CALL W3S2XY_SMC( QP, X1 )
               ELSE
                  CALL W3S2XY ( NSEA, NSEA, NX+1, NY, QP, MAPSF, X1 )
               ENDIF
-              NFIELD=1
-              VARNM(1)='qp'
-              VARNL(1)='peakedness'
-              VARNS(1)='sea_surface_wave_peakedness'
-              VARNG(1)='wave_peakedness'
-              VARNC(1)='Goda wave peakedness parameter'
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 32000
 !
+            ! Dynamic time step
             ELSE IF ( IFI .EQ. 9 .AND. IFJ .EQ. 1 ) THEN
-              FSC    = 0.1
-              UNITS  = 'min.'
-              ENAME  = '.dtd'
               DO ISEA=1, NSEA
                 IF ( DTDYN(ISEA) .NE. UNDEF ) THEN
                   DTDYN(ISEA) = DTDYN(ISEA) / 60.
                   END IF
                 END DO
               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, DTDYN , MAPSF, X1 )
-              NFIELD=1
-              VARNM(1)='dtd'
-              VARNL(1)='dynamic time step'
-              VARNS(1)='dynamic_time_step'
-              VARNG(1)='dynamic_time_step'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 32000
 !
+            ! Cut off frequency
             ELSE IF ( IFI .EQ. 9 .AND. IFJ .EQ. 2 ) THEN
-              FSC    = 0.001
-              UNITS  = 's-1'
-              ENAME  = '.fc'
               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, FCUT  , MAPSF, X1 )
-              NFIELD=1
-              VARNM(1)='fc'
-              VARNL(1)='cut off frequency'
-              VARNS(1)='cut_off_frequency'
-              VARNG(1)='cut_off_frequency'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 8000
 !
+            ! Maximum CFL for spatial advection
             ELSE IF ( IFI .EQ. 9 .AND. IFJ .EQ. 3 ) THEN
-              FSC    = 0.01
-              UNITS  = '1'
-              ENAME  = '.cfx'
               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, CFLXYMAX  , MAPSF, X1 )
-              NFIELD=1
-              VARNM(1)='cfx'
-              VARNL(1)='maximum cfl for spatial advection'
-              VARNS(1)='maximum_cfl_for_spatial_advection'
-              VARNG(1)='maximum_cfl_for_spatial_advection'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 32000
 !
+            ! Maximum CFL for direction advection
             ELSE IF ( IFI .EQ. 9 .AND. IFJ .EQ. 4 ) THEN
-              FSC    = 0.01
-              UNITS  = '1'
-              ENAME  = '.cfd'
               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, CFLTHMAX  , MAPSF, X1 )
-              NFIELD=1
-              VARNM(1)='cfd'
-              VARNL(1)='maximum cfl for direction advection'
-              VARNS(1)='maximum_cfl_for_direction_advection'
-              VARNG(1)='maximum_cfl_for_direction_advection'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 32000
 !
+            ! Maximum CFL for frequency advection
             ELSE IF ( IFI .EQ. 9 .AND. IFJ .EQ. 5 ) THEN
-              FSC    = 0.01
-              UNITS  = '1'
-              ENAME  = '.cfk'
               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, CFLKMAX  , MAPSF, X1 )
-              NFIELD=1
-              VARNM(1)='cfk'
-              VARNL(1)='maximum cfl for frequency advection'
-              VARNS(1)='maximum_cfl_for_frequency_advection'
-              VARNG(1)='maximum_cfl_for_frequency_advection'
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0 
-              VMAX = 32000
 !
+            ! User defined...
             ELSE IF ( IFI .EQ. 10 ) THEN
-              FSC    = 0.1
-              UNITS  = 'm'
-              WRITE (ENAME,'(A2,I2.2)') '.u', IFJ
+              !CB WRITE (ENAME,'(A2,I2.2)') '.u', IFJ
               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,IFJ)        &
                                                         , MAPSF, X1 )
-              NFIELD=1
-              WRITE (VARNM(1),'(A1,I2.2)') 'u', IFJ
-              WRITE (VARNL(1),'(A12,I2.2)') 'User_defined', IFJ
-              WRITE (VARNS(1),'(A12,I2.2)') 'User_defined', IFJ
-              WRITE (VARNG(1),'(A12,I2.2)') 'user_defined', IFJ
-              VARNC(1)=''
-              VARND(1)=''
-              VMIN = 0
-              VMAX = 9990
-!
             ELSE
               WRITE (NDSE,999) IFI, IFJ
               CALL EXTCDE ( 1 )
 !
             END IF ! IFI AND IFJ
 
-            ! Defines a differents for the second field if specified
-            UNITVAR(:)=UNITS
-            ! IF (UNITS2.NE.'SAME') UNITVAR(2)=UNITS2 ! C Hansen: obsolete
-
+            ! CB Get netCDF metadata for IFI, IFJ combination (all components).
+            DO I=1,NFIELD
+              META(I) = GETMETA(IFI, IFJ, ICOMP=I, IPART=IPART)
+            ENDDO
 
 ! 2.2 Make map
 
@@ -3438,12 +2088,12 @@
 ! 2.3 Setups the output type 4 ( NetCDF file )
 
       ! Subsections:
-      ! 2.3.1 Set flag for the field to be together or in a separate netCDF
-      ! 2.3.2 Set field name substring (ENAME in FNAMENC)
+      ! 2.3.1 Set flag for the variable to be together or in a separate netCDF
+      ! 2.3.2 Set variable name substring (META(1)%ENAME in FNAMENC)
       ! 2.3.3 Initialize dimensions etc.
       ! 2.3.4 Initialize an optional third dimension
 
-! 2.3.1 Set flag for the field to be together or in a separate netCDF file
+! 2.3.1 Set flag for the variable to be together or in a separate netCDF file
 
             ! FLSEP and NCJID: Control if output goes to to a separate file
             ! 
@@ -3461,15 +2111,8 @@
             ! with IFP >= 2, which is NOT a swell partition, is put in the
             ! same file as the field with IFP == 1, even if TOGETHER is .FALSE.
             ! 
-            ! An example of this is applied for the two subfields of
-            ! P2S (IFI,IFJ = 6,7). As these fields already go
-            ! to the same netCDF file even when TOGETHER is .FALSE., this
-            ! change doesn't affect the output except that the standard output
-            ! messages 'Writing new record ...' reports each subfield as a
-            ! separate records.
-            !
-            ! Another example for FLSEP is that it could apply to the field
-            ! USP (IFI,IFJ = 6,12) as follows in two settings a,b below (which
+            ! An example for FLSEP could apply to the field 
+            ! USP (IFI,IFJ = 6,12) as follows in two settings a,b below (this
             ! doesn't change the actual output except for the dimension name):
             ! a) Specify the name of the third dimension, e.g. segmented wave
             ! frequencies DIM3NAME(1:2)='fs' (for how to further modify the
@@ -3497,14 +2140,16 @@
             IF (I1.EQ.0 .AND. .NOT. FLSEP) I1=IFI
             IF (J1.EQ.0 .AND. .NOT. FLSEP) J1=IFJ
 
-            ! NCJID: ID of a requested joint netCDF file (NOT for swell part.)
+            ! NCJID: ID of a joint netCDF file if that is requested
+            !        This will overrule a True value of FLSEP for this field
+            !        This is not applied for swell partitions with INDEXIPART>1
             NCJID = 0
             IF ( IFP .GT. 1 .AND. FLSEP .AND. INDEXIPART .EQ. 1 ) &
               NCJID = NCIDS(IFI, IFJ, 1) ! is already open
 
 ! 2.3.2 Set variable name substring in the name of a new file (ENAME in FNAMENC)
 
-            S2=LEN_TRIM(ENAME)
+            S2=LEN_TRIM(META(1)%ENAME)
             S1=LEN_TRIM(FILEPREFIX)+S4
             FNAMENC(S1+1:50)='       '
             FNAMENC(S1+1:S1+1) = '_'
@@ -3516,7 +2161,7 @@
             ! If NOT flag TOGETHER or variable with freq dim &
             ! (ef, p2l, ...), add variable name in file name
             ELSE
-              FNAMENC(S1+2:S1+S2) = ENAME(2:S2)
+              FNAMENC(S1+2:S1+S2) = META(1)%ENAME(2:S2)
             ENDIF
             ! Defines the netcdf extension
             FNAMENC(S1+S2+1:S1+S2+3) = '.nc'
@@ -3530,6 +2175,28 @@
             ! If NCJID == 0 and FLSEP is True, the variable goes to
             ! a separate netCDF file. If NCJID == 0 and FLSEP is False,
             ! the variable go in a common netCDF id. NCIDS(1,1,1)
+            
+! 2.3.3 Initialize dimensions etc.
+
+            ! By default we only add a new third dimension to the netCDF file
+            ! if this is the first timestep in the file
+            NEW3D = .FALSE.
+
+            ! If the flag frequency is .TRUE., defines the fourth dimension
+            ! If there is a third dimension:            
+            IF (FLFRQ &
+              ! ( You may here add condition for other third dimensions: )
+              ! .OR. ( TRIM(DIM3NAME) .EQ. 'fs' )
+                 ) THEN 
+              DIMLN(4)=I2F-I1F+1
+              EXTRADIM=1
+              ! Require a new third dimension if this is the first timestep
+              ! in the netCDF file
+              IF ( NTIM.EQ.1 ) NEW3D=.TRUE.
+            ELSE
+              DIMLN(4)=0
+              EXTRADIM=0
+            END IF 
 
 ! 2.3.3 Initialize the space-time grid dimension lengths for a new netCDF file
             
@@ -3557,27 +2224,21 @@
             ENDIF
 
             ! Three arrays are defined here to contain netCDF id.'s:
-            !   DIMID is the netCDF dimensions to be defined for each field,
+            !   DIMID is the netCDF dimension id.'s to be defined for each field,
             !   DIMFIELD is the netCDF dimensions of the individual field, and
-            !   VARID the dimension variables corresponding to DIMID
+            !   VARID the dimension variable id.'s corresponding to DIMID
             !
-            ! To manage the possibility of more than one 'spectral' third       
-            ! dimension, and possibly in the same file, we let ITD be the index 
-            ! in DIMID of the time dimension. By default there is no 3'rd dim:  
-            ITD = 4                                                             
-            !                                                                   
-            ! If the field has a third dimension (e.g. frequency 'f') in    
-            ! FIELD(x,y,f,time), then ITD is also shifted by one to ITD = 5.
-            ! The netCDF id. of the third dimension will be stored at
-            ! DIMID(ITD-1). For an unstructured or an SMC flat grid there
-            ! is no y dimension.                      
+            ! For an unstructured mesh or an SMC flat grid there is no y
+            ! dimension. If the field has a third dimension (e.g. frequency 'f')
+            ! in FIELD(x,y,f,time), then the index in DIMID of the time dimension
+            ! is also shifted by one from 4 to 5. Let ITD denote this index here:
             !                                                                   
             ! COORD TYPE:  Dims in DIMFIELD:  Dims in DIMID:
             ! Regular   :  (x, y, [f,] time)  (lvl,    x,    y, [f,] time)
             ! SMC flat  :  (cell, [f,] time)  (lvl, cell,   [], [f,] time)
             ! Unstruct  :  (node, [f,] time)  (lvl, node, elem, [f,] time, noel)
             ! INDEX in DIMID:                         2     3 [ITD-1] ITD  ITD+1
-            ! INDEX in VARID:                         1     2    []  ITD-1  ITD
+            ! INDEX in VARID:                         1     2    10    3    4
             ! (DIMID(1) (lvl='level') is not a dimension of any actual field)
 
             ! Further, let TDIM be the index in DIMFIELD of the time dimension  
@@ -3587,10 +2248,6 @@
             IF ( GTYPE.EQ.UNGTYPE ) TDIM = 2                                    
             ! If the variable has a third dimension, we will set TDIM = TDIM + 1
             
-            ! Defines index in VARID of the first field variable
-            IVAR1=ITD+MAPSTAOUT
-            IF (GTYPE.EQ.UNGTYPE) IVAR1=IVAR1+1 ! To add triangles var id. TRIGP2
-
 ! 2.3.4 Define an optional third dimension
 
             ! Allow other third dimensions in addition to 'f' for frequency.
@@ -3611,9 +2268,6 @@
             
             ! By default the variable has no third dimension:
             EXTRADIM = 0
-            ! C. Hansen, note: EXTRADIM is defined arithmetically, but after
-            ! introducing indices ITD and TDIM above, it is considered a boolean
-            ! except for the subroutine W3CRNC.
             
             ! By default we only add a new third dimension to the netCDF file
             ! if this is the first timestep in the file
@@ -3625,19 +2279,16 @@
               ! .OR. ( TRIM(DIM3NAME) .EQ. 'fs' )
                  ) THEN
               EXTRADIM = 1
-              ITD = ITD + 1
               TDIM = TDIM + 1
-              IVAR1 = IVAR1 + 1
 
-              ! Require a new third dimension if this is the first timestep
-              ! in the netCDF file
+              ! Define and write a new third dimension if this is the first
+              ! timestep in the netCDF file
               IF ( NTIM.EQ.1 ) NEW3D=.TRUE.
             END IF
-
+            
             ! Contents of the new third dimension variable
             IF ( NEW3D ) THEN
-              DIMLN(ITD-1) = I2F-I1F+1
-              ALLOCATE(DIM3VAR(DIMLN(ITD-1)))
+              ALLOCATE(DIM3VAR(DIMLN(4)))
               ! (DIM3VAR will be deallocated after write to netCDF)
               IF ( FLFRQ ) THEN
                 DIM3NAME = 'f'
@@ -3660,14 +2311,12 @@
             ! If we need the third dimension in a netCDF file already open,
             ! check if the third dimension exists, and if it matches
             IF ( NEW3D .AND. .NOT.FLSEP ) THEN
-!/DEBUG       ! CHA 20200903 BUG: tested NCJID, must be the already open id.
               ! Tentative id. if already open
               OLDNCID=NCJID
               ! If all variables in the same file
               IF ( NCJID .EQ. 0 )  OLDNCID = NCIDS(1,1,1)
               
-              CALL W3NCINQ3( OLDNCID, DIM3NAME, DIMID3, DIMLN(ITD-1), &
-                             VCHCK=DIM3VAR )
+              CALL W3NCINQ3( OLDNCID, DIM3NAME, DIMID3, DIMLN(4), VCHCK=DIM3VAR )
               IF ( DIMID3 .EQ. -1 ) THEN
                 ! If DIM3NAME is defined in the netCDF but doesn't match
                 ! DIM3VAR, then nullify the NCJID and write to separate file
@@ -3762,24 +2411,8 @@
               ! Set the size of the 'level' dim
               DIMLN(1)=1
 
-              ! C. Hansen 20200907: grid coordinates VARNM(NFIELD+1,NFIELD+2)
-              ! are *not* used (were they used some time before?)
-              ! ! If NOT unstructure mesh (i.e. regular grid)
-              ! IF (GTYPE.NE.UNGTYPE) THEN      
-              !   ! If spherical coordinate
-              !   IF (FLAGLL) THEN 
-              !     VARNM(NFIELD+1)='Longitude'
-              !     VARNM(NFIELD+2)='Latitude'
-              !   ! If cartesian coordinate
-              !   ELSE
-              !     VARNM(NFIELD+1)='x'
-              !     VARNM(NFIELD+2)='y'
-              !   END IF
-              ! END IF   
-              ! 
-              ! 
-              ! 
-              ! 
+              ! ! Initializes the time iteration counter n
+              ! N=1
 
 ! 2.5.1 Creates the NetCDF file 
               CALL W3CRNC(FNAMENC,NCID,DIMID,DIMLN,VARID, &
@@ -3797,7 +2430,7 @@
               ! (Keep NEW3D = .TRUE. and DIM3VAR allocated to write the dimension
               ! variable later after having left the netCDF define mode )
               IF ( NEW3D ) &
-                CALL W3NCDEF3(NCID,DIM3NAME,DIMID(ITD-1),DIMLN(ITD-1),VARID3)
+                CALL W3NCDEF3(NCID,DIM3NAME,DIMID(4),DIMLN(4),VARID(10))
 
               ! If curvilinear grid, instanciates lat / lon
               IF (GTYPE.EQ.CLGTYPE) THEN
@@ -3847,13 +2480,15 @@
                   ! instanciates lon with x/lon for regular grid or nodes for unstructured mesh
                   IF (.NOT.ALLOCATED(LON)) ALLOCATE(LON(NX))
 !/RTD                  ! 2d longitude array for standard grid coordinates
-!/RTD                  IF (.NOT.ALLOCATED(LON2D)) ALLOCATE(LON2D(NX,NY),LON2DEQ(NX,NY),ANGLD2D(NX,NY))
+!/RTD                  IF ( RTDL .AND. .NOT.ALLOCATED(LON2D)) &
+!/RTD                    ALLOCATE(LON2D(NX,NY),LON2DEQ(NX,NY),ANGLD2D(NX,NY))
                   IF (.NOT.ALLOCATED(LAT)) THEN 
                     ! If regular grid, instanciates lat with y/lat
                     IF (GTYPE.EQ.RLGTYPE) THEN 
                       ALLOCATE(LAT(NY))
 !/RTD                      ! 2d latitude array for standard grid coordinates
-!/RTD                      IF (.NOT.ALLOCATED(LAT2D)) ALLOCATE(LAT2D(NX,NY),LAT2DEQ(NX,NY))
+!/RTD                      IF ( RTDL .AND. .NOT.ALLOCATED(LAT2D)) &
+!/RTD                        ALLOCATE(LAT2D(NX,NY),LAT2DEQ(NX,NY))
                     ! If unstructured mesh, instanciates lat with nodes
                     ELSE 
                       ALLOCATE(LAT(NX))
@@ -3916,23 +2551,27 @@
 !/RTD                                  ANGLD2D, POLAT, POLON, RTDNY*RTDNX)
 !/SMC                  ENDIF ! SMCTYPE
                 ELSE ! SMCGRD
-                  SXD=DBLE(0.000001d0*DNINT(1d6*(DBLE(SX)) ))
-                  SYD=DBLE(0.000001d0*DNINT(1d6*(DBLE(SY)) ))
-                  X0D=DBLE(0.000001d0*DNINT(1d6*(DBLE(X0)) ))
-                  Y0D=DBLE(0.000001d0*DNINT(1d6*(DBLE(Y0)) ))
-                  DO I=1,NX
-                    LON(I)=REAL(X0D+SXD*DBLE(I-1))
-!/RTD                    LON2DEQ(I,1:NY)=LON(I)
-                  END DO
-                  DO I=1,NY
-                    LAT(I)=REAL(Y0D+SYD*DBLE(I-1))
-!/RTD                    LAT2DEQ(1:NX,I)=LAT(I)
-                  END DO
-!/RTD                  ! Calculate the standard grid coordinates
-!/RTD                  DO I=1,NX
-!/RTD                    CALL W3EQTOLL(LAT2DEQ(I,1:NY), LON2DEQ(I,1:NY), LAT2D(I,1:NY), &
-!/RTD                                   LON2D(I,1:NY), ANGLD2D(I,1:NY), POLAT, POLON, NY)
-!/RTD                  END DO   
+                    SXD=DBLE(0.000001d0*DNINT(1d6*(DBLE(SX)) ))
+                    SYD=DBLE(0.000001d0*DNINT(1d6*(DBLE(SY)) ))
+                    X0D=DBLE(0.000001d0*DNINT(1d6*(DBLE(X0)) ))
+                    Y0D=DBLE(0.000001d0*DNINT(1d6*(DBLE(Y0)) ))
+                    DO I=1,NX
+                      LON(I)=REAL(X0D+SXD*DBLE(I-1))
+                    END DO
+                    DO I=1,NY
+                      LAT(I)=REAL(Y0D+SYD*DBLE(I-1))
+                    END DO
+!/RTD                  IF ( RTDL ) THEN
+!/RTD                    ! Calculate the standard grid coordinates
+!/RTD                    DO I=1,NX
+!/RTD                      LON2DEQ(I,:)=LON(I)
+!/RTD                    END DO
+!/RTD                    DO I=1,NY
+!/RTD                      LAT2DEQ(:,I)=LAT(I)
+!/RTD                    END DO                    
+!/RTD                    CALL W3EQTOLL(LAT2DEQ, LON2DEQ, LAT2D, LON2D,       &
+!/RTD                                  ANGLD2D, POLAT, POLON, NY*NX)
+!/RTD                  END IF ! RTDL
                   WRITE(STR2,'(F12.0)') SY
                   STR2=ADJUSTL(STR2)
                   IRET=NF90_PUT_ATT(NCID,NF90_GLOBAL,   &
@@ -4013,11 +2652,13 @@
                   'altitude_resolution','n/a')
               CALL CHECK_ERR(IRET)
 
+!/RTD              IF ( RTDL ) THEN
 !/RTD                  IRET=NF90_PUT_ATT(NCID,NF90_GLOBAL,  &
 !/RTD                      'grid_north_pole_latitude',POLAT)
 !/RTD                  IRET=NF90_PUT_ATT(NCID,NF90_GLOBAL,  &
 !/RTD                      'grid_north_pole_longitude',POLON)
-
+!/RTD                END IF
+              
               CALL T2D(TIME,STARTDATE,IERR)
               WRITE(STRSTARTDATE,'(I4.4,A,4(I2.2,A),I2.2)') STARTDATE(1),'-',STARTDATE(2),'-', &
                     STARTDATE(3),' ',STARTDATE(5),':',STARTDATE(6),':',STARTDATE(7)
@@ -4038,9 +2679,9 @@
 !/SMC                  CALL CHECK_ERR(IRET)
 !/SMC                  IF(SMCTYPE .EQ. 1) THEN
 !/SMC                    ! For type 1 SCM file also put lat/lons and cell sizes:
-!/SMC                    IRET=NF90_PUT_VAR(NCID,VARID(299),SMCCX)
+!/SMC                    IRET=NF90_PUT_VAR(NCID,VARID(5),SMCCX)
 !/SMC                    CALL CHECK_ERR(IRET)
-!/SMC                    IRET=NF90_PUT_VAR(NCID,VARID(300),SMCCY)
+!/SMC                    IRET=NF90_PUT_VAR(NCID,VARID(6),SMCCY)
 !/SMC                    CALL CHECK_ERR(IRET)
 !/SMC                  ENDIF
                 ELSE ! SMCGRD
@@ -4049,10 +2690,12 @@
                   IRET=NF90_PUT_VAR(NCID,VARID(2),LAT(IY1:IYN))
                   CALL CHECK_ERR(IRET)
                 ENDIF ! SMCGRD
-!/RTD                IRET=NF90_PUT_VAR(NCID,VARID(291),LON2D(IX1:IXN,IY1:IYN))
-!/RTD                CALL CHECK_ERR(IRET)
-!/RTD                IRET=NF90_PUT_VAR(NCID,VARID(292),LAT2D(IX1:IXN,IY1:IYN))
-!/RTD                CALL CHECK_ERR(IRET)
+!/RTD                IF ( RTDL ) THEN
+!/RTD                  IRET=NF90_PUT_VAR(NCID,VARID(7),LON2D(IX1:IXN,IY1:IYN))
+!/RTD                  CALL CHECK_ERR(IRET)
+!/RTD                  IRET=NF90_PUT_VAR(NCID,VARID(8),LAT2D(IX1:IXN,IY1:IYN))
+!/RTD                  CALL CHECK_ERR(IRET)
+!/RTD                  END IF
               END IF
 
               ! If curvilinear grid
@@ -4071,29 +2714,24 @@
                 CALL CHECK_ERR(IRET)
               END IF
 
-              ! Writes frequencies to netcdf file (or other third dim)
-              ! will be done in 1'st time step of each file, see Sect. 2.6.3
 
-              IF (GTYPE.EQ.UNGTYPE) THEN                
-                ! Writes triangles to netcdf file at variable index ITD-1+1
-                IRET=NF90_PUT_VAR(NCID,VARID(ITD),TRIGP2)
+              ! Writes triangles to netcdf file
+              IF (GTYPE.EQ.UNGTYPE) THEN
+                IRET=NF90_PUT_VAR(NCID,VARID(4),TRIGP2)
                 CALL CHECK_ERR(IRET)
               END IF
 
               ! Writes status map array
-              ! In section 2.3.4 we have defined IVAR1 as the index of the first
-              ! field variable:
-              ! IVAR1=ITD+MAPSTAOUT; IF (GTYPE.EQ.UNGTYPE) IVAR1=IVAR1+1
               IF (MAPSTAOUT.EQ.1) THEN 
                 START(1)=1
                 START(2)=1
                 COUNT(1)=IXN-IX1+1
                 COUNT(2)=IYN-IY1+1
                 IF (GTYPE.NE.UNGTYPE) THEN
-                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1-1),MAPOUT(IX1:IXN,IY1:IYN), &
+                  IRET=NF90_PUT_VAR(NCID,VARID(20),MAPOUT(IX1:IXN,IY1:IYN), &
                                      (/START(1:2)/),(/COUNT(1:2)/))
                 ELSE
-                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1-1),MAPOUT(IX1:IXN,1),(/START(1)/),(/COUNT(1)/))
+                  IRET=NF90_PUT_VAR(NCID,VARID(20),MAPOUT(IX1:IXN,1),(/START(1)/),(/COUNT(1)/))
                 ENDIF
                 CALL CHECK_ERR(IRET)
               END IF
@@ -4122,7 +2760,7 @@
 
               ! If it is an unstructured mesh
               IF (GTYPE.EQ.UNGTYPE) THEN
-                IRET=NF90_INQ_VARID (NCID, 'tri', VARID(ITD))
+                IRET=NF90_INQ_VARID (NCID, 'tri', VARID(4))
                 CALL CHECK_ERR(IRET)
               ! If it is a regular grid
               ELSE
@@ -4151,16 +2789,15 @@
                 CALL CHECK_ERR(IRET)
               END IF
               ! Get the dimension time
-              ! ITD: Index in DIMID of time dimension
-              IRET=NF90_INQ_DIMID (NCID, 'time', DIMID(ITD))
-              IRET=NF90_INQ_VARID (NCID, 'time', VARID(ITD-1))
+              IRET=NF90_INQ_DIMID (NCID, 'time', DIMID(4+EXTRADIM))
+              IRET=NF90_INQ_VARID (NCID, 'time', VARID(3))
               CALL CHECK_ERR(IRET)
               
               ! Define or get a third dimension (e.g. DIM3NAME='f')
               IF ( NEW3D ) THEN
                 ! A new third dimension has to be defined in an existing file
                 IRET = NF90_REDEF(NCID)
-                CALL W3NCDEF3( NCID, DIM3NAME, DIMID(ITD-1), DIMLN(ITD-1), VARID3 )
+                CALL W3NCDEF3( NCID, DIM3NAME, DIMID(4), DIMLN(4), VARID(10) )
                 IF ( IRET .EQ. NF90_NOERR ) THEN
                   IRET = NF90_ENDDEF(NCID)
                   CALL CHECK_ERR(IRET)
@@ -4168,7 +2805,7 @@
                 ! (Keep NEW3D = .TRUE. and DIM3VAR allocated to write the
                 ! variable contents later)
               ELSE IF (EXTRADIM.EQ.1) THEN
-                 IRET=NF90_INQ_DIMID (NCID, DIM3NAME, DIMID(ITD-1))
+                 IRET=NF90_INQ_DIMID (NCID, DIM3NAME, DIMID(4))
               END IF
 
               CALL CHECK_ERR(IRET)
@@ -4181,6 +2818,9 @@
 
 ! 2.6.3 Defines or gets the variables identifiers
 
+            ! Defines index of first field variable
+            IVAR1=21
+            
             ! If it is the first time step, define all the variables and attributes            
             IF (NTIM.EQ.1) THEN
 
@@ -4192,8 +2832,8 @@
               ! If we require a new 3'rd dimension as determined in Sect. 2.3.4
               IF ( NEW3D ) THEN
                 ! Write to netCDF, e.g. Frequencies
-                ! VARID3 has been determined in Sect. 2.5.1 or 2.6.1
-                IRET = NF90_PUT_VAR(NCID, VARID3, DIM3VAR)
+                ! VARID(10) has been determined in Sect. 2.5.1 or 2.6.1
+                IRET = NF90_PUT_VAR(NCID, VARID(10), DIM3VAR)
                 CALL CHECK_ERR(IRET)
                 DEALLOCATE(DIM3VAR)
                 NEW3D=.FALSE.
@@ -4207,73 +2847,61 @@
               CALL CHECK_ERR(IRET)
 
               ! The field indices depend on the grid being regular or 'flat'
-              ! ITD, TDIM, IVAR1 have been set in Sect. 2.3.4
-              ! ITD: Index in DIMID of time dimension
-              ! TDIM: Index in DIMFIELD of time dimension
+              ! TDIM: Index in DIMFIELD of time dimension. TDIM has been set
+              ! in Sect. 2.3.4
 
               ! The first index is x, lon, SMC cell, or node:
               DIMFIELD(1) = DIMID(2)
               ! 'y' or 'lat' for regular grid, will else be overwritten:
               DIMFIELD(2) = DIMID(3)
               ! Third dimension (e.g. 'f'):
-              IF ( EXTRADIM.EQ.1 ) DIMFIELD(TDIM-1) = DIMID(ITD-1)
+              IF ( EXTRADIM.EQ.1 ) DIMFIELD(TDIM-1) = DIMID(4)
               ! Time dimension:
-              DIMFIELD(TDIM) = DIMID(ITD)
+              DIMFIELD(TDIM) = DIMID(4+EXTRADIM)
 
               ! Loops on all the fields of the variable (i.e. ucur/vcur for current)
-              IVAR=IVAR1-1
               DO I=1,NFIELD
-                IVAR=IVAR+1
-                IF (NCVARTYPE.EQ.2) THEN
-                  IRET=NF90_DEF_VAR(NCID,VARNM(I), NF90_SHORT, DIMFIELD(1:TDIM), VARID(IVAR))
-                ELSE
-                  IRET=NF90_DEF_VAR(NCID,VARNM(I), NF90_FLOAT, DIMFIELD(1:TDIM), VARID(IVAR))
-                END IF
-!/NC4                IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(IVAR), 1, 1, DEFLATE)
-                CALL CHECK_ERR(IRET)
+                IVAR=IVAR1+I
+!/SMC!
+!/SMC                IF( SMCTYPE .EQ. 1 ) THEN
+!/SMC                  ! SMC Flat file
+!/SMC                  IF (NCVARTYPE.EQ.2) THEN 
+!/SMC                    IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_SHORT, (/DIMFIELD(1), DIMFIELD(TDIM)/), VARID(IVAR))
+!/SMC                    CALL CHECK_ERR(IRET)
+!/SMC                  ELSE
+!/SMC                    IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_FLOAT, (/DIMFIELD(1), DIMFIELD(TDIM)/), VARID(IVAR))
+!/SMC                    CALL CHECK_ERR(IRET)
+!/SMC                  ENDIF
+!/SMC                ELSE ! SMCTYPE .EQ. 1
+!/SMC!                
+                  IF (NCVARTYPE.EQ.2) THEN 
+                    IRET=NF90_DEF_VAR(NCID,META(I)%VARNM, NF90_SHORT, DIMFIELD(1:TDIM), VARID(IVAR))
+                    CALL CHECK_ERR(IRET)
+                  ELSE
+                    IRET=NF90_DEF_VAR(NCID,META(I)%VARNM, NF90_FLOAT, DIMFIELD(1:TDIM), VARID(IVAR))
+                    CALL CHECK_ERR(IRET)
+                  END IF
+!/NC4                  IF (NCTYPE.EQ.4) THEN
+!/NC4                    IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(IVAR), 1, 1, DEFLATE)
+!/NC4                    CALL CHECK_ERR(IRET)
+!/NC4                  ENDIF
+!/SMC!
+!/SMC                ENDIF ! SMCTYPE .EQ. 1
+
+                ! Set scale factor to 1.0 if using FLOAT variables for output
+                IF(NCVARTYPE .GT. 2) META(I)%FSC = 1.0
+
+                !! CB - USE NEW W3META MODULE
+                CALL WRITE_META(NCID, VARID(IVAR), META(I), IRET) ! CB
+                CALL CHECK_ERR(IRET) ! CB
 !
-                IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'long_name',VARNL(I))
-                CALL CHECK_ERR(IRET)
-                IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'standard_name',VARNS(I))
-                CALL CHECK_ERR(IRET)
-                IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'globwave_name',VARNG(I))
-                CALL CHECK_ERR(IRET)
-                IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'units',UNITVAR(I))
-                CALL CHECK_ERR(IRET)
-                IF (NCVARTYPE.EQ.2) THEN 
-                  IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'_FillValue',NF90_FILL_SHORT)
-                ELSE 
-                  IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'_FillValue',NF90_FILL_FLOAT)
-                  FSC=1.
-                  FSC3=1.
-                END IF
-                CALL CHECK_ERR(IRET)
-                IF (I.LE.2) THEN 
-                  IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'scale_factor',FSC)
-                ELSE
-                  IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'scale_factor',FSC3)
-                ENDIF 
-                CALL CHECK_ERR(IRET)
-                IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'add_offset',0.)
-                CALL CHECK_ERR(IRET)
-                IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'valid_min',VMIN)
-                CALL CHECK_ERR(IRET)
-                IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'valid_max',VMAX)
-                CALL CHECK_ERR(IRET)
-                IF (VARNC(I).NE.'') THEN
-                  IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'comment',VARNC(I))
-                  CALL CHECK_ERR(IRET)
-                END IF
-                IF (VARND(I).NE.'') THEN
-                  IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'direction_reference',VARND(I))
-                  CALL CHECK_ERR(IRET)
-                END IF
-!/RTD
+!/RTD                IF ( RTDL ) THEN
 !/RTD                  ! Add grid mapping attribute for rotated pole grids:
 !/RTD                  IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'grid_mapping',    &
 !/RTD                                    'rotated_pole')
 !/RTD                  CALL CHECK_ERR(IRET)
-!/RTD
+!/RTD                  END IF
+!/RTD!
               END DO
 !
               ! put START date in global attribute
@@ -4287,10 +2915,11 @@
 
            ! If it is not the first time step, get all VARID from the netcdf file opened
             IF (NTIM.GT.1) THEN 
-              IVAR=IVAR1-1
               DO I=1,NFIELD
-                IVAR=IVAR+1
-                IRET=NF90_INQ_VARID (NCID, VARNM(I), VARID(IVAR))
+                ! Get meta-data for field
+                !META = GETMETA(IFI, IFJ, ICOMP=I, IPART=IPART)
+                IVAR=IVAR1+I
+                IRET=NF90_INQ_VARID (NCID, META(I)%VARNM, VARID(IVAR))
                 CALL CHECK_ERR(IRET)
               END DO  
             END IF                
@@ -4299,9 +2928,10 @@
      
             CALL T2D(TIME,CURDATE,IERR)
             OUTJULDAY=TSUB(REFDATE,CURDATE)
+
             IF ( NCJID .NE. 0 ) FNAMENC(:)='(id.)'
-            WRITE(NDSO,'(3A,I6,A,I4,A,I2.2,A,I2.2,A,I2.2,A,I2.2,A,I2.2,2A)')        &
-                    'Writing new record ', TRIM(ENAME(2:)) ,' number ',NTIM,        &
+            WRITE(NDSO,'(A,A9,A,I6,A,I4,A,I2.2,A,I2.2,A,I2.2,A,I2.2,A,I2.2,2A)')        &
+                    'Writing new record ', META(1)%ENAME(2:) ,'number ',NTIM,    &
                     ' for ',CURDATE(1),':',CURDATE(2),':',CURDATE(3),'T',CURDATE(5),&
                     ':',CURDATE(6),':',CURDATE(7),' in file ',TRIM(FNAMENC)
 
@@ -4315,29 +2945,24 @@
 
             ! Sets time index
             START(TDIM)=NTIM
-            ! Here, TDIM is the index in DIMFIELD of the time dim. (Sect. 2.3.4)
+            ! TDIM is the index in DIMFIELD of the time dim. (Sect. 2.3.4)
             COUNT(1)=IXN-IX1+1
             COUNT(2)=IYN-IY1+1
             COUNT(3)=1
             COUNT(4)=1
 
             ! Puts time in NetCDF file
-
-            ! If it is the first field of the file in mode together
-            ! or NOT together or variable with a third dimension
-            ! ChrisBunney: Also - check IPART=TABIPART (-> C Hansen: IFP.EQ.1)
-            ! in case first requested output is a partitioned field.
-            IF ( ( IFI.EQ.I1 .AND. IFJ.EQ.J1 .AND. IFP.EQ.1 ) .OR. FLSEP ) THEN
-              IRET=NF90_PUT_VAR(NCID,VARID(ITD-1),OUTJULDAY,(/NTIM/))
-              ! ITD was set in Sect. 2.3.4
+            IF ( (IFI.EQ.I1 .AND. IFJ.EQ.J1 .AND. IFP.EQ.1) .OR. FLSEP ) THEN
+              IVAR1 = 21
+              IRET=NF90_PUT_VAR(NCID,VARID(3),OUTJULDAY,(/NTIM/))
               CALL CHECK_ERR(IRET)
             END IF
 !
 ! 2.6.5 Puts field(s) in NetCDF file
 !
             ! The START and COUNT above are for EXTRADIM==0 and a regular 2D
-            ! grid. If EXTRADIM==1, START(TDIM-1) will be incremented by 1
-            ! on each loop over the third array index IK=I1F,I2F (see below)
+            ! grid. If EXTRADIM==1, START(EDIM=TDIM-1) will be incremented by 1
+            ! on each loop over the third array index IK=I1F,I2F (see below).
             !
             ! For a regular grid ( SMCTYPE == 2 or .NOT.UNGTYPE ) we have
             ! if EXTRADIM==0: TDIM=3; START=(/1,1,NTIM/); COUNT=(/NX,NY,1/)
@@ -4354,7 +2979,8 @@
             
             IF (EXTRADIM.EQ.1) THEN
               ! The field variable has a third 'spectral' dimension
-              START(TDIM-1) = 0 ! To be incremented by 1 in each step IK=I1F,I2F
+              EDIM = TDIM - 1
+              START(EDIM) = 0 ! To be incremented by 1 in each step IK=I1F,I2F
             ELSE
               I1F = 0
               I2F = 0
@@ -4368,8 +2994,8 @@
             DO IK=I1F,I2F
               ! IK==I1F==I2F==0 unless EXTRADIM==1
               IF (EXTRADIM.EQ.1) THEN
-                ! Increment START(TDIM-1) by 1
-                START(TDIM-1) = START(TDIM-1)+1
+                ! Increment START(EDIM) by 1
+                START(EDIM) = START(EDIM)+1
                 ! Copy the 2D field for each index IK of the third dim
                 IF ( NFIELD.EQ.1 ) THEN
                   X1(:,:) = XK(:,:,IK)
@@ -4380,7 +3006,7 @@
                   ! Implementation of an eventual variable with NFIELD==3 and
                   ! EXTRADIM==1 has to be completed here
                   WRITE(NDSE,*) ' *** WAVEWATCH III ERROR IN OUNF :'
-                  WRITE(NDSE,*) ' Program missing for NFIELD==3 with a third dim'
+                  WRITE(NDSE,*) ' No program code for NFIELD==3 with a third dim'
                   CALL EXTCDE ( 45 )                  
                 END IF
               END IF
@@ -4479,6 +3105,11 @@
 
           ! Repeat if there are extra partitions or subfields for the
           ! group (IFI,IFJ)
+          IF ( NFP .GT. NFPMAX ) THEN
+            ! This must never occur for the user
+            WRITE(NDSE,*) 'Hardcoded configuration error: NFP > NFPMAX'
+            CALL EXTCDE(1)
+            END IF
           END DO ! WHILE IFP .LE. NFP
 !      
         END DO  ! IFJ=1, NGRPP
@@ -4526,7 +3157,7 @@
 
 
 !--------------------------------------------------------------------------    
-      SUBROUTINE W3NCINQ3(NCID,DIMNAME,DIMID,DIMLN,VCHCK)
+      SUBROUTINE W3NCINQ3(NCID,DIMNAME,DIMID3,DIMLN3,VCHCK)
       
       ! Check if a third dimension is defined
       
@@ -4536,15 +3167,15 @@
       
       INTEGER, INTENT(IN)               :: NCID
       CHARACTER*(*), INTENT(IN)         :: DIMNAME
-      INTEGER, INTENT(OUT)              :: DIMID
-      INTEGER, INTENT(IN)               :: DIMLN
+      INTEGER, INTENT(OUT)              :: DIMID3
+      INTEGER, INTENT(IN)               :: DIMLN3
       REAL, INTENT(IN), OPTIONAL        :: VCHCK(:)
 
 !
 !/ ------------------------------------------------------------------- /
 !   Local parameters
 !
-      INTEGER                           :: DIMLNT, IRET, DIMIDT, VARID
+      INTEGER                           :: DIMLNT, IRET, DIMIDT, VARID3
       REAL                              :: VART(2)
 
 
@@ -4569,34 +3200,34 @@
       IF ( IRET .NE. NF90_NOERR ) RETURN
 
       ! If there is already a dimension named DIMNAME, analyze it and return
-      DIMID = -1
+      DIMID3 = -1
       ! get the length of the dimension 
       IRET = NF90_INQUIRE_DIMENSION(NCID, DIMIDT, LEN=DIMLNT)        
-      IF ( DIMLNT .NE. DIMLN ) RETURN
+      IF ( DIMLNT .NE. DIMLN3 ) RETURN
       
       ! get the VARID of the dimension variable
-      IRET = NF90_INQ_VARID(NCID, TRIM(DIMNAME), VARID)
+      IRET = NF90_INQ_VARID(NCID, TRIM(DIMNAME), VARID3)
       IF ( IRET .NE. NF90_NOERR ) RETURN
       
       !Check contents ...
-      IRET = NF90_GET_VAR(NCID,VARID,VART, &
-                          START=(/1/), COUNT=(/2/), STRIDE=(/DIMLN-1/))
+      IRET = NF90_GET_VAR(NCID,VARID3,VART, &
+                          START=(/1/), COUNT=(/2/), STRIDE=(/DIMLN3-1/))
       IF (IRET .NE. NF90_NOERR) RETURN
         
       IF ( PRESENT(VCHCK) ) THEN
-        IF (VART(1) .NE. VCHCK(1) .OR. VART(2) .NE. VCHCK(DIMLN)) THEN
+        IF (VART(1) .NE. VCHCK(1) .OR. VART(2) .NE. VCHCK(DIMLN3)) THEN
           WRITE(NDSE,*) 'Dimension variable contents does not match'
           RETURN
         END IF
       END IF
       
-      DIMID = DIMIDT
+      DIMID3 = DIMIDT
       
       END SUBROUTINE W3NCINQ3
 
       
 !--------------------------------------------------------------------------    
-      SUBROUTINE W3NCDEF3(NCID,DIMNAME,DIMID,DIMLN,VARID)
+      SUBROUTINE W3NCDEF3(NCID,DIMNAME,DIMID3,DIMLN3,VARID3)
       
       ! Define one of the known third dimensions (e.g. DIMNAME='f')
       ! The netCDF file must be open in define mode
@@ -4607,9 +3238,9 @@
       
       INTEGER, INTENT(IN)               :: NCID
       CHARACTER*(*), INTENT(IN)         :: DIMNAME
-      INTEGER, INTENT(OUT)              :: DIMID
-      INTEGER, INTENT(IN)               :: DIMLN
-      INTEGER, INTENT(OUT)              :: VARID
+      INTEGER, INTENT(OUT)              :: DIMID3
+      INTEGER, INTENT(IN)               :: DIMLN3
+      INTEGER, INTENT(OUT)              :: VARID3
 
 !
 !/ ------------------------------------------------------------------- /
@@ -4617,29 +3248,29 @@
 !
       INTEGER                           :: IRET
       
-      IRET = NF90_DEF_DIM(NCID, TRIM(DIMNAME), DIMLN, DIMID)
+      IRET = NF90_DEF_DIM(NCID, TRIM(DIMNAME), DIMLN3, DIMID3)
       CALL CHECK_ERR(IRET)
       
-      IRET = NF90_DEF_VAR(NCID, TRIM(DIMNAME), NF90_FLOAT, DIMID, VARID)
-!/NC4      IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID, 1, 1, DEFLATE)
+      IRET = NF90_DEF_VAR(NCID, TRIM(DIMNAME), NF90_FLOAT, DIMID3, VARID3)
+!/NC4      IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID3, 1, 1, DEFLATE)
       CALL CHECK_ERR(IRET)
 !
 ! frequency
 !
       IF ( TRIM(DIMNAME) .EQ. 'f' ) THEN
-        IRET=NF90_PUT_ATT(NCID,VARID,'long_name','wave_frequency')
+        IRET=NF90_PUT_ATT(NCID,VARID3,'long_name','wave_frequency')
         CALL CHECK_ERR(IRET)
-        IRET=NF90_PUT_ATT(NCID,VARID,'standard_name','wave_frequency')
+        IRET=NF90_PUT_ATT(NCID,VARID3,'standard_name','wave_frequency')
         CALL CHECK_ERR(IRET)
-        IRET=NF90_PUT_ATT(NCID,VARID,'units','s-1')
+        IRET=NF90_PUT_ATT(NCID,VARID3,'units','s-1')
         CALL CHECK_ERR(IRET)
-        IRET=NF90_PUT_ATT(NCID,VARID,'axis','Hz')
+        IRET=NF90_PUT_ATT(NCID,VARID3,'axis','Hz')
         CALL CHECK_ERR(IRET)
 !
 ! Here you may put netcdf attibutes for another third dim
 !
       ! ELSE IF ( TRIM(DIMNAME) .EQ. 'fs' ) THEN
-      !   IRET=NF90_PUT_ATT(NCID,VARID,'long_name','segmented_wave_frequency')
+      !   IRET=NF90_PUT_ATT(NCID,VARID3,'long_name','segmented_wave_frequency')
       !   ...
       END IF
       
@@ -4649,7 +3280,10 @@
 !--------------------------------------------------------------------------    
       SUBROUTINE W3CRNC (NCFILE, NCID, DIMID, DIMLN, VARID,  &
                          EXTRADIM, NCTYPE, MAPSTAOUT )
-      USE W3GDATMD
+!
+      USE W3GDATMD, ONLY : GTYPE, FLAGLL, UNGTYPE, CLGTYPE, RLGTYPE
+!/RTD ! Rotated pole parameters from the mod_def file 
+!/RTD      USE W3GDATMD, ONLY : POLAT, POLON
       USE NETCDF
       USE W3TIMEMD
 
@@ -4675,11 +3309,13 @@
 !
       CHARACTER                         :: ATTNAME*120,ATTVAL*120
 
-! C. Hansen, future proposal: EXTRADIM is used arithmetically, but might
-! be considered a boolean by introducing indices ITD and ITV:
-! ITD=4+EXTRADIM (index of time in DIMID)
-! ITV=3+EXTRADIM (index of time in VARID)
-! 
+!/RTD ! RTDL == False for a standard lat-lon grid. Will be set to True if the
+!/RTD ! grid is rotated
+!/RTD      LOGICAL                           :: RTDL = .FALSE.
+
+!/RTD ! Is the grid really rotated
+!/RTD        IF ( Polat < 90. ) RTDL = .True.
+!      
 ! Creation in netCDF3 or netCDF4
 !
       IF(NCTYPE.EQ.3)  IRET = NF90_CREATE(TRIM(NCFILE), NF90_CLOBBER, NCID)
@@ -4749,14 +3385,14 @@
 !/SMC              CALL CHECK_ERR(IRET)
 !/SMC
 !/SMC              ! For seapoint style SMC grid, also define out cell size variables:
-!/SMC              IRET = NF90_DEF_VAR(NCID, 'cx', NF90_SHORT, DIMID(2), VARID(299))
+!/SMC              IRET = NF90_DEF_VAR(NCID, 'cx', NF90_SHORT, DIMID(2), VARID(5))
 !/SMC              CALL CHECK_ERR(IRET)
 !/SMC              IRET = NF90_PUT_ATT(NCID, VARID(299), 'long_name',        &
 !/SMC                                  'longitude cell size factor')
 !/SMC              IRET = NF90_PUT_ATT(NCID, VARID(299), 'valid_min', 1)
 !/SMC              IRET = NF90_PUT_ATT(NCID, VARID(299), 'valid_max', 256)
 !/SMC
-!/SMC              IRET = NF90_DEF_VAR(NCID, 'cy', NF90_SHORT, DIMID(2), VARID(300))
+!/SMC              IRET = NF90_DEF_VAR(NCID, 'cy', NF90_SHORT, DIMID(2), VARID(6))
 !/SMC              call CHECK_ERR(IRET)
 !/SMC              IRET = NF90_PUT_ATT(NCID, VARID(300), 'long_name',        &
 !/SMC                                  'latitude cell size factor')
@@ -4783,20 +3419,27 @@
           IRET = NF90_DEF_VAR(NCID, 'latitude', NF90_FLOAT, DIMID(2), VARID(2))
           END IF
         IRET=NF90_PUT_ATT(NCID,VARID(1),'units','degree_east')
+!/RTD ! Is the grid really rotated
+!/RTD        IF ( .NOT. RTDL ) THEN        
         IRET=NF90_PUT_ATT(NCID,VARID(1),'long_name','longitude')
         IRET=NF90_PUT_ATT(NCID,VARID(1),'standard_name','longitude')
+!/RTD        ELSE     
 !/RTD        ! Override the above for RTD pole:
-!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(1),'long_name','longitude in rotated pole grid')
-!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(1),'standard_name','grid_longitude')
+!/RTD          IRET=NF90_PUT_ATT(NCID,VARID(1),'long_name','longitude in rotated pole grid')
+!/RTD          IRET=NF90_PUT_ATT(NCID,VARID(1),'standard_name','grid_longitude')
+!/RTD        END IF        
         IRET=NF90_PUT_ATT(NCID,VARID(1),'valid_min',-180.0)
         IRET=NF90_PUT_ATT(NCID,VARID(1),'valid_max',360.)
 !
         IRET=NF90_PUT_ATT(NCID,VARID(2),'units','degree_north')
+!/RTD        IF ( .NOT. RTDL ) THEN        
         IRET=NF90_PUT_ATT(NCID,VARID(2),'long_name','latitude')
         IRET=NF90_PUT_ATT(NCID,VARID(2),'standard_name','latitude')
+!/RTD        ELSE        
 !/RTD        ! Override the above for RTD pole:
 !/RTD        IRET=NF90_PUT_ATT(NCID,VARID(2),'long_name','latitude in rotated pole grid')
 !/RTD        IRET=NF90_PUT_ATT(NCID,VARID(2),'standard_name','grid_latitude')
+!/RTD        END IF        
         IRET=NF90_PUT_ATT(NCID,VARID(2),'valid_min',-90.0)
         IRET=NF90_PUT_ATT(NCID,VARID(2),'valid_max',180.)
 !
@@ -4804,53 +3447,60 @@
 !/SMC          IF(SMCTYPE .EQ. 1) THEN
 !/RTD            ! For SMC grid type 1, standard lat/lon variables are 1D:
 !/RTD            IRET = NF90_DEF_VAR(NCID, 'standard_longitude', NF90_FLOAT, &
-!/RTD                    (/ DIMID(2) /), VARID(291))
+!/RTD                    (/ DIMID(2) /), VARID(7))
 !/RTD            call CHECK_ERR(IRET)
 !/RTD 
 !/RTD            IRET = NF90_DEF_VAR(NCID, 'standard_latitude', NF90_FLOAT, &
-!/RTD                    (/ DIMID(2) /), VARID(292))
+!/RTD                    (/ DIMID(2) /), VARID(8))
 !/RTD            call CHECK_ERR(IRET)
 !/SMC          ELSE
 !/RTD            IRET = NF90_DEF_VAR(NCID, 'standard_longitude', NF90_FLOAT, &
-!/RTD                    (/ DIMID(2), DIMID(3)/), VARID(291))
+!/RTD                    (/ DIMID(2), DIMID(3)/), VARID(7))
 !/RTD            call CHECK_ERR(IRET)
 !/RTD
 !/RTD            IRET = NF90_DEF_VAR(NCID, 'standard_latitude', NF90_FLOAT, &
-!/RTD                    (/ DIMID(2), DIMID(3)/), VARID(292))
+!/RTD                    (/ DIMID(2), DIMID(3)/), VARID(8))
 !/RTD            call CHECK_ERR(IRET)
 !/SMC          ENDIF
         ELSE
+!/RTD      IF ( RTDL ) THEN
 !/RTD        !Add secondary coordinate system linking rotated grid back to standard lat-lon
 !/RTD        IRET = NF90_DEF_VAR(NCID, 'standard_longitude', NF90_FLOAT, (/ DIMID(2), DIMID(3)/), &
-!/RTD                             VARID(291))
+!/RTD                             VARID(7))
 !/RTD        call CHECK_ERR(IRET)
 !/RTD
 !/RTD        IRET = NF90_DEF_VAR(NCID, 'standard_latitude', NF90_FLOAT, (/ DIMID(2), DIMID(3)/), &
-!/RTD                             VARID(292))
+!/RTD                             VARID(8))
 !/RTD        call CHECK_ERR(IRET)
+!/RTD      END IF
         ENDIF ! SMCGRD
 !/RTD
+!/RTD      IF ( RTDL ) THEN
 !/RTD        ! Attributes for standard_longitude:
-!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(291),'units','degree_east')
-!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(291),'long_name','longitude')
-!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(291),'standard_name','longitude')
-!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(291),'valid_min',-180.0)
-!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(291),'valid_max',360.)
+!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(7),'units','degree_east')
+!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(7),'long_name','longitude')
+!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(7),'standard_name','longitude')
+!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(7),'valid_min',-180.0)
+!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(7),'valid_max',360.)
 !/RTD
 !/RTD        ! Attributes for standard_latitude:
-!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(292),'units','degree_north')
-!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(292),'long_name','latitude')
-!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(292),'standard_name','latitude')
-!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(292),'valid_min',-90.0)
-!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(292),'valid_max',180.)
+!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(8),'units','degree_north')
+!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(8),'long_name','latitude')
+!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(8),'standard_name','latitude')
+!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(8),'valid_min',-90.0)
+!/RTD        IRET=NF90_PUT_ATT(NCID,VARID(8),'valid_max',180.)
 !/RTD
 !/RTD        ! Add rotated pole grid mapping variable (dummy scalar variable
 !/RTD        ! used to simply store rotated pole information; see CF1.6 conventions).
-!/RTD        IRET=NF90_DEF_VAR(NCID, 'rotated_pole', NF90_CHAR, VARID(293))
-!/RTD        IRET=NF90_PUT_ATT(NCID, VARID(293), 'grid_north_pole_latitude',POLAT)
-!/RTD        IRET=NF90_PUT_ATT(NCID, VARID(293), 'grid_north_pole_longitude',POLON)
-!/RTD        IRET=NF90_PUT_ATT(NCID, VARID(293), 'grid_mapping_name',              &
+!/RTD        ! TODO: FUTURE WW3_OUNF DEVELOPMENT WILL ALLOW USER TO DEFINE THE 
+!/RTD        ! COORDINATE REFERENCE SYSTEM - THIS WILL REQUIRE THE BELOW TO BE
+!/RTD        ! HANDLED DIFFERENTLY. C. Bunney.
+!/RTD        IRET=NF90_DEF_VAR(NCID, 'rotated_pole', NF90_CHAR, VARID(12))
+!/RTD        IRET=NF90_PUT_ATT(NCID, VARID(12), 'grid_north_pole_latitude',POLAT)
+!/RTD        IRET=NF90_PUT_ATT(NCID, VARID(12), 'grid_north_pole_longitude',POLON)
+!/RTD        IRET=NF90_PUT_ATT(NCID, VARID(12), 'grid_mapping_name',              &
 !/RTD                                   'rotated_latitude_longitude')
+!/RTD      END IF
 !
       ELSE 
         IF (GTYPE.EQ.RLGTYPE) THEN 
@@ -4884,59 +3534,56 @@
 !
 !  time
 !
-      IRET = NF90_DEF_VAR(NCID, 'time', NF90_DOUBLE, DIMID(4+EXTRADIM), VARID(3+EXTRADIM))
-!/NC4      IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(3+EXTRADIM), 1, 1, DEFLATE)
+      IRET = NF90_DEF_VAR(NCID, 'time', NF90_DOUBLE, DIMID(4+EXTRADIM), VARID(3))
+!/NC4      IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(3), 1, 1, DEFLATE)
       CALL CHECK_ERR(IRET)
       SELECT CASE (TRIM(CALTYPE))
         CASE ('360_day')
-          IRET=NF90_PUT_ATT(NCID,VARID(3+EXTRADIM),'long_name','time in 360 day calendar')
+          IRET=NF90_PUT_ATT(NCID,VARID(3),'long_name','time in 360 day calendar')
         CASE ('365_day')
-          IRET=NF90_PUT_ATT(NCID,VARID(3+EXTRADIM),'long_name','time in 365 day calendar')
+          IRET=NF90_PUT_ATT(NCID,VARID(3),'long_name','time in 365 day calendar')
         CASE ('standard')
-          IRET=NF90_PUT_ATT(NCID,VARID(3+EXTRADIM),'long_name','julian day (UT)')
+          IRET=NF90_PUT_ATT(NCID,VARID(3),'long_name','julian day (UT)')
       END SELECT
       CALL CHECK_ERR(IRET)
-      IRET=NF90_PUT_ATT(NCID,VARID(3+EXTRADIM),'standard_name','time')
+      IRET=NF90_PUT_ATT(NCID,VARID(3),'standard_name','time')
       CALL CHECK_ERR(IRET)
-      IRET=NF90_PUT_ATT(NCID,VARID(3+EXTRADIM),'units','days since 1990-01-01 00:00:00')
+      IRET=NF90_PUT_ATT(NCID,VARID(3),'units','days since 1990-01-01 00:00:00')
       CALL CHECK_ERR(IRET)
-      IRET=NF90_PUT_ATT(NCID,VARID(3+EXTRADIM),'conventions', &
+      IRET=NF90_PUT_ATT(NCID,VARID(3),'conventions', &
         'relative julian days with decimal part (as parts of the day )')
-      IRET=NF90_PUT_ATT(NCID,VARID(3+EXTRADIM),'axis','T')
+      IRET=NF90_PUT_ATT(NCID,VARID(3),'axis','T')
       CALL CHECK_ERR(IRET)
-      IRET=NF90_PUT_ATT(NCID,VARID(3+extradim),'calendar',TRIM(CALTYPE))
+      IRET=NF90_PUT_ATT(NCID,VARID(3),'calendar',TRIM(CALTYPE))
       CALL CHECK_ERR(IRET)
 !
 ! triangles for irregular grids
 !
       IF (GTYPE.EQ.UNGTYPE) THEN
-        IVAR=3+EXTRADIM+1
         DIMTRI(1)=DIMID(4+EXTRADIM+1)
         DIMTRI(2)=DIMID(3)
-        IRET = NF90_DEF_VAR(NCID, 'tri', NF90_INT, DIMTRI, VARID(IVAR))
-!/NC4        IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(IVAR), 1, 1, DEFLATE)
+        IRET = NF90_DEF_VAR(NCID, 'tri', NF90_INT, DIMTRI, VARID(4))
+!/NC4        IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(4), 1, 1, DEFLATE)
       END IF
 !
 !  Status map: useful for grid combination
 !
       IF (MAPSTAOUT.EQ.1) THEN 
         IF (GTYPE.EQ.UNGTYPE) THEN 
-          IVAR=5+EXTRADIM
-          IRET = NF90_DEF_VAR(NCID,'MAPSTA', NF90_SHORT,(/ DIMID(2) /), VARID(IVAR)) 
+          IRET = NF90_DEF_VAR(NCID,'MAPSTA', NF90_SHORT,(/ DIMID(2) /), VARID(20))
         ELSE 
-          IVAR=4+EXTRADIM
           IRET = NF90_DEF_VAR(NCID,'MAPSTA', NF90_SHORT,(/ DIMID(2) , DIMID(3) /), &
-                                                                       VARID(IVAR)) 
+                                                                       VARID(20))
           ENDIF
-!/NC4          IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(IVAR), 1, 1, DEFLATE)
+!/NC4          IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(20), 1, 1, DEFLATE)
 !
-        IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'long_name','status map')
-        IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'standard_name','status map')
-        IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'units','1')
+        IRET=NF90_PUT_ATT(NCID,VARID(20),'long_name','status map')
+        IRET=NF90_PUT_ATT(NCID,VARID(20),'standard_name','status map')
+        IRET=NF90_PUT_ATT(NCID,VARID(20),'units','1')
         CALL CHECK_ERR(IRET)
-        IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'valid_min',-32)
+        IRET=NF90_PUT_ATT(NCID,VARID(20),'valid_min',-32)
         CALL CHECK_ERR(IRET)
-        IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'valid_max',32)
+        IRET=NF90_PUT_ATT(NCID,VARID(20),'valid_max',32)
         CALL CHECK_ERR(IRET)
       END IF
 
@@ -4971,6 +3618,10 @@
 !/SMC         ENDIF
       ENDIF
 
+      ! ChrisB: Write user global attributes:
+      CALL WRITE_GLOBAL_META(NCID, IRET)
+      CALL CHECK_ERR(IRET)
+
       open(unit=994,file='NC_globatt.inp',status='old',iostat=ICODE)
       IF (ICODE.EQ.0) THEN
         DO WHILE (ICODE.EQ.0)
@@ -4996,7 +3647,7 @@
 
 !==============================================================================
 
-      SUBROUTINE CHECK_ERR(IRET)
+      SUBROUTINE CHECK_ERROR(IRET, ILINE)
 
       USE NETCDF
       USE W3ODATMD, ONLY: NDSE
@@ -5004,17 +3655,18 @@
 
       IMPLICIT NONE
 
-      INTEGER IRET
+      INTEGER IRET, ILINE
 
       IF (IRET .NE. NF90_NOERR) THEN
         WRITE(NDSE,*) ' *** WAVEWATCH III ERROR IN OUNF :'
+        WRITE(NDSE,*) ' LINE NUMBER ', ILINE
         WRITE(NDSE,*) ' NETCDF ERROR MESSAGE: '
         WRITE(NDSE,*) NF90_STRERROR(IRET)
         CALL EXTCDE ( 59 )
       END IF
       RETURN
 
-      END SUBROUTINE CHECK_ERR
+      END SUBROUTINE CHECK_ERROR
 
 !==============================================================================
 
