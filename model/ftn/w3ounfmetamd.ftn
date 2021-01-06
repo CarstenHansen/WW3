@@ -10,6 +10,8 @@
 !/                  +-----------------------------------+
 !/
 !/    02-Nov-2020 : Creation                            ( version 7.12 )
+!/    15-Jan-2021 : Allow up to 5 (subfield-)components
+!/                                           (C.Hansen) ( version 7.XX )
 !/
 !  1. Purpose :
 !
@@ -19,7 +21,7 @@
 !
 !     Default netCDF meta data is provided for each WW3 output variable
 !     and is stored intentally via the META_T type. The meta values are
-!     grouped by component (max 3), field (IFI) and group (IFJ).
+!     grouped by component (max 5), field (IFI) and group (IFJ).
 !     
 !     The user can override this meta data via an input text file
 !     with the filename `ounfmeta.inp`.
@@ -201,7 +203,7 @@
       DO I = 1,NOGRP
         ALLOCATE(GROUP(I)%FIELD(NOGE(I)))
         DO J = 1,NOGE(I)
-          ALLOCATE(GROUP(I)%FIELD(J)%META(3)) ! Hardcode to 3 components for the moment
+          ALLOCATE(GROUP(I)%FIELD(J)%META(5)) ! Hardcode to 5 components for the moment
         ENDDO
       ENDDO 
 
@@ -525,7 +527,7 @@
             WRITE(NDSE,5014) NOGE(IFI), TRIM(FN_META), ILINE
             CALL EXTCDE(1)
           ENDIF
-          IF(IFC .LT. 1 .OR. IFC .GT. 3) THEN
+          IF(IFC .LT. 1 .OR. IFC .GT. 5) THEN
             WRITE(NDSE,5015) TRIM(FN_META), ILINE
             CALL EXTCDE(1)
           ENDIF
@@ -579,7 +581,7 @@
                '  => ', A /)
 !
  5015 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : ' /          &
-               '     IFC value should be in range 1,3' /              &
+               '     IFC value should be in range 1,5' /              &
                '     FILENAME = ', A /                                &
                '     LINE =', I5 /                                    &
                '  => ', A /)
@@ -1137,7 +1139,7 @@
         WRITE(NDSE,1001) NOGE(IFI)
         CALL EXTCDE(1)
       ENDIF
-      IF(IFC .LT. 1 .OR. IFC .GT. 3) THEN
+      IF(IFC .LT. 1 .OR. IFC .GT. 5) THEN
         WRITE(NDSE,1002)
         CALL EXTCDE(1)
       ENDIF
@@ -1158,7 +1160,7 @@
                '     GETMETA: IFJ value should be in range 1,',I2    / )
 !               
  1002 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : '           / &
-               '     GETMETA: IFC value should be in range 1,3'      / )
+               '     GETMETA: IFC value should be in range 1,5'      / )
 !               
       END FUNCTION GETMETA
 
@@ -2564,6 +2566,55 @@
       META(2)%VARNS='northward_partitioned_surface_stokes_drift'
       META(2)%VARNG='northward_partitioned_surface_stokes_drift'
       META(2)%VARNC='usp=sqrt(ussp**2+vssp**2)'
+! IFI=6, IFJ=13 
+!/XSTO      META => GROUP(6)%FIELD(13)%META
+!/XSTO      ! First sub-field 'Wavenumber of the zero-upcrossing period'
+!/XSTO          META(1)%FSC  = 0.0002
+!/XSTO          META(1)%VMIN = 0.0002
+!/XSTO          META(1)%VMAX = 6.5532 ! 32766*0.0002             
+!/XSTO          META(1)%UNITS  = 'm-1'
+!/XSTO          META(1)%ENAME  = '.ksc'
+!/XSTO          META(1)%VARNM='ksc'
+!/XSTO          META(1)%VARNL='Wavenumber of zero-upcross'
+!/XSTO          META(1)%VARNS=''
+!/XSTO          META(1)%VARNG=''
+!/XSTO          META(1)%VARNC='Profile depths Z = zk / ksc'
+!/XSTO          META(1)%VARND=''
+!/XSTO      ! Second sub-field 'Total Stokes drift'
+!/XSTO          META(2)=META(1)
+!/XSTO          META(2)%ENAME  = '.xsm'
+!/XSTO          META(2)%FSC    = 1.
+!/XSTO          META(2)%VMIN = -1000 
+!/XSTO          META(2)%VMAX =  1000
+!/XSTO          META(2)%UNITS  = 'm2 s-1'
+!/XSTO          META(2)%VARNM='uxsm'
+!/XSTO          META(2)%VARNL='eastward wave pseudo momentum'
+!/XSTO          META(2)%VARNS='eastward_wave_pseudo_momentum'
+!/XSTO          META(2)%VARNG=''
+!/XSTO          META(2)%VARNC='K = ksc'
+!/XSTO          META(2)%VARND = DIRCOM
+!/XSTO          META(3)=META(2)
+!/XSTO          META(3)%VARNM='vxsm'
+!/XSTO          META(3)%VARNL='northward wave pseudo momentum'
+!/XSTO          META(3)%VARNS='northward_wave_pseudo_momentum'
+!/XSTO      ! Third sub-field 'Vertical profile of Stokes drift'
+!/XSTO          META(4)=META(2)
+!/XSTO          META(4)%FSC    = 1./30000.
+!/XSTO          META(4)%ENAME  = '.svp'
+!/XSTO          META(4)%VMIN = -1. 
+!/XSTO          META(4)%VMAX =  1.
+!/XSTO          META(4)%UNITS   = 'm s-1'
+!/XSTO          META(4)%VARNM(1)='usvp'
+!/XSTO          META(4)%VARNL='eastward stokes drift profile'
+!/XSTO          META(4)%VARNS='eastward_stokes_drift_profile'
+!/XSTO          META(4)%VARNG=''
+!/XSTO          META(4)%VARNC='Try piece-wise interpolation of u(Z) + jv(Z)'
+!/XSTO          META(4)%VARND = DIRCOM
+!/XSTO          META(5)=META(4)
+!/XSTO          META(5)%VARNM='vsvp'
+!/XSTO          META(5)%VARNL='northward stokes drift profile'
+!/XSTO          META(5)%VARNS='northward_stokes_drift_profile'
+!/XSTO          META(5)%VARNC='u(Z) + jv(Z) = (u(0) + jv(0)) e^{j B zk} e^{A zk^0.5}'
 !
 !---------- GROUP 7 ----------------
 !   
