@@ -989,6 +989,7 @@
 !/XSTO      CASE('XSP')
 !/XSTO        I = 6
 !/XSTO        J = 13
+!/XSTO! w3ounfmetadata GROUP(6)%FIELD(J=14,15)%META also used by CASE('XSP')
 !
 ! Group 7
 !

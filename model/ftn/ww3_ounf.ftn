@@ -42,6 +42,8 @@
 !/    15-Jan-2021 : Extend handling of 3'rd dimension   ( version 7.XX )
 !/    15-Jan-2021 : XSTO option: Stokes drift profile   ( version 7.XX )
 !/                  for extended spectral tail
+!/    15-Jan-2021 : MFIT+XSTO options: Stokes drift     ( version 7.XX )
+!/                  profile parametric fit
 !/
 !/    Copyright 2009-2013 National Weather Service (NWS),
 !/       National Oceanic and Atmospheric Administration.  All rights
@@ -127,6 +129,7 @@
 !  9. Switches :
 !
 !     !/S     Enable subroutine tracing.
+!     !/XSTO  Stokes drift profile for spectrum with extended tail
 !
 ! 10. Source code :
 !
@@ -805,7 +808,7 @@
                                  MAPSTAOUT, NDSDAT,                    &
                                  NFIELD, IRET, IK, EXTRADIM, IVAR,  &
                                  IVAR1, IDVAROUT
-      INTEGER                 :: NCJID, IFP, NFP
+      INTEGER                 :: NCJID, IFP, NFP, IFK
       INTEGER                 :: N3, TDIM, EDIM, DIMID3
       INTEGER                 :: DIMID(6), VARID(300), START(4),       &
                                  COUNT(4), DIMLN(6), DIMFIELD(4),      &
@@ -970,8 +973,6 @@
       FNAMENC=''
       FNAMENC(1:S1)=FILEPREFIX(1:S1)
       FNAMENC(S1+1:S1+S4) = TIMEID(1:S4)
-
-      !
 
 ! 1.4 Increment the time step or set a flag when an new time stamp in files
 
@@ -1935,8 +1936,6 @@
                 XXK(:,:,IK)=XX
                 XYK(:,:,IK)=XY
               END DO
-              FSC    = 0.0005
-              ENAME  = '.usp'
 !
 !/XSTO     ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 13 ) THEN
 !/XSTO        ! The three subfields (NFP=3) are joined in the netCDF file
@@ -1945,6 +1944,7 @@
 !/XSTO        IF ( IFP .EQ. 1 ) THEN
 !/XSTO          ! 'Wavenumber of the zero-upcrossing period'
 !/XSTO          ! For an XSTO spectral tail
+!/XSTO          NFIELD=1
 !/XSTO      ! NOTE: The magnitude of ksc spans from O(1e-2) to O(1e+1)
 !/XSTO      !       It can be scaled to a 16-bit integer only with an
 !/XSTO      !       accuracy of order O(1e-3), and a value of FSC larger
@@ -1955,36 +1955,13 @@
 !/XSTO          ELSE
 !/XSTO            CALL W3S2XY ( NSEA, NSEA, NX+1, NY, UXSP(1:NSEA,1), MAPSF, X1 )
 !/XSTO          ENDIF ! SMCGRD
-!/XSTO          NFIELD=1
 !/XSTO!
 !/XSTO        ELSE IF ( IFP .EQ. 2 ) THEN
-!/XSTO          ! Vertically integrated Stokes drift == wave pseudo momentum
-!/XSTO          ! For an XSTO spectral tail
-!/XSTO          ! This variable is nearly the same as TUS, the
-!/XSTO          ! 'Stokes transport', but with the XSTO extended tail
-!/XSTO!/RTD          ! Rotate x,y vector back to standard pole
-!/XSTO!/RTD          IF ( FLAGUNR ) CALL W3XYRTN(NSEA, UXSP(1:NSEA,2), &
-!/XSTO!/RTD                                      UXSP(1:NSEA,3), AnglD)
-!/XSTO          IF( SMCGRD ) THEN
-!/XSTO!/SMC            CALL W3S2XY_SMC( UXSP(1:NSEA,2), XX )
-!/XSTO!/SMC            CALL W3S2XY_SMC( UXSP(1:NSEA,3), XY )
-!/XSTO          ELSE
-!/XSTO            CALL W3S2XY ( NSEA, NSEA, NX+1, NY, UXSP(1:NSEA,2), MAPSF, XX )
-!/XSTO            CALL W3S2XY ( NSEA, NSEA, NX+1, NY, UXSP(1:NSEA,3), MAPSF, XY )
-!/XSTO          ENDIF ! SMCGRD
-!/XSTO          NFIELD=2
-!/XSTO          IFK = 1
-!/XSTO! NOTE: The magnitude of wave pseudo momentum spans from O(1e-3) to O(1e+3)
-!/XSTO!       Thus it cannot be scaled to a 16-bit integer
-!/XSTO!       We might alternatively consider to store xsm * ksc
-!/XSTO          IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
-!/XSTO!
-!/XSTO        ELSE IF ( IFP .EQ. 3 ) THEN
 !/XSTO          ! Vertical profile of Stokes drift
 !/XSTO          ! For an XSTO spectral tail
 !/XSTO          DIM3NAME='zk'
 !/XSTO          NFIELD=2
-!/XSTO          IFK=3
+!/XSTO          IFK=1
 !/XSTO          I1F=1
 !/XSTO          I2F=NZO
 !/XSTO          DO IK = 4,NZO+3
@@ -2001,11 +1978,30 @@
 !/XSTO            XYK(:,:,IK-3)=XY
 !/XSTO          END DO
 !/XSTO!
+!/XSTO        ELSE IF ( IFP .EQ. 3 ) THEN
+!/XSTO          ! Vertically integrated Stokes drift == wave pseudo momentum
+!/XSTO          ! For an XSTO spectral tail
+!/XSTO          ! This variable is nearly the same as TUS, the
+!/XSTO          ! 'Stokes transport', but with the XSTO extended tail
+!/XSTO          NFIELD=2
+!/XSTO          IFK = 2
+!/XSTO!/RTD          ! Rotate x,y vector back to standard pole
+!/XSTO!/RTD          IF ( FLAGUNR ) CALL W3XYRTN(NSEA, UXSP(1:NSEA,2), &
+!/XSTO!/RTD                                      UXSP(1:NSEA,3), AnglD)
+!/XSTO          IF( SMCGRD ) THEN
+!/XSTO!/SMC            CALL W3S2XY_SMC( UXSP(1:NSEA,2), XX )
+!/XSTO!/SMC            CALL W3S2XY_SMC( UXSP(1:NSEA,3), XY )
+!/XSTO          ELSE
+!/XSTO            CALL W3S2XY ( NSEA, NSEA, NX+1, NY, UXSP(1:NSEA,2), MAPSF, XX )
+!/XSTO            CALL W3S2XY ( NSEA, NSEA, NX+1, NY, UXSP(1:NSEA,3), MAPSF, XY )
+!/XSTO          ENDIF ! SMCGRD
+!/XSTO! NOTE: The magnitude of wave pseudo momentum spans from O(1e-3) to O(1e+3)
+!/XSTO!       Thus it cannot be scaled to a 16-bit integer
+!/XSTO!       We might alternatively consider to store xsm * ksc
+!/XSTO          IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
+!/XSTO!
 !/XSTO          END IF ! IFP .EQ. 3
 !/XSTO!
-!
-!
-! 7) Wave-bottom layer
 !
 !
 ! 7) Wave-bottom layer
@@ -2150,7 +2146,7 @@
 
             ! CB Get netCDF metadata for IFI, IFJ combination (all components).
             DO I=1,NFIELD
-              META(I) = GETMETA(IFI, IFJ, ICOMP=IFK+I, IPART=IPART)
+              META(I) = GETMETA(IFI, IFJ+IFK, ICOMP=I, IPART=IPART)
             ENDDO
 
 ! 2.2 Make map
@@ -2343,15 +2339,17 @@
             
             ! By default the variable has no third dimension:
             DIMLN(4)=0
-            EXTRADIM = 0
+            EXTRADIM=0
             
             ! By default we only add a new third dimension to the netCDF file
             ! if this is the first timestep in the file
             NEW3D = .FALSE.
 
-            ! If there is a third dimension:            
+            ! If the flag frequency is .TRUE., defines the fourth dimension
+            ! This is the third spatial dimension:            
             IF ( FLFRQ &
               ! ( You may here add condition for other third dimensions: )
+              ! .OR. ( TRIM(DIM3NAME) .EQ. 'fs' ) &
 !/XSTO           .OR. ( TRIM(DIM3NAME) .EQ. 'zk' ) &
                  ) THEN
               EXTRADIM = 1
@@ -2499,9 +2497,6 @@
 
               ! Set the size of the 'level' dim
               DIMLN(1)=1
-
-              ! ! Initializes the time iteration counter n
-              ! N=1
 
 ! 2.5.1 Creates the NetCDF file 
               CALL W3CRNC(FNAMENC,NCID,DIMID,DIMLN,VARID, &
@@ -3360,14 +3355,14 @@
 !/XSTO! profile depth below surface
 !/XSTO!
 !/XSTO      ELSE IF ( TRIM(DIMNAME) .EQ. 'zk' ) THEN
-!/XSTO        IRET=NF90_PUT_ATT(NCID,VARID,'long_name','normalized_depth')
+!/XSTO        IRET=NF90_PUT_ATT(NCID,VARID3,'long_name','normalized_depth')
 !/XSTO        CALL CHECK_ERR(IRET)
-!/XSTO        IRET=NF90_PUT_ATT(NCID,VARID,'standard_name','normalized_depth_below_surface')
-!/XSTO        IRET=NF90_PUT_ATT(NCID,VARID,'comment','zk = Z * ksc')
+!/XSTO        IRET=NF90_PUT_ATT(NCID,VARID3,'standard_name','normalized_depth_below_surface')
+!/XSTO        IRET=NF90_PUT_ATT(NCID,VARID3,'comment','zk = Z * ksc')
 !/XSTO        CALL CHECK_ERR(IRET)
-!/XSTO        IRET=NF90_PUT_ATT(NCID,VARID,'units','1')
+!/XSTO        IRET=NF90_PUT_ATT(NCID,VARID3,'units','1')
 !/XSTO        CALL CHECK_ERR(IRET)
-!/XSTO        IRET=NF90_PUT_ATT(NCID,VARID,'axis','down')
+!/XSTO        IRET=NF90_PUT_ATT(NCID,VARID3,'axis','down')
 !/XSTO        CALL CHECK_ERR(IRET)
 !
 ! Here you may put netcdf attibutes for another third dim
