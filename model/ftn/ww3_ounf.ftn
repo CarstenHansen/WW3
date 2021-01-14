@@ -977,15 +977,21 @@
         DO IFJ=1, NGRPP
 
           IF ( .NOT. FLG2D(IFI,IFJ) ) CYCLE
+
+          ! Here, the flag for the field IFI of the group IFJ is .TRUE.
+          
           ! Instanciates the partition array
           INDEXIPART=1
 
           ! NFP: Number of partitions or sub-fields under each fields flag.
           ! Is to be incremented by one for each partition or extra subfield
-          NFP = 1 
+          NFP = 1
+          ! Subfield index, to be incremented
           IFP = 0
           DO WHILE ( IFP .LT. NFP )
             IFP = IFP + 1
+
+            NFIELD = 1
 
             ! Increment NFP by one if a following partition is requested
             ! (Loops over IPART for partition variables)
@@ -1018,6 +1024,11 @@
             FLFRQ = .FALSE.
             ! C Hansen: Comment out obsolete FLDIR
             ! FLDIR = .FALSE.
+!
+            ! NCVARTYPEI.EQ.3 means the NetCDF data type depends on the
+            ! field. Datatype real is set for a field
+            ! (IFI,IFJ,IFP) by coding: 'IF (NCVARTYPEI.EQ.3) NCVARTYPE=4'
+            ! The default data type is short integer: 
             IF (NCVARTYPEI.EQ.3) NCVARTYPE=2
 !
             ! Depth
@@ -1732,27 +1743,25 @@
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, TUSY(1:NSEA)      &
                                                         , MAPSF, XY )
               ENDIF ! SMCGRD
-! X1, X2 will not be output when NFIELD == 2
-! ( Like for .cur, .wnd, .ust, .taw, and .uss ) (CHA at FCOO 2019-06-13): 
               !! Commented out unnecessary statements below for time being
-              !! (...) X1,X2 are not actually written out below
-              !DO ISEA=1, NSEA
-              !  CABS   = SQRT(TUSX(ISEA)**2+TUSY(ISEA)**2)
-              !  IF ( CABS .NE. UNDEF ) THEN
-              !      TUSY(ISEA) = MOD ( 630. -                         &
-              !            RADE*ATAN2(TUSY(ISEA),TUSX(ISEA)) , 360. )
-              !    ELSE
-              !      TUSY(ISEA) = UNDEF
-              !    END IF
-              !  TUSX(ISEA) = CABS
-              !  END DO
-              !IF( SMCGRD ) THEN
-!/SMC                !CALL W3S2XY_SMC( TUSX(:), X1 )
-!/SMC                !CALL W3S2XY_SMC( TUSY(:), X2 ) ! TODO: CHRISB: TUSY is in degrees....W3S2XY_SMC expects radians...
-              !ELSE
-              !  CALL W3S2XY ( NSEA, NSEA, NX+1, NY,TUSX,MAPSF, X1 )
-              !  CALL W3S2XY ( NSEA, NSEA, NX+1, NY,TUSY,MAPSF, X2 )
-              !ENDIF ! SMCGRD
+              !! like for CX,CY (IFI==1 .AND. IFJ==2), and others
+              ! DO ISEA=1, NSEA
+              !   CABS   = SQRT(TUSX(ISEA)**2+TUSY(ISEA)**2)
+              !   IF ( CABS .NE. UNDEF ) THEN
+              !       TUSY(ISEA) = MOD ( 630. -                         &
+              !             RADE*ATAN2(TUSY(ISEA),TUSX(ISEA)) , 360. )
+              !     ELSE
+              !       TUSY(ISEA) = UNDEF
+              !     END IF
+              !   TUSX(ISEA) = CABS
+              !   END DO
+              ! IF( SMCGRD ) THEN
+! !/SMC                CALL W3S2XY_SMC( TUSX(:), X1 )
+! !/SMC                CALL W3S2XY_SMC( TUSY(:), X2 ) ! TODO: CHRISB: TUSY is in degrees....W3S2XY_SMC expects radians...
+              ! ELSE
+              !   CALL W3S2XY ( NSEA, NSEA, NX+1, NY,TUSX,MAPSF, X1 )
+              !   CALL W3S2XY ( NSEA, NSEA, NX+1, NY,TUSY,MAPSF, X2 )
+              ! ENDIF ! SMCGRD
               NFIELD=2
 !
             ! Surface stokes drift
@@ -1773,7 +1782,7 @@
                                                         , MAPSF, XY )
               ENDIF ! SMCGRD
               !! Commented out unnecessary statements below for time being
-              !! TAUWIX, TAUWIY are in north-east convention and X1,X2
+              !! USSX, USSY are in north-east convention and X1,X2
               !! are not actually written out below
               !DO ISEA=1, NSEA
               !  CABS   = SQRT(USSX(ISEA)**2+USSY(ISEA)**2)
@@ -1895,6 +1904,9 @@
                 XXK(:,:,IK)=XX
                 XYK(:,:,IK)=XY
               END DO
+!
+!
+! 7) Wave-bottom layer
 !
             ! RMS of bottom displacement amplitude
             ELSE IF ( IFI .EQ. 7 .AND. IFJ .EQ. 1 ) THEN
@@ -2076,11 +2088,12 @@
 
 ! 2.3.1 Set flag for the variable to be together or in a separate netCDF file
 
-            ! FLSEP and NCJID: Options to overrule output to a separate file
+            ! FLSEP and NCJID: Control if output goes to to a separate file
             ! 
             ! FLSEP is a logical flag indicating that a field should be put
-            ! in a separate netCDF file. This represents the use of a flag FLFRQ
-            ! for spectral fields with a 'fourth' dimension frequency ('f').
+            ! in a separate netCDF file. This represents one of two uses of
+            ! a flag FLFRQ for spectral fields with the third dimension
+            ! frequency ('f').
             !  
             ! NCJID (a 'Joint netCDF ID') may be applied for a field that
             ! contains two or more subfields with different units or scales.
@@ -2091,15 +2104,22 @@
             ! with IFP >= 2, which is NOT a swell partition, is put in the
             ! same file as the field with IFP == 1, even if TOGETHER is .FALSE.
             ! 
-            ! An example of this is applied for the two subfields of
-            ! the field P2S (IFI,IFJ = 6,7). As these fields already go
-            ! to the same netCDF file even when TOGETHER is .FALSE., this
-            ! change doesn't affect the output except that the standard output
-            ! messages 'Writing new record ...' reports each subfield as a
-            ! separate records.
+            ! An example for FLSEP could apply to the field 
+            ! USP (IFI,IFJ = 6,12) as follows in two settings a,b below (this
+            ! doesn't change the actual output except for the dimension name):
+            ! a) Specify the name of the third dimension, e.g. segmented wave
+            ! frequencies DIM3NAME(1:2)='fs' (for how to further modify the
+            ! code, look for 'fs' in the comments lines).
+            ! b) Set FLSEP=.TRUE. to indicate that the field must be in a
+            ! separate netCDF file (similar to FLFRQ=.TRUE. when DIM3NAME=='f').
+            ! If you choose FLSEP=.FALSE., the field can go to a common
+            ! netCDF if mode TOGETHER is chosen by the user.
+            !
 
             ! FLSEP: Default is .FALSE.
             FLSEP = .FALSE.
+            ! The variable goes to a separate file if it has a
+            ! frequency 'f' dimension
             FLSEP = (FLSEP .OR. FLFRQ)
 
             ! The variable goes to a separate file if TOGETHER is .FALSE.
@@ -2220,7 +2240,7 @@
                 IF (IRET == 0) CLOSE(1234, STATUS='delete')
                 FEXIST=.FALSE.
               END IF
-            END IF            
+            END IF
 
             ! Set FIRST_TOGETHER FALSE for following fields in the file
             IF ( .NOT. FLSEP .AND. FIRST_TOGETHER ) FIRST_TOGETHER = .FALSE.
@@ -2573,7 +2593,7 @@
                 CALL CHECK_ERR(IRET)
               END IF
 
-              ! Writes status map array at variable index 2+1+coordtype+idim-4
+              ! Writes status map array
               IF (MAPSTAOUT.EQ.1) THEN 
                 START(1)=1
                 START(2)=1
@@ -2703,7 +2723,7 @@
                   IRET=NF90_INQ_DIMID (NCID, 'x', DIMID(2))
                   IRET=NF90_INQ_VARID (NCID, 'x', VARID(1))
                   IRET=NF90_INQ_DIMID (NCID, 'y', DIMID(3)) 
-                  IRET=NF90_INQ_VARID (NCID, 'y', VARID(1))
+                  IRET=NF90_INQ_VARID (NCID, 'y', VARID(2))
                 END IF 
                 CALL CHECK_ERR(IRET)
               END IF

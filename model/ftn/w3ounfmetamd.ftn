@@ -203,7 +203,7 @@
         DO J = 1,NOGE(I)
           ALLOCATE(GROUP(I)%FIELD(J)%META(3)) ! Hardcode to 3 components for the moment
         ENDDO
-      ENDDO 
+      ENDDO
 
       ! Allocate storage for Global meta-data
       ALLOCATE(GLOBAL_META(MAX_GBLMETA))
@@ -2406,8 +2406,8 @@
       META(1)%UNITS  = 'm2 s-1'
       META(1)%ENAME  = '.tus'
       META(1)%VARND = DIRCOM
-      META(1)%VMIN = -9.9
-      !TODO WHERE IS VMAX?
+      META(1)%VMIN = -32. ! C. Hansen: changed from -9.9
+      META(1)%VMAX =  32.
       
       ! First component
       META(1)%VARNM='utus'
