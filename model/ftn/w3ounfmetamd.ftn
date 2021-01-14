@@ -1,4 +1,4 @@
-!/ ------------------------------------------------------------------- /
+ !/ ------------------------------------------------------------------- /
       MODULE W3OUNFMETAMD
 !/
 !/                  +-----------------------------------+
@@ -21,7 +21,7 @@
 !
 !     Default netCDF meta data is provided for each WW3 output variable
 !     and is stored intentally via the META_T type. The meta values are
-!     grouped by component (max 5), field (IFI) and group (IFJ).
+!     grouped by component (max 3), field (IFI) and group (IFJ).
 !     
 !     The user can override this meta data via an input text file
 !     with the filename `ounfmeta.inp`.
@@ -210,21 +210,47 @@
         ENDDO
       ENDDO
 !/XSTO!
-!/XSTO        CALL W3FLDTOIJ('XSP', I, J, 1, 1, 1)
-!/XSTO        ! Assert usage flags are false for J+K    
-!/XSTO        DO K = 1,2
-!/XSTO          ALLOCATE(GROUP(I)%FIELD(J+K)%META(2))
-!/XSTO        ENDDO
-!/MFIT        CALL W3FLDTOIJ('MFIT', I, J, 1, 1, 1)
-!/MFIT        ALLOCATE(GROUP(I)%FIELD(J+1)%META(2))
-!/MFIT        DO K = 2,6
-!/MFIT          ALLOCATE(GROUP(10)%FIELD(J+K)%META(1))
+!/XSTO        CALL W3FLDTOIJ('XSP   ', I, J, 1, 1, 1)
+!/XSTO! C Hansen: Before PR: Let extended-tail-tus a separate parameter 'xts'
+!/XSTO! C Hansen: Before PR: Allocate for a list of the true flags only, plus
+!/XSTO!        the sub-parameter zk
+!/XSTO        IF ( ALLOCATED(GROUP(I)%FIELD) .AND. J+2 .GT. NOGE(I) ) THEN
+!/XSTO          ! C Hansen: Reallocate GROUP(6)%FIELD)
+!/XSTO          DO J = 1,NOGE(I)
+!/XSTO            DEALLOCATE(GROUP(I)%FIELD(J)%META)
+!/XSTO          ENDDO
+!/XSTO          DEALLOCATE(GROUP(I)%FIELD)
+!/XSTO        END IF      
+!/XSTO          ALLOCATE(GROUP(I)%FIELD(J+2))
+!/XSTO          DO K = 1,NOGE(I)
+!/XSTO            ALLOCATE(GROUP(I)%FIELD(K)%META(3)) ! 2 components
+!/XSTO          ENDDO
+!/XSTO          DO K = NOGE(I)+1,J+2
+!/XSTO            ALLOCATE(GROUP(I)%FIELD(K)%META(2)) ! 2 components
+!/XSTO          ENDDO
+!/MFIT        CALL W3FLDTOIJ('MFIT  ', I, J, 1, 1, 1)
+!/MFIT        IF ( ALLOCATED(GROUP(I)%FIELD)) THEN      
+!/MFIT          ! C Hansen: Reallocate GROUP(10)%FIELD)
+!/MFIT          DO K = 1,NOGE(I)
+!/MFIT            DEALLOCATE(GROUP(I)%FIELD(K)%META)
+!/MFIT          ENDDO
+!/MFIT          DEALLOCATE(GROUP(I)%FIELD)
+!/MFIT        END IF      
+!/MFIT        ALLOCATE(GROUP(I)%FIELD(max(J+6,NOGE(I)+6)))      
+!/MFIT        DO K = 1,J+1
+!/MFIT          ALLOCATE(GROUP(I)%FIELD(K)%META(2)) ! 2 components
+!/MFIT        ENDDO
+!/MFIT        DO K = J+2,J+6
+!/MFIT          ALLOCATE(GROUP(I)%FIELD(K)%META(1)) ! 1 component
+!/MFIT        ENDDO
+!/MFIT        ! Another user parameter, J = 2
+!/MFIT        DO K = J+7,8
+!/MFIT          ALLOCATE(GROUP(I)%FIELD(K)%META(3)) ! 3 components
 !/MFIT        ENDDO
       
       ! Allocate storage for Global meta-data
       ALLOCATE(GLOBAL_META(MAX_GBLMETA))
       N_GBLMETA = 0
-
       ! 2. Set direction convention:
       DIRCOM = ""
 !/RTD      IF ( FLAGUNR ) THEN
@@ -595,7 +621,7 @@
                '  => ', A /)
 !
  5015 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : ' /          &
-               '     IFC value should be in range 1,5' /              &
+               '     IFC value should be in range 1,3' /              &
                '     FILENAME = ', A /                                &
                '     LINE =', I5 /                                    &
                '  => ', A /)
@@ -1150,8 +1176,12 @@
         CALL EXTCDE(1)
       ENDIF
       IF(IFJ .LT. 1 .OR. IFJ .GT. NOGE(IFI)) THEN
+!/XSTO      IF ( IFI .NE. 6 .OR. IFJ .LT. 1 .OR. IFJ .GT. NOGE(IFI)+2 ) THEN
+!/MFIT      IF ( IFI .NE. 10 .OR. IFJ .LT. 1 .OR. IFJ .GT. 7 ) THEN
         WRITE(NDSE,1001) NOGE(IFI)
         CALL EXTCDE(1)
+!/MFIT      END IF
+!/XSTO      END IF
       ENDIF
       IF(IFC .LT. 1 .OR. IFC .GT. 3) THEN
         WRITE(NDSE,1002)
@@ -2422,8 +2452,9 @@
       META(1)%UNITS  = 'm2 s-1'
       META(1)%ENAME  = '.tus'
       META(1)%VARND = DIRCOM
-      META(1)%VMIN = -9.9
-      !TODO WHERE IS VMAX?
+      META(1)%VMIN = -32.
+      META(1)%VMAX = 32.
+      ! !TODO WHERE IS VMAX?
       
       ! First component
       META(1)%VARNM='utus'
@@ -2602,13 +2633,13 @@
 !/XSTO      META(1)%VMIN = -1. 
 !/XSTO      META(1)%VMAX =  1.
 !/XSTO      META(1)%UNITS   = 'm s-1'
-!/XSTO      META(1)%VARNM(1)='usvp'
+!/XSTO      META(1)%VARNM='usvp'
 !/XSTO      META(1)%VARNL='eastward stokes drift profile'
 !/XSTO      META(1)%VARNS='eastward_stokes_drift_profile'
 !/XSTO      META(1)%VARNG=''
 !/XSTO      META(1)%VARNC='Try piece-wise interpolation of u(Z) + jv(Z)'
 !/XSTO      META(1)%VARND = DIRCOM
-!/XSTO      META(2)=META(4)
+!/XSTO      META(2)=META(1)
 !/XSTO      META(2)%VARNM='vsvp'
 !/XSTO      META(2)%VARNL='northward stokes drift profile'
 !/XSTO      META(2)%VARNS='northward_stokes_drift_profile'
@@ -2926,7 +2957,7 @@
 !/MFIT      META(2)%varnm = 'S0Y'
 !/MFIT      META(2)%varnl = 'Northward surface Stokes-drift / abs(MK)'
 !/MFIT      META(2)%varnc='Up(Z) = Up(0) exp( -AM (Z Kz)^PM )'
-! IFI=10, IFJ=2
+! IFI=10, IFJ=1, IFP=2
 !/MFIT      META => GROUP(10)%FIELD(2)%META
 !/MFIT      META(1) = GROUP(10)%FIELD(1)%META(1)
 !/MFIT      META(1)%varnm = 'SdX'
@@ -2938,33 +2969,40 @@
 !/MFIT      META(2)%varnm = 'SdY'
 !/MFIT      META(2)%varnl = 'Northward deep part Stokes-drift / abs(MK)'
 !/MFIT      META(2)%varnc = 'Ud(0) = Sd * abs(MK)'
-! IFI=10, IFJ=3
+! IFI=10, IFJ=1, IFP=3
 !/MFIT      META => GROUP(10)%FIELD(3)%META
-!/MFIT      META(1) = GROUP(10)%FIELD(1)%META(1)
+!/MFIT      META(1) = GROUP(10)%FIELD(2)%META(1)
 !/MFIT      META(1)%VARND = ''
+!/MFIT      META(1)%varnc = ''
 !/MFIT      META(1)%vmin = 0
 !/MFIT      META(1)%varnm = 'AM'
 !/MFIT      META(1)%varnl = 'MFIT parameter AM'
+!/MFIT      META(1)%ENAME = '.am'
 !/MFIT      META => GROUP(10)%FIELD(4)%META
 !/MFIT      META(1) = GROUP(10)%FIELD(3)%META(1)
 !/MFIT      META(1)%varnm = 'PM'
-!/MFIT      META(1)%varnl = 'MFIT parameter PM''
+!/MFIT      META(1)%varnl = 'MFIT parameter PM'
+!/MFIT      META(1)%ENAME = '.pm'
 !/MFIT      META => GROUP(10)%FIELD(5)%META
 !/MFIT      META(1) = GROUP(10)%FIELD(3)%META(1)
-!/MFIT      META(1)%varnm = 'AM'
+!/MFIT      META(1)%varnm = 'AMd'
 !/MFIT      META(1)%varnl = 'MFIT parameter AMd'
+!/MFIT      META(1)%ENAME = '.amd'
 !/MFIT      META => GROUP(10)%FIELD(6)%META
 !/MFIT      META(1) = GROUP(10)%FIELD(3)%META(1)
 !/MFIT      META(1)%varnm = 'PMd'
 !/MFIT      META(1)%varnl = 'MFIT parameter PMd'
+!/MFIT      META(1)%ENAME = '.pmd'
 !/MFIT      META => GROUP(10)%FIELD(7)%META
 !/MFIT      META(1) = GROUP(10)%FIELD(3)%META(1)
 !/MFIT      META(1)%varnm = 'SIC'
 !/MFIT      META(1)%varnl = 'MFIT quality integer'
+!/MFIT      META(1)%ENAME = '.sic'
 !/MFIT      META(1)%FSC  = 1
 !/MFIT      META(1)%vmin = -32766
 !/MFIT      META(1)%vmax = 32766
-! IFI=10, IFJ=4     
+! IFI=10, IFJ=2     
+      META => GROUP(10)%FIELD(2)%META
 !/MFIT      META => GROUP(10)%FIELD(8)%META
       META(1)%FSC    = 0.1
       META(1)%UNITS  = 'm'

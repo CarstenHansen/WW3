@@ -202,7 +202,7 @@
                                  IOUT, S3, IRET, HASNC4,               &
                                  NBIPART, CNTIPART, NCVARTYPEI, IPART, &
                                  RTDNX, RTDNY
-      INTEGER                 :: NFPMAX = 3 ! Depends on the hard-coded max
+      INTEGER                 :: NFPMAX = 7 ! Depends on the hard-coded max
       INTEGER                 :: TOUT(2), TDUM(2), STOPDATE(8)
 !
       INTEGER, ALLOCATABLE    :: TABIPART(:), NCIDS(:,:,:)
@@ -219,20 +219,6 @@
                                  VECTOR, TOGETHER, FLGNML
 
       LOGICAL                 :: SMCGRD = .FALSE.
-!/MFIT!
-!/MFIT!  FCOO Stokes drift parametric fit ('MFIT') NetCDF variable names
-!/MFIT!      
-!/MFIT      character(len=3), dimension(7) :: MFIT_varname = &
-!/MFIT              (/ "S0 ", "Sd ", "AM ", "PM ", "AMd", "PMd", "SIC" /)
-!/MFIT!
-!/MFIT      character(len=39), dimension(7) :: MFIT_longname = &
-!/MFIT              (/ "Surface Stokes-drift / abs(MK)         ", &
-!/MFIT                 "Deep part Stokes-drift / abs(MK)       ", &
-!/MFIT                 "MFIT parameter AM                      ", &
-!/MFIT                 "MFIT parameter PM                      ", &
-!/MFIT                 "MFIT parameter AMd                     ", &
-!/MFIT                 "MFIT parameter PMd                     ", &
-!/MFIT                 "Quality measure ITSIC                  "/)
 !/MFIT!
 !/MFIT      LOGICAL                 :: SVP = .TRUE.
 !/MFIT      character(len=10)       :: cmt_PMd = 'PMd = 1.30'
@@ -1038,6 +1024,8 @@
         DO IFJ=1, NGRPP
 
           IF ( .NOT. FLG2D(IFI,IFJ) ) CYCLE
+          ! Here, the flag for the field IFI of the group IFJ is .TRUE.
+          
           ! Instanciates the partition array
           INDEXIPART=1
 
@@ -1050,6 +1038,8 @@
           IFK = 0
           DO WHILE ( IFP .LT. NFP )
             IFP = IFP + 1
+
+            NFIELD = 1
 
             ! Increment NFP by one if a following partition is requested
             ! (Loops over IPART for partition variables)
@@ -1963,8 +1953,6 @@
                 XXK(:,:,IK)=XX
                 XYK(:,:,IK)=XY
               END DO
-              FSC    = 0.0005
-              ENAME  = '.usp'
 !
 !/XSTO     ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 13 ) THEN
 !/XSTO        ! The three subfields (NFP=3) are joined in the netCDF file
@@ -1974,6 +1962,7 @@
 !/XSTO        IF ( IFP .EQ. 1 ) THEN
 !/XSTO          ! 'Wavenumber of the zero-upcrossing period'
 !/XSTO          ! For an XSTO spectral tail
+!/XSTO          NFIELD=1
 !/XSTO      ! NOTE: The magnitude of ksc spans from O(1e-2) to O(1e+1)
 !/XSTO      !       It can be scaled to a 16-bit integer only with an
 !/XSTO      !       accuracy of order O(1e-3), and a value of FSC larger
@@ -1984,13 +1973,36 @@
 !/XSTO          ELSE
 !/XSTO            CALL W3S2XY ( NSEA, NSEA, NX+1, NY, UXSP(1:NSEA,1), MAPSF, X1 )
 !/XSTO          ENDIF ! SMCGRD
-!/XSTO          NFIELD=1
+!/XSTO!
+!/XSTO        ELSE IF ( IFP .EQ. 2 ) THEN
+!/XSTO          ! Vertical profile of Stokes drift
+!/XSTO          ! For an XSTO spectral tail
+!/XSTO          DIM3NAME='zk'
+!/XSTO          NFIELD=2
+!/XSTO          IFK=1
+!/XSTO          I1F=1
+!/XSTO          I2F=NZO
+!/XSTO          DO IK = 4,NZO+3
+!/XSTO!/RTD       ! Rotate x,y vector back to standard pole
+!/XSTO!/RTD       IF ( FLAGUNR ) CALL W3XYRTN(NSEA, UXSP(:,IK), UXSP(:,NZO+IK), AnglD)
+!/XSTO            IF( SMCGRD ) THEN
+!/XSTO!/SMC         CALL W3S2XY_SMC( UXSP(:,IK), XX )
+!/XSTO!/SMC         CALL W3S2XY_SMC( UXSP(:,NZO+IK), XY )
+!/XSTO            ELSE
+!/XSTO              CALL W3S2XY ( NSEA, NSEA, NX+1,NY,UXSP(:,IK), MAPSF, XX )
+!/XSTO              CALL W3S2XY ( NSEA, NSEA, NX+1,NY,UXSP(:,NZO+IK), MAPSF, XY )
+!/XSTO            ENDIF ! SMCGRD
+!/XSTO            XXK(:,:,IK-3)=XX
+!/XSTO            XYK(:,:,IK-3)=XY
+!/XSTO          END DO
 !/XSTO!
 !/XSTO        ELSE IF ( IFP .EQ. 3 ) THEN
 !/XSTO          ! Vertically integrated Stokes drift == wave pseudo momentum
 !/XSTO          ! For an XSTO spectral tail
 !/XSTO          ! This variable is nearly the same as TUS, the
 !/XSTO          ! 'Stokes transport', but with the XSTO extended tail
+!/XSTO          NFIELD=2
+!/XSTO          IFK = 2
 !/XSTO!/MFIT    ! Multiply by 2*ksc
 !/XSTO!/MFIT    UXSP(1:NSEA,2) = UXSP(1:NSEA,2)*UXSP(1:NSEA,1)*2.
 !/XSTO!/MFIT    UXSP(1:NSEA,3) = UXSP(1:NSEA,3)*UXSP(1:NSEA,1)*2.
@@ -2049,36 +2061,13 @@
 !/XSTO            CALL W3S2XY ( NSEA, NSEA, NX+1, NY, UXSP(1:NSEA,2), MAPSF, XX )
 !/XSTO            CALL W3S2XY ( NSEA, NSEA, NX+1, NY, UXSP(1:NSEA,3), MAPSF, XY )
 !/XSTO          ENDIF ! SMCGRD
-!/XSTO          NFIELD=2
-!/XSTO          IFK = 3
 !/XSTO!/MFIT          IF ( .FALSE. ) THEN
 !/XSTO! NOTE: The magnitude of wave pseudo momentum spans from O(1e-3) to O(1e+3)
 !/XSTO!       Thus it cannot be scaled to a 16-bit integer
 !/XSTO!       We might alternatively consider to store xsm * ksc
 !/XSTO          IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
 !/XSTO!
-!/XSTO        ELSE IF ( IFP .EQ. 2 ) THEN
-!/XSTO          ! Vertical profile of Stokes drift
-!/XSTO          ! For an XSTO spectral tail
-!/XSTO          DIM3NAME='zk'
-!/XSTO          NFIELD=2
-!/XSTO          IFK=1
-!/XSTO          I1F=1
-!/XSTO          I2F=NZO
-!/XSTO          DO IK = 4,NZO+3
-!/XSTO!/RTD       ! Rotate x,y vector back to standard pole
-!/XSTO!/RTD       IF ( FLAGUNR ) CALL W3XYRTN(NSEA, UXSP(:,IK), UXSP(:,NZO+IK), AnglD)
-!/XSTO            IF( SMCGRD ) THEN
-!/XSTO!/SMC         CALL W3S2XY_SMC( UXSP(:,IK), XX )
-!/XSTO!/SMC         CALL W3S2XY_SMC( UXSP(:,NZO+IK), XY )
-!/XSTO            ELSE
-!/XSTO              CALL W3S2XY ( NSEA, NSEA, NX+1,NY,UXSP(:,IK), MAPSF, XX )
-!/XSTO              CALL W3S2XY ( NSEA, NSEA, NX+1,NY,UXSP(:,NZO+IK), MAPSF, XY )
-!/XSTO            ENDIF ! SMCGRD
-!/XSTO            XXK(:,:,IK-3)=XX
-!/XSTO            XYK(:,:,IK-3)=XY
-!/XSTO          END DO
-!/XSTO!
+!/XSTO!/MFIT          END IF
 !/XSTO          END IF ! IFP .EQ. 3
 !/XSTO!
 !
@@ -2213,7 +2202,8 @@
               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, CFLKMAX  , MAPSF, X1 )
 !
 !/MFIT            ELSE IF ( IFI .EQ. 10 .AND. IFJ .EQ. 1 ) THEN
-!/MFIT              ! The seven subfields (IFP=1,2,3) are joined in netCDF file
+!/MFIT              ! The seven subfields (IFP=1..7) are joined in netCDF file
+!/MFIT              NFP = 7 ! Number of subfields loop over IFP=1,NFP
 !/MFIT              ! 2D Vectors "S0", "Sd"
 !/MFIT            IF ( IFP .EQ. 1 ) THEN
 !/MFIT              NFIELD=2
@@ -2225,7 +2215,7 @@
 !/MFIT                            UXSP(:,4+NZO), MAPSF, XY )
 !/MFIT            ELSE IF ( IFP .EQ. 2 ) THEN
 !/MFIT              NFIELD=2
-!/MFIT              IFK = 2
+!/MFIT              IFK = 1
 !/MFIT              ! "Sd": Deep fit surface drift normalized by abs(2MK)+MK0
 !/MFIT              CALL W3S2XY ( NSEA, NSEA, NX+1, NY,                   &
 !/MFIT                            USERO(:,1), MAPSF, XX )
@@ -2235,18 +2225,18 @@
 !/MFIT            ELSE IF ( IFP .LE. 7 ) THEN
 !/MFIT              ! AM, PM, AMd, PMd, SIC
 !/MFIT              NFIELD=1
-!/MFIT              IFK=4
-!/MFIT                CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,I)        &
-!/MFIT                                                         , MAPSF, X1 )
+!/MFIT              IFK=IFP-1
+!/MFIT              CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,IFP)      &
+!/MFIT                                                       , MAPSF, X1 )
 !/MFIT            END IF ! IFP
 !/MFIT!
             ! User defined...
             ELSE IF ( IFI .EQ. 10 ) THEN
               !CB WRITE (ENAME,'(A2,I2.2)') '.u', IFJ
 !/MFIT              IF (.FALSE.) &
-               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,IFJ)        &
+              CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,IFJ)        &
                                                         , MAPSF, X1 )
-!/MFIT               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,IFJ+7)    &
+!/MFIT               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,8)    &
 !/MFIT                                                        , MAPSF, X1 )
             ELSE
               WRITE (NDSE,999) IFI, IFJ
@@ -2379,28 +2369,6 @@
             ! a separate netCDF file. If NCJID == 0 and FLSEP is False,
             ! the variable go in a common netCDF id. NCIDS(1,1,1)
             
-! 2.3.3 Initialize dimensions etc.
-
-            ! By default we only add a new third dimension to the netCDF file
-            ! if this is the first timestep in the file
-            NEW3D = .FALSE.
-
-            ! If the flag frequency is .TRUE., defines the fourth dimension
-            ! If there is a third dimension:            
-            IF (FLFRQ &
-              ! ( You may here add condition for other third dimensions: )
-              ! .OR. ( TRIM(DIM3NAME) .EQ. 'fs' )
-                 ) THEN 
-              DIMLN(4)=I2F-I1F+1
-              EXTRADIM=1
-              ! Require a new third dimension if this is the first timestep
-              ! in the netCDF file
-              IF ( NTIM.EQ.1 ) NEW3D=.TRUE.
-            ELSE
-              DIMLN(4)=0
-              EXTRADIM=0
-            END IF 
-
 ! 2.3.3 Initialize the space-time grid dimension lengths for a new netCDF file
             
             ! If regular grid, initializes the lat/lon or x/y dimension lenghts
@@ -2440,7 +2408,7 @@
             ! Regular   :  (x, y, [f,] time)  (lvl,    x,    y, [f,] time)
             ! SMC flat  :  (cell, [f,] time)  (lvl, cell,   [], [f,] time)
             ! Unstruct  :  (node, [f,] time)  (lvl, node, elem, [f,] time, noel)
-            ! INDEX in DIMID:                         2     3 [ITD-1] ITD  ITD+1
+            ! INDEX in DIMID:                         2     3  [IT-1] IT  IT+1
             ! INDEX in VARID:                         1     2    10    3    4
             ! (DIMID(1) (lvl='level') is not a dimension of any actual field)
 
@@ -2470,6 +2438,7 @@
             ! variable having a third dimension or not.
             
             ! By default the variable has no third dimension:
+            DIMLN(4)=0
             EXTRADIM = 0
             
             ! By default we only add a new third dimension to the netCDF file
@@ -2479,6 +2448,7 @@
             ! If there is a third dimension:            
             IF ( FLFRQ &
               ! ( You may here add condition for other third dimensions: )
+              ! .OR. ( TRIM(DIM3NAME) .EQ. 'fs' ) &
 !/XSTO           .OR. ( TRIM(DIM3NAME) .EQ. 'zk' ) &
                  ) THEN
               EXTRADIM = 1
@@ -2491,6 +2461,7 @@
             
             ! Contents of the new third dimension variable
             IF ( NEW3D ) THEN
+              DIMLN(4) = I2F-I1F+1 
               ALLOCATE(DIM3VAR(DIMLN(4)))
               ! (DIM3VAR will be deallocated after write to netCDF)
               IF ( FLFRQ ) THEN
@@ -2625,9 +2596,6 @@
 
               ! Set the size of the 'level' dim
               DIMLN(1)=1
-
-              ! ! Initializes the time iteration counter n
-              ! N=1
 
 ! 2.5.1 Creates the NetCDF file 
               CALL W3CRNC(FNAMENC,NCID,DIMID,DIMLN,VARID, &
@@ -2960,7 +2928,7 @@
               ! still need to define the fields (I=1,NFIELD) and optional third
               ! 'spectral' dimension. This will be done in Sect. 2.6.3
 
-! 2.6 Append data to the file
+! 2.6 Append data to the existing file
 
       ! Subsections:
       ! 2.6.1 Get the dimensions from the netcdf header
@@ -3104,12 +3072,12 @@
 !/SMC!
 !/SMC                ENDIF ! SMCTYPE .EQ. 1
 
-                ! Set scale factor to 1.0 if using FLOAT variables for output
-                IF(NCVARTYPE .GT. 2) META(I)%FSC = 1.0
+                  ! Set scale factor to 1.0 if using FLOAT variables for output
+                  IF(NCVARTYPE .GT. 2) META(I)%FSC = 1.0
 
-                !! CB - USE NEW W3META MODULE
-                CALL WRITE_META(NCID, VARID(IVAR), META(I), IRET) ! CB
-                CALL CHECK_ERR(IRET) ! CB
+                  !! CB - USE NEW W3META MODULE
+                  CALL WRITE_META(NCID, VARID(IVAR), META(I), IRET) ! CB
+                  CALL CHECK_ERR(IRET) ! CB
 !
 !/RTD                IF ( RTDL ) THEN
 !/RTD                  ! Add grid mapping attribute for rotated pole grids:
@@ -3219,7 +3187,7 @@
                   X1(:,:) = XXK(:,:,IK)
                   X2(:,:) = XYK(:,:,IK)
                 ELSE
-                  ! Implementation of a eventual variable with NFIELD==3 and
+                  ! Implementation of an eventual variable with NFIELD==3 and
                   ! EXTRADIM==1 has to be completed here
                   WRITE(NDSE,*) ' *** WAVEWATCH III ERROR IN OUNF :'
                   WRITE(NDSE,*) ' No program code for NFIELD==3 with a third dim'
@@ -3248,20 +3216,20 @@
                 WHERE ( X1(IX1:IXN,IY1:IYN) .EQ. MFILLR )
                   MX1(IX1:IXN,IY1:IYN) = MFILL
                 ELSEWHERE
-                  MX1(IX1:IXN,IY1:IYN) = NINT(X1(IX1:IXN,IY1:IYN)/FSC)
+                  MX1(IX1:IXN,IY1:IYN) = NINT(X1(IX1:IXN,IY1:IYN)/META(1)%FSC)
                 END WHERE
                 IF (NFIELD.GE.2 ) THEN
                   WHERE ( X1(IX1:IXN,IY1:IYN) .EQ. MFILLR )
                     MXX(IX1:IXN,IY1:IYN) = MFILL
                   ELSEWHERE
-                    MXX(IX1:IXN,IY1:IYN) = NINT(X2(IX1:IXN,IY1:IYN)/FSC)
+                    MXX(IX1:IXN,IY1:IYN) = NINT(X2(IX1:IXN,IY1:IYN)/META(2)%FSC)
                   END WHERE
                 END IF
                 IF (NFIELD.EQ.3 ) THEN
                   WHERE ( X1(IX1:IXN,IY1:IYN) .EQ. MFILLR )
                     MXY(IX1:IXN,IY1:IYN) = MFILL
                   ELSEWHERE
-                    MXY(IX1:IXN,IY1:IYN) = NINT(XY(IX1:IXN,IY1:IYN)/FSC3)
+                    MXY(IX1:IXN,IY1:IYN) = NINT(XY(IX1:IXN,IY1:IYN)/META(3)%FSC)
                   END WHERE
                 END IF
 !
@@ -3285,30 +3253,30 @@
 !
               IF ( NCVARTYPE.EQ.2 ) THEN
                 ! Short type output
-                IRET=NF90_PUT_VAR(NCID,VARID(IVAR1),               &
+                IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
                     MX1(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
               ELSE
                  ! Real type output
-                 IRET=NF90_PUT_VAR(NCID,VARID(IVAR1),               &
+                 IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
                     X1(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
               END IF              
               call CHECK_ERR(IRET)              
               IF (NFIELD.GE.2 ) THEN
                 IF ( NCVARTYPE.EQ.2 ) THEN
-                   IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),             &
+                   IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),             &
                        MXX(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
                 ELSE
-                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),             &
+                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),             &
                        X2(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
                 END IF
                 call CHECK_ERR(IRET)
               END IF
               IF (NFIELD.EQ.3 ) THEN
                 IF ( NCVARTYPE.EQ.2 ) THEN
-                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),             &
+                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+3),             &
                        MXY(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
                 ELSE
-                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),             &
+                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+3),             &
                        XY(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
                 END IF
                 call CHECK_ERR(IRET)                
@@ -3398,11 +3366,11 @@
       ! Chech for a dimension (e.g. DIMNAME='f') in the netCDF file.
       
       ! Returns:
-      ! DIMID = 0  : DIMNAME not defined
-      ! DIMID > 0  : DIMNAME defined and matches
-      ! DIMID = -1 : DIMNAME defined but doesn't match DIMLN, VCHC
+      ! DIMID3 = 0  : DIMNAME not defined
+      ! DIMID3 > 0  : DIMNAME defined and matches
+      ! DIMID3 = -1 : DIMNAME defined but doesn't match DIMLN, VCHC
       
-      DIMID = 0
+      DIMID3 = 0
 
       ! check that NCID is defined
       IF ( NCID .EQ. 0 ) THEN
@@ -3486,14 +3454,14 @@
 !/XSTO! profile depth below surface
 !/XSTO!
 !/XSTO      ELSE IF ( TRIM(DIMNAME) .EQ. 'zk' ) THEN
-!/XSTO        IRET=NF90_PUT_ATT(NCID,VARID,'long_name','normalized_depth')
+!/XSTO        IRET=NF90_PUT_ATT(NCID,VARID3,'long_name','normalized_depth')
 !/XSTO        CALL CHECK_ERR(IRET)
-!/XSTO        IRET=NF90_PUT_ATT(NCID,VARID,'standard_name','normalized_depth_below_surface')
-!/XSTO        IRET=NF90_PUT_ATT(NCID,VARID,'comment','zk = Z * ksc')
+!/XSTO        IRET=NF90_PUT_ATT(NCID,VARID3,'standard_name','normalized_depth_below_surface')
+!/XSTO        IRET=NF90_PUT_ATT(NCID,VARID3,'comment','zk = Z * ksc')
 !/XSTO        CALL CHECK_ERR(IRET)
-!/XSTO        IRET=NF90_PUT_ATT(NCID,VARID,'units','1')
+!/XSTO        IRET=NF90_PUT_ATT(NCID,VARID3,'units','1')
 !/XSTO        CALL CHECK_ERR(IRET)
-!/XSTO        IRET=NF90_PUT_ATT(NCID,VARID,'axis','down')
+!/XSTO        IRET=NF90_PUT_ATT(NCID,VARID3,'axis','down')
 !/XSTO        CALL CHECK_ERR(IRET)
 !
 ! Here you may put netcdf attibutes for another third dim

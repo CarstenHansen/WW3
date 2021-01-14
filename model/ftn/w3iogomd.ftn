@@ -1059,13 +1059,15 @@
       CASE('U1')
         I = 10
         J = 1
-      CASE('U2') ! 'U1' and 'U2' are synonyms in /MFIT
+!/MFIT        J = 2
+!/MFIT! 'U1' and 'U2' are synonyms in /MFIT
+      CASE('U2')
         I = 10
-        J = 1
+        J = 2
 !/MFIT!
-     CASE('MFIT')
-        I = 10
-        J = 2 ! w3ounfmetadata GROUP(10)%FIELD(J=3..6)%META also in CASE('MFIT')
+!/MFIT     CASE('MFIT')
+!/MFIT        I = 10
+!/MFIT        J = 1 ! w3ounfmetadata GROUP(10)%FIELD(2..6)%META also in CASE('MFIT')
 ! Not found:
 !/COU      CASE('DRY')
       CASE('UNSET')
