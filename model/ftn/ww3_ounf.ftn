@@ -804,7 +804,7 @@
       INTEGER                 :: S1, S2, S4, S5, NCID, OLDNCID,        & 
                                  MAPSTAOUT, NDSDAT,                    &
                                  NFIELD, IRET, IK, EXTRADIM, IVAR,  &
-                                 IVAR1, IDVAROUT, NCVARTYPE
+                                 IVAR1, IDVAROUT
       INTEGER                 :: NCJID, IFP, NFP
       INTEGER                 :: N3, TDIM, EDIM, DIMID3
       INTEGER                 :: DIMID(6), VARID(300), START(4),       &
@@ -1005,6 +1005,9 @@
         DO IFJ=1, NGRPP
 
           IF ( .NOT. FLG2D(IFI,IFJ) ) CYCLE
+
+          ! Here, the flag for the field IFI of the group IFJ is .TRUE.
+          
           ! Instanciates the partition array
           INDEXIPART=1
 
@@ -1017,6 +1020,8 @@
           IFK = 0
           DO WHILE ( IFP .LT. NFP )
             IFP = IFP + 1
+
+            NFIELD = 1
 
             ! Increment NFP by one if a following partition is requested
             ! (Loops over IPART for partition variables)
@@ -2002,6 +2007,9 @@
 !
 ! 7) Wave-bottom layer
 !
+!
+! 7) Wave-bottom layer
+!
             ! RMS of bottom displacement amplitude
             ELSE IF ( IFI .EQ. 7 .AND. IFJ .EQ. 1 ) THEN
               ! NB: ABA and ABD are the X and Y components of the bottom displacement
@@ -2265,28 +2273,6 @@
             ! a separate netCDF file. If NCJID == 0 and FLSEP is False,
             ! the variable go in a common netCDF id. NCIDS(1,1,1)
             
-! 2.3.3 Initialize dimensions etc.
-
-            ! By default we only add a new third dimension to the netCDF file
-            ! if this is the first timestep in the file
-            NEW3D = .FALSE.
-
-            ! If the flag frequency is .TRUE., defines the fourth dimension
-            ! If there is a third dimension:            
-            IF (FLFRQ &
-              ! ( You may here add condition for other third dimensions: )
-              ! .OR. ( TRIM(DIM3NAME) .EQ. 'fs' )
-                 ) THEN 
-              DIMLN(4)=I2F-I1F+1
-              EXTRADIM=1
-              ! Require a new third dimension if this is the first timestep
-              ! in the netCDF file
-              IF ( NTIM.EQ.1 ) NEW3D=.TRUE.
-            ELSE
-              DIMLN(4)=0
-              EXTRADIM=0
-            END IF 
-
 ! 2.3.3 Initialize the space-time grid dimension lengths for a new netCDF file
             
             ! If regular grid, initializes the lat/lon or x/y dimension lenghts
@@ -2320,13 +2306,13 @@
             ! For an unstructured mesh or an SMC flat grid there is no y
             ! dimension. If the field has a third dimension (e.g. frequency 'f')
             ! in FIELD(x,y,f,time), then the index in DIMID of the time dimension
-            ! is also shifted by one from 4 to 5. Let ITD denote this index here:
+            ! is also shifted by one from 4 to 5. Let IT denote this index here:
             !                                                                   
             ! COORD TYPE:  Dims in DIMFIELD:  Dims in DIMID:
             ! Regular   :  (x, y, [f,] time)  (lvl,    x,    y, [f,] time)
             ! SMC flat  :  (cell, [f,] time)  (lvl, cell,   [], [f,] time)
             ! Unstruct  :  (node, [f,] time)  (lvl, node, elem, [f,] time, noel)
-            ! INDEX in DIMID:                         2     3 [ITD-1] ITD  ITD+1
+            ! INDEX in DIMID:                         2     3  [IT-1]  IT  IT+1
             ! INDEX in VARID:                         1     2    10    3    4
             ! (DIMID(1) (lvl='level') is not a dimension of any actual field)
 
@@ -2356,6 +2342,7 @@
             ! variable having a third dimension or not.
             
             ! By default the variable has no third dimension:
+            DIMLN(4)=0
             EXTRADIM = 0
             
             ! By default we only add a new third dimension to the netCDF file
@@ -2377,6 +2364,7 @@
             
             ! Contents of the new third dimension variable
             IF ( NEW3D ) THEN
+              DIMLN(4) = I2F-I1F+1 
               ALLOCATE(DIM3VAR(DIMLN(4)))
               ! (DIM3VAR will be deallocated after write to netCDF)
               IF ( FLFRQ ) THEN
@@ -2846,7 +2834,7 @@
               ! still need to define the fields (I=1,NFIELD) and optional third
               ! 'spectral' dimension. This will be done in Sect. 2.6.3
 
-! 2.6 Append data to the file
+! 2.6 Append data to the existing file
 
       ! Subsections:
       ! 2.6.1 Get the dimensions from the netcdf header
@@ -2990,12 +2978,12 @@
 !/SMC!
 !/SMC                ENDIF ! SMCTYPE .EQ. 1
 
-                ! Set scale factor to 1.0 if using FLOAT variables for output
-                IF(NCVARTYPE .GT. 2) META(I)%FSC = 1.0
+                  ! Set scale factor to 1.0 if using FLOAT variables for output
+                  IF(NCVARTYPE .GT. 2) META(I)%FSC = 1.0
 
-                !! CB - USE NEW W3META MODULE
-                CALL WRITE_META(NCID, VARID(IVAR), META(I), IRET) ! CB
-                CALL CHECK_ERR(IRET) ! CB
+                  !! CB - USE NEW W3META MODULE
+                  CALL WRITE_META(NCID, VARID(IVAR), META(I), IRET) ! CB
+                  CALL CHECK_ERR(IRET) ! CB
 !
 !/RTD                IF ( RTDL ) THEN
 !/RTD                  ! Add grid mapping attribute for rotated pole grids:
@@ -3134,20 +3122,20 @@
                 WHERE ( X1(IX1:IXN,IY1:IYN) .EQ. MFILLR )
                   MX1(IX1:IXN,IY1:IYN) = MFILL
                 ELSEWHERE
-                  MX1(IX1:IXN,IY1:IYN) = NINT(X1(IX1:IXN,IY1:IYN)/FSC)
+                  MX1(IX1:IXN,IY1:IYN) = NINT(X1(IX1:IXN,IY1:IYN)/META(1)%FSC)
                 END WHERE
                 IF (NFIELD.GE.2 ) THEN
                   WHERE ( X1(IX1:IXN,IY1:IYN) .EQ. MFILLR )
                     MXX(IX1:IXN,IY1:IYN) = MFILL
                   ELSEWHERE
-                    MXX(IX1:IXN,IY1:IYN) = NINT(X2(IX1:IXN,IY1:IYN)/FSC)
+                    MXX(IX1:IXN,IY1:IYN) = NINT(X2(IX1:IXN,IY1:IYN)/META(2)%FSC)
                   END WHERE
                 END IF
                 IF (NFIELD.EQ.3 ) THEN
                   WHERE ( X1(IX1:IXN,IY1:IYN) .EQ. MFILLR )
                     MXY(IX1:IXN,IY1:IYN) = MFILL
                   ELSEWHERE
-                    MXY(IX1:IXN,IY1:IYN) = NINT(XY(IX1:IXN,IY1:IYN)/FSC3)
+                    MXY(IX1:IXN,IY1:IYN) = NINT(XY(IX1:IXN,IY1:IYN)/META(3)%FSC)
                   END WHERE
                 END IF
 !
@@ -3171,30 +3159,30 @@
 !
               IF ( NCVARTYPE.EQ.2 ) THEN
                 ! Short type output
-                IRET=NF90_PUT_VAR(NCID,VARID(IVAR1),               &
+                IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
                     MX1(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
               ELSE
                  ! Real type output
-                 IRET=NF90_PUT_VAR(NCID,VARID(IVAR1),               &
+                 IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
                     X1(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
               END IF              
               call CHECK_ERR(IRET)              
               IF (NFIELD.GE.2 ) THEN
                 IF ( NCVARTYPE.EQ.2 ) THEN
-                   IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),             &
+                   IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),             &
                        MXX(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
                 ELSE
-                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),             &
+                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),             &
                        X2(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
                 END IF
                 call CHECK_ERR(IRET)
               END IF
               IF (NFIELD.EQ.3 ) THEN
                 IF ( NCVARTYPE.EQ.2 ) THEN
-                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),             &
+                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+3),             &
                        MXY(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
                 ELSE
-                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),             &
+                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+3),             &
                        XY(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
                 END IF
                 call CHECK_ERR(IRET)                
@@ -3284,11 +3272,11 @@
       ! Chech for a dimension (e.g. DIMNAME='f') in the netCDF file.
       
       ! Returns:
-      ! DIMID = 0  : DIMNAME not defined
-      ! DIMID > 0  : DIMNAME defined and matches
-      ! DIMID = -1 : DIMNAME defined but doesn't match DIMLN, VCHC
+      ! DIMID3 = 0  : DIMNAME not defined
+      ! DIMID3 > 0  : DIMNAME defined and matches
+      ! DIMID3 = -1 : DIMNAME defined but doesn't match DIMLN, VCHC
       
-      DIMID = 0
+      DIMID3 = 0
 
       ! check that NCID is defined
       IF ( NCID .EQ. 0 ) THEN
