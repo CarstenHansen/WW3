@@ -10,7 +10,7 @@
 !/                  +-----------------------------------+
 !/
 !/    02-Nov-2020 : Creation                            ( version 7.12 )
-!/    15-Jan-2021 : Allow up to 5 (subfield-)components
+!/    15-Jan-2021 : Extra (subfield-)components under switch XSTO
 !/                                           (C.Hansen) ( version 7.XX )
 !/
 !  1. Purpose :
@@ -200,7 +200,7 @@
       LOGICAL :: FLGNML
       INTEGER :: I, J
 !/XSTO      INTEGER :: K
-      
+
       ! 1. Allocate nested GROUP, FIELD structure:
       ALLOCATE(GROUP(NOGRP))
       DO I = 1,NOGRP
@@ -247,7 +247,7 @@
 !/MFIT        DO K = J+7,8
 !/MFIT          ALLOCATE(GROUP(I)%FIELD(K)%META(3)) ! 3 components
 !/MFIT        ENDDO
-      
+
       ! Allocate storage for Global meta-data
       ALLOCATE(GLOBAL_META(MAX_GBLMETA))
       N_GBLMETA = 0
@@ -1177,10 +1177,10 @@
       ENDIF
       IF(IFJ .LT. 1 .OR. IFJ .GT. NOGE(IFI)) THEN
 !/XSTO      IF ( IFI .NE. 6 .OR. IFJ .LT. 1 .OR. IFJ .GT. NOGE(IFI)+2 ) THEN
-!/MFIT      IF ( IFI .NE. 10 .OR. IFJ .LT. 1 .OR. IFJ .GT. 7 ) THEN
+!/MFIT        IF ( IFI .NE. 10 .OR. IFJ .LT. 1 .OR. IFJ .GT. 7 ) THEN
         WRITE(NDSE,1001) NOGE(IFI)
         CALL EXTCDE(1)
-!/MFIT      END IF
+!/MFIT        END IF
 !/XSTO      END IF
       ENDIF
       IF(IFC .LT. 1 .OR. IFC .GT. 3) THEN
@@ -2452,9 +2452,8 @@
       META(1)%UNITS  = 'm2 s-1'
       META(1)%ENAME  = '.tus'
       META(1)%VARND = DIRCOM
-      META(1)%VMIN = -32.
-      META(1)%VMAX = 32.
-      ! !TODO WHERE IS VMAX?
+      META(1)%VMIN = -32. ! C. Hansen: changed from -9.9
+      META(1)%VMAX =  32.
       
       ! First component
       META(1)%VARNM='utus'

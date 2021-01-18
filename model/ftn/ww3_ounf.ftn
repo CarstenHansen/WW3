@@ -820,8 +820,8 @@
       INTEGER                 :: S1, S2, S4, S5, NCID, OLDNCID,        & 
                                  MAPSTAOUT, NDSDAT,                    &
                                  NFIELD, IRET, IK, EXTRADIM, IVAR,  &
-                                 IVAR1, IDVAROUT, NCVARTYPE
-      INTEGER                 :: NCJID, IFP, NFP
+                                 IVAR1, IDVAROUT
+      INTEGER                 :: NCJID, IFP, NFP, IFK
       INTEGER                 :: N3, TDIM, EDIM, DIMID3
       INTEGER                 :: DIMID(6), VARID(300), START(4),       &
                                  COUNT(4), DIMLN(6), DIMFIELD(4),      &
@@ -989,8 +989,6 @@
       FNAMENC=''
       FNAMENC(1:S1)=FILEPREFIX(1:S1)
       FNAMENC(S1+1:S1+S4) = TIMEID(1:S4)
-
-      !
 
 ! 1.4 Increment the time step or set a flag when an new time stamp in files
 
@@ -2402,13 +2400,13 @@
             ! For an unstructured mesh or an SMC flat grid there is no y
             ! dimension. If the field has a third dimension (e.g. frequency 'f')
             ! in FIELD(x,y,f,time), then the index in DIMID of the time dimension
-            ! is also shifted by one from 4 to 5. Let ITD denote this index here:
+            ! is also shifted by one from 4 to 5. Let IT denote this index here:
             !                                                                   
             ! COORD TYPE:  Dims in DIMFIELD:  Dims in DIMID:
             ! Regular   :  (x, y, [f,] time)  (lvl,    x,    y, [f,] time)
             ! SMC flat  :  (cell, [f,] time)  (lvl, cell,   [], [f,] time)
             ! Unstruct  :  (node, [f,] time)  (lvl, node, elem, [f,] time, noel)
-            ! INDEX in DIMID:                         2     3  [IT-1] IT  IT+1
+            ! INDEX in DIMID:                         2     3  [IT-1]  IT  IT+1
             ! INDEX in VARID:                         1     2    10    3    4
             ! (DIMID(1) (lvl='level') is not a dimension of any actual field)
 
@@ -2439,13 +2437,14 @@
             
             ! By default the variable has no third dimension:
             DIMLN(4)=0
-            EXTRADIM = 0
+            EXTRADIM=0
             
             ! By default we only add a new third dimension to the netCDF file
             ! if this is the first timestep in the file
             NEW3D = .FALSE.
 
-            ! If there is a third dimension:            
+            ! If the flag frequency is .TRUE., defines the fourth dimension
+            ! This is the third spatial dimension:            
             IF ( FLFRQ &
               ! ( You may here add condition for other third dimensions: )
               ! .OR. ( TRIM(DIM3NAME) .EQ. 'fs' ) &
