@@ -1022,7 +1022,6 @@
         DO IFJ=1, NGRPP
 
           IF ( .NOT. FLG2D(IFI,IFJ) ) CYCLE
-
           ! Here, the flag for the field IFI of the group IFJ is .TRUE.
           
           ! Instanciates the partition array
@@ -2233,7 +2232,7 @@
             ELSE IF ( IFI .EQ. 10 ) THEN
               !CB WRITE (ENAME,'(A2,I2.2)') '.u', IFJ
 !/MFIT              IF (.FALSE.) &
-               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,IFJ)        &
+              CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,IFJ)        &
                                                         , MAPSF, X1 )
 !/MFIT               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,8)    &
 !/MFIT                                                        , MAPSF, X1 )
@@ -2407,8 +2406,8 @@
             ! Regular   :  (x, y, [f,] time)  (lvl,    x,    y, [f,] time)
             ! SMC flat  :  (cell, [f,] time)  (lvl, cell,   [], [f,] time)
             ! Unstruct  :  (node, [f,] time)  (lvl, node, elem, [f,] time, noel)
-            ! INDEX in DIMID:                         2     3  [IT-1]  IT   IT+1
-            ! INDEX in VARID:                         1     2    10    3     4
+            ! INDEX in DIMID:                         2     3  [IT-1]  IT  IT+1
+            ! INDEX in VARID:                         1     2    10    3    4
             ! (DIMID(1) (lvl='level') is not a dimension of any actual field)
 
             ! Further, let TDIM be the index in DIMFIELD of the time dimension  
@@ -2449,7 +2448,7 @@
             IF ( FLFRQ &
               ! ( You may here add condition for other third dimensions: )
               ! .OR. ( TRIM(DIM3NAME) .EQ. 'fs' ) &
-!/XSTO          .OR. ( TRIM(DIM3NAME) .EQ. 'zk' ) &
+!/XSTO           .OR. ( TRIM(DIM3NAME) .EQ. 'zk' ) &
                  ) THEN
               EXTRADIM = 1
               TDIM = TDIM + 1
@@ -2597,8 +2596,6 @@
               ! Set the size of the 'level' dim
               DIMLN(1)=1
 
-              ! ! Initializes the time iteration counter n
-              ! N=1
 ! 2.5.1 Creates the NetCDF file 
               CALL W3CRNC(FNAMENC,NCID,DIMID,DIMLN,VARID, &
                           EXTRADIM,NCTYPE,MAPSTAOUT)
@@ -2930,7 +2927,7 @@
               ! still need to define the fields (I=1,NFIELD) and optional third
               ! 'spectral' dimension. This will be done in Sect. 2.6.3
 
-! 2.6 Append data to the file
+! 2.6 Append data to the existing file
 
       ! Subsections:
       ! 2.6.1 Get the dimensions from the netcdf header
@@ -3074,12 +3071,12 @@
 !/SMC!
 !/SMC                ENDIF ! SMCTYPE .EQ. 1
 
-                ! Set scale factor to 1.0 if using FLOAT variables for output
-                IF(NCVARTYPE .GT. 2) META(I)%FSC = 1.0
+                  ! Set scale factor to 1.0 if using FLOAT variables for output
+                  IF(NCVARTYPE .GT. 2) META(I)%FSC = 1.0
 
-                !! CB - USE NEW W3META MODULE
-                CALL WRITE_META(NCID, VARID(IVAR), META(I), IRET) ! CB
-                CALL CHECK_ERR(IRET) ! CB
+                  !! CB - USE NEW W3META MODULE
+                  CALL WRITE_META(NCID, VARID(IVAR), META(I), IRET) ! CB
+                  CALL CHECK_ERR(IRET) ! CB
 !
 !/RTD                IF ( RTDL ) THEN
 !/RTD                  ! Add grid mapping attribute for rotated pole grids:
@@ -3189,7 +3186,7 @@
                   X1(:,:) = XXK(:,:,IK)
                   X2(:,:) = XYK(:,:,IK)
                 ELSE
-                  ! Implementation of a eventual variable with NFIELD==3 and
+                  ! Implementation of an eventual variable with NFIELD==3 and
                   ! EXTRADIM==1 has to be completed here
                   WRITE(NDSE,*) ' *** WAVEWATCH III ERROR IN OUNF :'
                   WRITE(NDSE,*) ' No program code for NFIELD==3 with a third dim'

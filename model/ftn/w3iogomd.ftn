@@ -1061,7 +1061,7 @@
         J = 1
 !/MFIT        J = 2
 !/MFIT! 'U1' and 'U2' are synonyms in /MFIT
-     CASE('U2')  
+      CASE('U2')
         I = 10
         J = 2
 !/MFIT!
