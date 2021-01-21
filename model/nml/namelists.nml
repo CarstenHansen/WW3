@@ -399,6 +399,15 @@ $                                 provides 3 partitions of both x & y component,
 $                                 with a reasonable accuracy for using in
 $                                 a climate model. 
 $
+$ Output of Stokes mean drift profile array--------------------------- $
+$ NDP: Number of depths (->NDEPTH)
+$ DSC: Depth scale specifying the largest depth Z(NDP)=DSC/(2pi/Tz)^2*GRAV
+$ TYP: Tail type (C*4); 'DoEw': Donelan-Ewans
+$                       'DE20': Donelan-Ewans tail truncated at 2.0 Hz
+$                       'DE'IF: Donelan-Ewans truncated at I.F Hz
+$                       'None': Prognostic spectrum frequencies, only
+$ &XSTO NDP = 11, DSC = 1.0, TYP = 'DE20' /
+$
 $ Miscellaneous ------------------------------------------------------ $
 $   Misc. parameters    : Namelist MISC
 $                           CICE0  : Ice concentration cut-off.

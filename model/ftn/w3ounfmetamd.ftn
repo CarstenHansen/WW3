@@ -223,7 +223,7 @@
 !/XSTO        END IF      
 !/XSTO          ALLOCATE(GROUP(I)%FIELD(J+2))
 !/XSTO          DO K = 1,NOGE(I)
-!/XSTO            ALLOCATE(GROUP(I)%FIELD(K)%META(3)) ! 2 components
+!/XSTO            ALLOCATE(GROUP(I)%FIELD(K)%META(3)) ! 3 components
 !/XSTO          ENDDO
 !/XSTO          DO K = NOGE(I)+1,J+2
 !/XSTO            ALLOCATE(GROUP(I)%FIELD(K)%META(2)) ! 2 components

@@ -122,6 +122,7 @@
                           , FLGRD,                               &
                            FLGR2, FLGD, FLG2, NPT, XPT, YPT, PNAMES,   &
                           IPRT, PRTFRM, MPI_COMM, FLAGSTIDEIN)
+
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -357,6 +358,7 @@
                           OUTPTS, FNMPRE, IX0, IXN, IXS, IY0, IYN,    &
                           IYS, FLFORM, IOSTYP, UNIPTS, UPPROC, NOTYPE,&
                           FLOGR2, NOGRP, NGRPP, FLOGD, FLOG2
+!/XSTO      USE W3ODATMD, ONLY: XSVB      
       USE W3ADATMD, ONLY: NSEALM, IAPPRO, FLCOLD, FLIWND, DW, CG, WN, &
                           UA, UD, U10, U10D, AS
 !/MPI      USE W3ADATMD, ONLY: MPI_COMM_WAVE, MPI_COMM_WCMP
@@ -424,7 +426,6 @@
       REAL                    :: WLVeff
 !/T       REAL, ALLOCATABLE      :: XOUT(:,:)
       LOGICAL                 :: OPENED
-      LOGICAL                 :: TSTOUD
       CHARACTER(LEN=8)        :: STTIME
       CHARACTER(LEN=10)       :: STDATE
       INTEGER                 :: ISPROC
@@ -432,8 +433,6 @@
       CHARACTER(LEN=23)       :: DTME21
       CHARACTER(LEN=30)       :: LFILE, TFILE
 !/PDLIB      INTEGER                 :: IScal(1), IPROC
-! TODO: !/XSTO USE  W3ODATMD, ONLY : XSVB: Verboseness level [0..4] of output
-!/XSTO      INTEGER                 :: XSVB = 1
 !/
 !/ ------------------------------------------------------------------- /
 !
@@ -581,19 +580,17 @@
 !/DEBUGINIT       WRITE(*,*) '1: w3initmd f=', TRIM(FNMPRE(:J)//LFILE(:IFL))
           OPEN (MDS(1),FILE=FNMPRE(:J)//LFILE(:IFL),ERR=888,IOSTAT=IERR)
 !
-      TSTOUD = TSTOUT
-!/XSTO ! Unless /SHRD, let Stokes verbose output to testNNN.FEXT
-!/XSTO      IF ( XSVB .GT. 0 ) THEN
-!/XSTO        TSTOUD = .TRUE.
-!/SHRD        TSTOUD = TSTOUT     
-!/XSTO      END IF 
-!/XSTO!
-      IF ( MDS(3).NE.MDS(1) .AND. MDS(3).NE.MDS(4) .AND. TSTOUD ) THEN
+      IF ( MDS(3).NE.MDS(1) .AND. MDS(3).NE.MDS(4) ) THEN
+        IF ( TSTOUT &
+!/XSTO         .OR. XSVB .GT. 0 &
+             ) THEN
+!/XSTO!    If /DIST, let Stokes verbose output to testNNN.FEXT
           INQUIRE (MDS(3),OPENED=OPENED)
 !/DEBUGINIT       WRITE(*,*) '2: w3initmd f=', TRIM(FNMPRE(:J)//TFILE(:IFT))
 !/DIST          IF ( OPENED ) CLOSE (MDS(3))
 !/SHRD          IF ( .NOT. OPENED )                                   &
             OPEN (MDS(3),FILE=FNMPRE(:J)//TFILE(:IFT),ERR=889,IOSTAT=IERR)
+          END IF ! TSTOUT
         END IF
 !
 ! 1.d Dataset unit numbers
@@ -866,7 +863,7 @@
 !/DEBUGINIT     WRITE(740+IAPROC,*) ' After ALL_VA_INTEGRAL_PRINT'
 !/DEBUGINIT     FLUSH(740+IAPROC)
 !/TIMINGS       CALL PRINT_MY_TIME("Before W3IORS")
-      CALL W3IORS ( 'READ', NDS(6), SIG(NK), IMOD )
+      CALL W3IORS ( 'READ', NDS(6), SIG(NK), IMOD)
 !/TIMINGS       CALL PRINT_MY_TIME("After W3IORS")
 !/MEMCHECK      WRITE(740+IAPROC,*) 'memcheck_____:', 'WW3_INIT SECTION 3a'
 !/MEMCHECK      call getMallocInfo(mallinfos)
@@ -2026,7 +2023,7 @@
 !/MPI                                 IP(4), I, J, JSEA, ITARG, IB,   &
 !/MPI                                 JSEA0, JSEAN, NSEAB, IBOFF,     &
 !/MPI                                 ISEA, ISPROC, K, NRQMAX
-      INTEGER                 :: NZ2
+!/XSTO      INTEGER                 :: NZ2
 !/S      INTEGER, SAVE           :: IENT
 !/MPI      LOGICAL                 :: FLGRDALL(NOGRP,NGRPP)
 !/MPI      LOGICAL                 :: FLGRDARST(NOGRP,NGRPP)
@@ -2050,7 +2047,7 @@
 !/MPI      IT0    = NSPEC
 !/MPI      IROOT  = NAPFLD - 1
 !
-!/MPI      NZ2=0
+!/XSTO      NZ2 = 0
 !/XSTO      IF ( NZO .GT. 0 ) NZ2=3+2*NZO
 !
 !/MPI      IF ((FLOUT(1) .OR. FLOUT(7)).and.(.not. LPDLIB .or.       &
@@ -2070,8 +2067,8 @@
 !/MPI          IF ( FLGRDALL( 6, 8) ) NRQMAX = NRQMAX + 2*NK
 !/MPI          IF ( FLGRDALL( 6,12) ) NRQMAX = NRQMAX + 2*NK
 !
-!/MPI          IF ( NZ2 .GT. 0 ) NRQMAX = NRQMAX + NZ2
-!
+!/XSTO!/MPI          IF ( NZ2 .GT. 0 ) NRQMAX = NRQMAX + NZ2 ! FLGRDALL( 6, 13)
+!/XSTO!
 !/MPI          IF ( NRQMAX .GT. 0 ) THEN 
 !/MPI              ALLOCATE ( OUTPTS(IMOD)%OUT1%IRQGO(NRQMAX) )
 !/MPI              ALLOCATE ( OUTPTS(IMOD)%OUT1%IRQGO2(NRQMAX*NAPROC) )
@@ -2693,16 +2690,16 @@
 !/MPI                    END DO
 !/MPI                END IF 
 !
-!/MPI !              IF ( FLGRDALL( 6, 13) ) THEN
-!/MPI                  DO K=1,NZ2
-!/MPI                    IH     = IH + 1
-!/MPI                    IT     = IT + 1
-!/MPI      CALL MPI_SEND_INIT (UXSP(1,K),NSEALM , MPI_REAL, IROOT,  &
-!/MPI                                IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
-!/MPIT      WRITE (NDST,9011) IH, 'UXSP ', IROOT, IT, IRQGO(IH), IERR
-!/MPI                    END DO
-!/MPI !                END IF
-!      
+!/XSTO!/MPI !              IF ( FLGRDALL( 6, 13) ) THEN ! <==> NZ2 > 0
+!/XSTO!/MPI                  DO K=1,NZ2
+!/XSTO!/MPI                    IH     = IH + 1
+!/XSTO!/MPI                    IT     = IT + 1
+!/XSTO!/MPI      CALL MPI_SEND_INIT (UXSP(1,K),NSEALM , MPI_REAL, IROOT,  &
+!/XSTO!/MPI                                IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+!/XSTO!/MPIT      WRITE (NDST,9011) IH, 'UXSP ', IROOT, IT, IRQGO(IH), IERR
+!/XSTO!/MPI                    END DO
+!/XSTO!/MPI !                END IF
+!/XSTO!      
 !/MPI              IF ( FLGRDALL( 7, 1) ) THEN
 !/MPI                  IH     = IH + 1
 !/MPI                  IT     = IT + 1
@@ -3506,16 +3503,16 @@
 !/MPI                      END DO
 !/MPI                  END IF  
 !
-!/MPI !                IF ( FLGRDALL( 6, 13) ) THEN
-!/MPI                    DO K=1, NZ2
-!/MPI                      IH     = IH + 1
-!/MPI                      IT     = IT + 1
-!/MPI      CALL MPI_RECV_INIT (UXSP(I0,K),1,WW3_FIELD_VEC, IFROM, IT, &
-!/MPI                               MPI_COMM_WAVE, IRQGO2(IH), IERR )
-!/MPIT      WRITE (NDST,9011) IH, 'UXSP ', IFROM, IT, IRQGO2(IH), IERR
-!/MPI                      END DO
-!/MPI !                  END IF
-!
+!/XSTO!/MPI !                IF ( FLGRDALL( 6, 13) ) THEN ! <==> NZ2 > 0
+!/XSTO!/MPI                    DO K=1, NZ2
+!/XSTO!/MPI                      IH     = IH + 1
+!/XSTO!/MPI                      IT     = IT + 1
+!/XSTO!/MPI      CALL MPI_RECV_INIT (UXSP(I0,K),1,WW3_FIELD_VEC, IFROM, IT, &
+!/XSTO!/MPI                               MPI_COMM_WAVE, IRQGO2(IH), IERR )
+!/XSTO!/MPIT      WRITE (NDST,9011) IH, 'UXSP ', IFROM, IT, IRQGO2(IH), IERR
+!/XSTO!/MPI                      END DO
+!/XSTO!/MPI !                  END IF
+!/XSTO!
 !/MPI                IF ( FLGRDALL( 7, 1) ) THEN
 !/MPI                    IH     = IH + 1
 !/MPI                    IT     = IT + 1

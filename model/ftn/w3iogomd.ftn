@@ -202,7 +202,7 @@
 !
 !/ ------------------------------------------------------------------- /
       USE CONSTANTS
-      USE W3GDATMD, ONLY: E3DF, P2MSF, US3DF, USSPF, STEXU, STEYU, STEDU
+      USE W3GDATMD, ONLY: E3DF, P2MSF, US3DF, USSPF
 !/XSTO      USE W3GDATMD, ONLY: XSND
 !/XSTO      USE W3ODATMD, ONLY: NZO
       USE W3ODATMD, ONLY: NOGRP, NGRPP
@@ -278,7 +278,7 @@
 !/XSTO        FLGRD(6,13)=.FALSE.
 !/XSTO        FLGR2(6,13)=.FALSE.
 !/XSTO      END IF
-!/XSTO      ! Set NZO for use in W3DIMA and W3DIMX
+!/XSTO      ! Set NZO for use in W3MPIO and W3DIMA
 !/XSTO      NZO = 0
 !/XSTO      IF ( FLGRD(6,13) ) NZO = XSND
 !/MFIT      ! For FLGRD(10,1), if FLGRD( 6, 13) is False, only the surface U_S
@@ -2483,7 +2483,6 @@
                           STMAXE, STMAXD, HMAXE, HCMAXE, HMAXD, HCMAXD,&
                           USSP
 !/XSTO      USE W3ADATMD, ONLY: UXSP
-!/XSTO!      USE W3GDATMD, ONLY: XSND
 !/XSTO      USE W3ODATMD, ONLY: NZO
 !/
       USE W3ODATMD, ONLY: NOGRP, NGRPP, IDOUT, UNDEF, NDST, NDSE,     &
@@ -2877,7 +2876,7 @@
             END DO
 !
         ELSE
-!/XSTO          ! NZO is required for use in W3DIMA and W3DIMX
+!/XSTO          ! NZO is required for use in W3MPIO and W3DIMA
 !/XSTO          IF ( FLOGRD(6,13) .AND. .NOT. NZO == XSND ) &
 !/XSTO             WRITE (NDSE,*) 'ERROR: NZO=',NZO,' should be equal to ',XSND
 !/MFIT          IF ( FLOGRD(10,1) .AND. .NOT.FLOGRD(6,13) .AND. .NOT.NZO==1 ) &
@@ -3791,7 +3790,6 @@
 !
 !
 !/OMPG/!$OMP PARALLEL DO PRIVATE(JSEA,ISEA,FACTOR,KD,FKD,USSCO,MINDIFF,IB)
-
 !
          DO JSEA=1, NSEAL
 !/DIST              ISEA         = IAPROC + (JSEA-1)*NAPROC

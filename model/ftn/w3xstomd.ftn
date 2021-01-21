@@ -55,7 +55,9 @@
 !/                  + Collect technical doc. in comments in diag_DE_init()
 !/                  + For the extended tail to be representative, the local wind
 !/                    sea peak must be within the prognostic range, fp < IKTT
-!/
+!/    21-Jan-2021 : Match the exact expressions in C. Hansen, 2020 (DRAFT):
+!/                  "Mean Stokes drift profile from a wave model with a
+!/                  parametric extension of the spectral tail".
 !-------------------
 !/                       
 !  1. Purpose, and output data
@@ -73,17 +75,15 @@
 !
 !  a) In ww3_grid.inp/ww3_grid.nml, you may modify three namelist variables:
 !     $ NDP: Number of depths (->NDEPTH)
-!     $ DSC: Depth scale specifying the largest depth Z(NDP)
+!     $ DSC: Depth scale specifying the largest depth Z(NDP)=DSC/(2pi/Tz)^2*GRAV
 !     $ TYP: Tail type (C*4); 'DoEw': Donelan-Ewans,
-!     $      'DE20': Donelan-Ewans tail truncated at 2.0 Hz
-!     $      or 'None': Spectrum truncated with no extention
-!     &XSTO NDP = 5, DSC = 1.0, TYP = 'DE20' /
+!     $                       'DE20': Donelan-Ewans truncated at 2.0 Hz,
+!     $                       'DE'IF: Donelan-Ewans truncated at I.F Hz
+!     $                       'None': Prognostic spectrum frequencies, only
+!     &XSTO NDP = 11, DSC = 1.0, TYP = 'DE20' /
 !
-!  b) In w3iogomd.ftn: Call the subroutine CALC_XSTOKES() (module W3XSTOMD): At
-!     each WW3 output time step, calculation of the Stokes drift profile
-!
-!  ( TODO: ( In ww3_shel.nml, you may set other namelist variables:
-!     $ XSVB: Verboseness level [0..4] of output. Default XSVB=1 )
+!  ( TODO: In ww3_shel.nml, you may in the future set namelist variable
+!     XSVB: Verboseness level [0..4] of output. Default XSVB=1 )
 !
 !  3. Estimation of Stokes drift of the diagnostic tail.
 !
@@ -101,20 +101,18 @@
 !  Based on observational data (the 'Maui' experiment) Ewans (1997) suggests
 !  a mathematical model to fit the data, which results in the
 !  following expression for the first circular moment:
-!    m1(omega) = cos(theta_E(f/fP)) exp( -(sigma(f/fP)**2)/2 ),
+!    m1E(omega) = cos(theta_E(f/fP)) exp( -(sigma(f/fP)**2)/2 ),
 !  where f/fP is the ratio of local spectral frequency f=omega/2pi over the
 !  peak frequency fP. Ewans provides expressions for theta_E, the reflection
 !  from the mean direction of two 'binodal' directional peaks, and sigma, the
 !  standard deviation of Gaussian-shaped distributions around each of the two
 !  peaks.
 
-!  In the present usage, Ewans' m1 is approximated by a function,
-!    m1t(f/fP) = m1(f/fP=1) * exp( phih * (f/fP - 1) )
-!  where phih is a negative factor representing the 
+!  In the present usage ('Donelan-Ewans': subroutine diag_DE_init(NP)),
+!  Ewans' m1 is approximated by a function,
+!    m1t(f/fP) = m1E(f/fP=1) * exp( a sinh(phih * (f/fP - 1)) )
+!  where a = 1.25 and phih = -0.187 is a negative factor representing the 
 !  increasing directional spread with increasing f/fP.
-!  Approximate expressions for m1t have been evaluated in a function 
-!  plot_Ewans_m1E() of a Python program 
-!    /home/cha/projects/wave/WW3ToSTWStokes/python_work/Ewans_m1.py:
 
 !  A formula for the spectral tail is assumed in the form of Donelan et. al
 !  (1985),
@@ -124,8 +122,10 @@
 !  investigated. In the present usage, alpha is estimated based on a few of 
 !  the highest frequency bins of the prognostic spectrum.
 !  We note that the resulting estimates of alpha is sensitive to the choice of
-!  formulation of wind input. The present module has been tested (and tuned)
-!  with the Tolman-Chalikov input terms formulation ( WW3 switch '/ST2')
+!  formulation of wind input. It was first tested (and tuned) with the
+!  Tolman-Chalikov input terms formulation ( WW3 switch '/ST2'), and is
+!  also consistent with ST4-Romero or ST6, which are supposed with certain
+!  parameter combinations to have an omega^-4 spectral tail up to f/fP ~ 3-4.
 !
 !  With the spectrum of Donelan et. al and Ewans' formula for m1(omega), the
 !  integrated Stokes drift int_omegat^inf d Stokes(omega) will *not* converge,
@@ -138,50 +138,86 @@
 !  drift by a small amount. The applied approximation m1t(omega) to Ewans'
 !  formula for m1(omega) provides a low-pass filter at an equivalent frequency
 !  scale. Thus it is suggested that there will be little effect of applying 
-!  an explicit formula of an omega^-5 spectral tail. This suggestion ought to
-!  be verified more thoroughly.
+!  an explicit formula of an omega^-5 spectral tail.
 !
-!  4. Implementation in WW3:
+!  4. Integrated pseudo-momentum over the diagnostic spectral tail
+!
+!  A common look-up table for this, Im(nt), is calculated in a subroutine
+!  specfic for the parametric tail (for Donelan-Ewans: subroutine
+!  diag_DE_init(NP)).
+!
+!  The index nt corresponds to fd/fp rounded to nearest integer: 
+!  fd/fp = DFH**ntf; nt=nint( ntf )
+  
+!  The spectrum is normalized by the spectral level. For Donelan-Ewans
+!  this is estimated from the omnidirectional spectrum S(omega) as
+!  Dsn = S(omega)*omega^4.
+  
+!  Im(nt), where ft/fP = fhn = DFH**n, n = 1, ..., Np
+!  Im(nt) = sum_fhn^fhcut m1(fh) fh^-2 log(DFH)
+!  The integrated momentum of the spectral tail is
+!  M(ft) = GRAV * Dsn sigP^-2 Im(n), n = log(ft/fP)/log(DFH)
+!
+!  M is a first 'kv/sig'-moment - like the the first spectral moment
+!  (that determines the mean wave period) but considered a vector sum.
+!  kv is the wave number vector, kv = k * (cos(theta), sin(theta))
+!
+!
+!  5. Diagnostic tail until Ncut
+!
+!  The diagnostic tail contribution is calculated in the subroutine
+!  CALC_XSTOKES(A) using a common 2-D array SBDiaZ(:,:) for the
+!  normalized Stokes drift.
+!
+!  The look-up array start index nt, and the spectral level Dsn, are
+!  defined as above
+!
+!  StkDiag(:) = SBDiaZ(:,nt) * (1. - ntf) ! Fraction at fd/fp
+!  do ntt = nt+1, min(ntr,NP)
+!    StkDiag(:) = StkDiag(:) + SBDiaZ(:,ntt)
+!  end do
+!
+!  Starting at the surface, SBDiaZ(0,:) = DStkOsn(:). This is calculated
+!  in a subroutine specfic for the parametric tail. This example is for
+!  Donelan-Ewans, subroutine diag_DE_init(NP):
+!  
+!  fh = fht 
+!  do ntt = Np+1, Ncut
+!        DStkOsn(ntt) = exp( aa * sinh(phih * (fh - 1.)) )
+!        Sum = Sum + DStkOsn(ntt)
+!        fh = fh * DFH
+!  end do
+!  DStkOsn(Np+1)=Sum
+!
+!  The depth dependent array SBDiaZ(1:NZ,:) is calculated in the
+!  subroutine XSTOKES_INIT:
+!
+!  Let XKH = DFH**2
+!
+!  Initial value of ratio of wavenumbers:
+!  Rk = fOfp(JSEA)**2
+!  ! Loop over spectral bins
+!  do ntt = NP + 1, Ncut
+!    ! Loop over depth bins
+!    do iz = 1,NZ
+!      ! Assume no shallow water effect at high frequencies
+!      A2S = EXP( - 2 * Rk * ZK_S(iz) )
+!      SBDiaZ(iz,ntt) =  DStkOsn(ntt) * A2S
+!      end do
+!    ! Increment the ratio of wavenumbers
+!    Rk = Rk * XKH
+!    end do
+!
+!  ! Ignored for now: 5b. Tail of the tail:
+!
+!  ! A supplement tail is appended at the *end* of the discretized
+!  ! diagnostic range.
+!  
+!  6. Implementation in the WW3 code:
 !
 !  Code lines are added to WW3 by the compile switch '!/XSTO'
 !   
 !  a) In w3iogomd.ftn
-!    a1) subroutine W3FLGRDUPDT:
-!        (...)
-!        !/XSTO      ! Set NZO for use in W3DIMA, W3DIMX
-!        !/XSTO      NZO = 0
-!        !/XSTO      IF ( FLGRD(6,13) ) NZO = XSND
-!    a2) subroutine W3OUTG:
-!        Declare use of CALC_XSTOKES()
-!        !/XSTO      USE W3XSTOMD, ONLY: CALC_XSTOKES
-!
-!    a3) W3OUTG:
-!        Ensure there is a representative value of T02 at all water points
-!             DO JSEA=1, NSEAL
-!       (...)
-!               IF ( ET02(JSEA) .GT. 1.E-7  .AND.  ET(JSEA) .GT. 0 ) THEN
-!                 T02(JSEA) = TPI * SQRT(ET(JSEA) / ET02(JSEA) )
-!                 T01(JSEA) = TPI * ET(JSEA) / ET1(JSEA)
-!               ELSE
-!       !/XSTO! Overall minimum period is TPI / SIG(NK)
-!                 T02(JSEA) = TPI / SIG(NK)
-!                 T01(JSEA) = T02(JSEA)
-!                 ENDIF
-!       (...)
-!       !  Add here USERO(JSEA,1) ...
-!       !
-!       !/XSTO! UXSP(JSEA,1:3+2*XSND) is set by CALC_XSTOKES(A)
-!       !/XSTO! CALC_XSTOKES(A) has its own loop over JSEA and thus called
-!       !/XSTO! outside and after the present loop
-!                 END IF
-!               END DO
-!       (...)
-!    a4) Later in  W3OUTG(), outside any loop over space and spectrum:
-!        
-!       !/XSTO ! Stokes drift with extended tail
-!       !/XSTO       IF ( FLOLOC(6,13)        &
-!       !/XSTO           CALL CALC_XSTOKES(A)
-!
 !     In CALC_XSTOKES() (w3xstomd.ftn) the stokes drift profile is calculated
 !     by a call of DSTOKES(A, JSEA, U10, UDIR, T02). (For the initial scale
 !     value for wave period [Ts] the zero upcrossing period T02 is chosen.)
@@ -191,128 +227,26 @@
 !       Part of the GRIDS structure (W3GDATMD) and stored in mod_def
 !       XSND: Number of depths for Stokes profile U_S(1:XSND)
 !       XSDS: Depth scale specifying the largest depth Z(XSND) for the profile
-!       XSTY: Tail par. type. 'DoEw': Donelan-Ewans, 'None': Truncated spectrum
-!     b1) w3gdatmd.ftn:
-!       MODULE W3GDATMD:
-!       PUBLIC
-!       TYPE GRID
-!          (...)
-!          !/XSTO ! Namelist parameters for extended tail Stokes drift
-!          !/XSTO        INTEGER               :: XSND
-!          !/XSTO        REAL                  :: XSDS       
-!          !/XSTO        CHARACTER(LEN=4)      :: XSTY
-!          (...)
-!       END TYPE GRID
-!       (...)
-!       !/ Data aliases for structure GRID(S)
-!       (...)
-!       !/XSTO      INTEGER, POINTER           :: XSND
-!       !/XSTO      REAL, POINTER              :: XSDS
-!       !/XSTO      CHARACTER(LEN=4), POINTER  :: XSTY
-!       (...)
-!       SUBROUTINE W3SETG
-!       (...)  
-!       !/XSTO      XSND  => GRIDS(IMOD)%XSND
-!       !/XSTO      XSDS  => GRIDS(IMOD)%XSDS
-!       !/XSTO      XSTY  => GRIDS(IMOD)%XSTY
-!       
-!     b2)  w3iogrmd.ftn
-        
-!       Add/Read extended tail Stokes parameters from mod_def
-        
-!       ! Parameters in modules  --------------------------------------------- *
-!       (...)
-!       IF ( WRITE ) THEN
-!         (...)
-!       !/XSTO         WRITE (NDSM) XSND, XSDS, XSTY
-!         (...)
-!         ELSE
-!         (...)
-!       !/XSTO         READ (NDSM) XSND, XSDS, XSTY
+!       XSTY: Tail par. type. 'DoEw': Donelan-Ewans,
+!                             'DE20': Donelan-Ewans truncated at 2.0 Hz,
+!                             'DE'IF: Donelan-Ewans truncated at I.F Hz
+!                             'None': Prognostic spectrum  frequencies, only
 !
-!     b3)  ww3_grid.ftn
-!
-!             PROGRAM W3GRID
-!       (...)
-!       !/XSTO ! Extended tail Stokes drift profile
-!       !/XSTO      INTEGER                 :: NDP
-!       !/XSTO      REAL                    :: DSC
-!       !/XSTO      CHARACTER(LEN=4)        :: TYP
-!       (...)
-!       !/XSTO
-!       !/XSTO ! Extended tail Stokes drift profile
-!       !/XSTO     NAMELIST /XSTO/ NDP, DSC, TYP
-!       (...)
-!       ! 6.n Set miscellaneous parameters (ice, seeding, numerics ... )
-!       (...)
-!       !/XSTO ! CHA at GMOC 20190416:
-!       !/XSTO ! XSND: Number of depths for Stokes profile
-!       !/XSTO ! XSDS: Depth scale specifying the largest depth for the profile,
-!       !/XSTO !       XSDS = Kz * Z(XSND)
-!       !/XSTO ! XSTY: Tail type; 'DoEw': Donelan-Ewans, or 'None': Truncated spectrum
-!       !/XSTO     NDP = 5
-!       !/XSTO     DSC = 1.0
-!       !/XSTO     TYP = 'DoEw'
-!       !/XSTO     CALL READNL ( NDSS, 'XSTO', STATUS )
-!       !/XSTO     XSND = NDP
-!       !/XSTO     XSDS = DSC
-!       !/XSTO     XSTY = TYP
-!        
 !  c) In w3adatmd.ftn:
 !       Declare and allocate arrays ZK_S (Z*K_S) and 
 !       UXSP: The full Stokes 2D profile and integral parameters M_X, M_Y, K_S
 !
-!       ! TODO: Move to w3odatmd from w3xstomd also XSVB:
-!       Verboseness level [0..4] of XSTO test output to NDSV  
-!       In ww3_shel.nml, set XSVB by a namelist variable VBS
-!
 !  d) Modify the makefile scripts (make_makefile.sh, w3_new) as 
 !     described in the WW3 manual chpt. 5.5
 !     make_makefile.sh:
-!     for type in ...  xsto; do
+!       for type in ...  xsto; do
 !       (...)        
-!       case $type in ...
-!         (...)        
-!     #sort:xsto:
-!         xsto ) TY='upto1'
-!                ID='Extended tail Stokes drift'
-!                TS='XSTO'
-!                OK='XSTO' ;;
-!
-!      (...)
-!      case $prog in
-!         (...)
-!         ww3_shel) IDstring='Generic shell'        
-!                   (...)
-!                   IO="$IO w3xstomd"
-!         (...)
-!         ww3_multi|ww3_multi_esmf)
-!                   (...)
-!                   IO="$IO w3xstomd"
-!      (...)        
-!      case $mod in
-!         (...)
-!         'W3XSTOMD'     ) modtest=w3xstomd.o ;;
 !
 !     w3_new:
-!        case $... in
-!          'xsto' ) cd $main_dir/ftn ; touch w3xstomd.ftn
-!                                      touch w3initmd.ftn
-!                                      touch w3odatmd.ftn
-!                                      touch w3gdatmd.ftn
-!                                      touch w3iogomd.ftn
-!                                      touch w3iogrmd.ftn
-!                                      touch ww3_grid.ftn ;;
+!       case $... in
+!       (...)        
 !
-!  5. Variables and types :
-!
-!      Name      Type  Scope    Description
-!     ----------------------------------------------------------------
-!                C*10  Private
-!      
-!     ----------------------------------------------------------------
-!
-!  6. Subroutines and functions :
+!  7. Subroutines and functions :
 !
 !      Name      Type  Scope    Description
 !     ----------------------------------------------------------------
@@ -320,27 +254,13 @@
 !                              profile calculation
 !     ----------------------------------------------------------------
 !
-!  7. Subroutines and functions used :
-!
-!      Name      Type  Module   Description
-!     ----------------------------------------------------------------
-!
-!     ----------------------------------------------------------------
-!
-!  8. Remarks :
-!
-!
-!  9. Switches :
+!  8. Switches :
 !
 !       !/SHRD  Switch for shared / distributed memory architecture.
 !       !/DIST  Id.
-!
-!       !/ST2   Source term set 2 (Tolman and Chalikov)
-!               ST2 is required for consistent scaling properties.
 !  
-!/NL1
-
-!  10. Source code :
+!
+!  9. Source code :
 !
 
 !/ ------------------------------------------------------------------- /
@@ -403,7 +323,7 @@
       real               :: m1E      
 
 ! Spectral parameters for Stokes spectral tail calculation
-      real               :: SBDia , StT0, StTE
+      real               :: SBDia ! , StT0, StTE
       
 ! CHA 20200603  ftr: truncation frequency, default 10 Hz
 !              ntre: relative truncation bin ntre = ntr - nt
@@ -438,8 +358,7 @@
 !/ ------------------------------------------------------------------- /
 !/ Step a) XSTOKES_INIT(): Initialisation. A few
 !/         input lines are read from ww3_shel.inp. Lookup tables are
-!/         calculated for the diagnostic tail, and for the final ajustment
-!/         to depth-integrated drift
+!/         calculated for the diagnostic tail
 !/
 !/ ------------------------------------------------------------------- /
 !/
@@ -482,7 +401,7 @@
       integer                  :: IERR
             
 ! Common Stokes drift depth distribution parameters
-      real                     :: DEPTH, zki, Tk_scl, XZK
+      real                     :: DEPTH, zki, tRk, XZK
       integer                  :: IZ, ntt, ikd
       logical                  :: OPENED
       
@@ -525,10 +444,6 @@
       ! For calculating exp(2 K Z) = exp(2 K0 Z) * exp( 2 (K-K0) Z )
       allocate( DWN(NK), stat=IERR )
 
-      
-      ! Initialize an overall sum of squares of relative deviation of
-      ! depth-integrated Stokes drift from pseudo-momentum
-      ! Mres_rel = 0.
       
       ! Construct a scalable array ZK_S of the stokes profile for each
       ! individual sea point:
@@ -643,17 +558,24 @@
       XKH = DFH**2
       NP = IKT
       
-! NP: Number of frequency bins in the scalable diagnostic Stokes array.
-!     It should span the full prognostic range, from F1 to
-!     F1 * DFH**NP == F1 * XFR**IKT or NP = ceiling(IKT * log(XFR)/log(DFH))
-!     If DFH==XFR, then NP=IKT
-      ! Index shift to the next bin in StokesOsn
-      ! NTW = log(XFR) / log(DFH)
-      ! NP = ceiling(IKT * NTW)
-      
       ! SBDiaZ(z,bin): A 'normalized, look-up' vertical Stokes Drift profile
       ! shape for spectral bins of the diagnostic tail.
-      ! Factorized as DStkOsn(bin) * exp( -Tk_scl(bin) * ZK_S(z) )
+      ! Factorized as DStkOsn(bin) * exp( -tRk(bin) * ZK_S(z) )
+      !
+      ! For the Diagnostic range the surface Stokes drift for every spectral
+      ! bin is multiplied with a depth factor EXP( -2 K Z), assuming deep water
+      ! dispersion at the high frequencies. We apply a look-up array 
+      !  SBDiaZ(1:NZ,1:NP) = DStkOsn(1:NP) * exp ( -2*Rk(1:NP)*ZK_S(1:NZ) )
+      ! where Rk is a discrete array representing f/fp**2        
+        
+      ! Let tRk = 2*Rk = 2 * XKH**ntt.
+      
+      ! NP  should span the full prognostic range, from F1 to
+      ! F1 * DFH**NP == F1 * XFR**IKT or NP = ceiling(IKT * log(XFR)/log(DFH))
+      ! If DFH==XFR, then NP=IKT
+      ! Index shift to the next bin in DStkOsn: log(XFR) / log(DFH)
+      ! NP = ceiling(IKT * log(XFR) / log(DFH))
+      
      
       if ( .not. allocated(SBDiaZ) ) allocate( SBDiaZ(XSND, NP), stat=IERR )
 
@@ -701,22 +623,14 @@
         CALL EXTCDE ( 74 )
         end if
       
-      ! For the Diagnostic range the surface Stokes drift for every spectral
-      ! bin is multiplied with a depth factor EXP( -2 K Z), assuming deep water
-      ! dispersion at the high frequencies. We apply a look-up array 
-      !  SBDiaZ(1:NZ,1:NP) = DStkOsn(1:NP) * exp ( -2*k_scl(1:NP)*ZK_S(1:NZ) )
-      ! where k_scl is a discrete array representing f/fp**2        
-        
-      ! Let Tk_scl = 2*k_scl = 2 * XKH**ntt.
-      
-      Tk_scl = 2.
+      tRk = 2.
       do ntt=1,NP
-        Tk_scl = Tk_scl*XKH ! = 2 * XKH**ntt
-        SBDiaZ(:,ntt) = DStkOsn(ntt) * exp( -Tk_scl * ZK_S(:) )          
+        tRk = tRk*XKH ! = 2 * XKH**ntt
+        SBDiaZ(:,ntt) = DStkOsn(ntt) * exp( -tRk * ZK_S(:) )          
         end do
         
       if ( xsto_verbose .gt. 2 ) WRITE (NDSV, *), &
-              'NP =',NP,'Tk_scl(NP) =', Tk_scl, 'ZK_S(:) =', ZK_S
+              'NP =',NP,'2Rk(NP) =', tRk, 'ZK_S(:) =', ZK_S
 
       if ( xsto_verbose .gt. 2 ) WRITE (NDSV, *), &
               '   SBDiaZ(1:XSND,int(NP/2)) =', SBDiaZ(1:XSND, int(NP/2))
@@ -852,7 +766,7 @@
       INTEGER               :: numDepths, IZ, nt, ntt, ntr
       
       ! Factors for the diagnostic (spectral tail) calculation
-      REAL                  :: k_scl, fOfp_ini, ntf
+      REAL                  :: Rk, fOfp_ini, ntf
       
       ! Factors for the prognostic calculation
       REAL                  :: A2S0, AX, AY, EDWTZ, DDWTZ
@@ -869,7 +783,7 @@
 
 ! Integral pseudo-momentum parameters
       REAL                  :: A2M, Mdiag, MprogX, MprogY, &
-                               Ares_rel, MtransX, MtransY, Mres_rel
+                               MtransX, MtransY
       
 ! Stokes drift wave number scale and parameters for 'inlined version of WAVNU1'
       real                  :: SIX, R1
@@ -892,9 +806,6 @@
       V_S = 0.
       StkDiag = 0.
 
-!-------------------
-! The following definition of the transition range is consistent with the
-! source term switch in w3srcemd, /ST2
       
       if ( xsto_verbose .gt. 1 .and. JSEA .eq. 1 ) &
           WRITE (NDSV, *), '  Transition range IKTT =', IKTT, 'to IKT =', IKT 
@@ -1025,19 +936,9 @@
         ! EXP( -2 K Z), assuming deep water dispersion at the high frequencies.
 
         ! We apply a look-up array at bin nt (see SUBROUTINE diag_DE_init()):
-        !  SBDiaZ(iz,nt) = DStkOsn(iz) *  exp ( -2*k_scl(nt) * ZK_S(iz) )
-        ! where  fOfp(JSEA)**2 is in the interval [k_scl(nt), k_scl(nt+1)[
+        !  SBDiaZ(iz,nt) = DStkOsn(iz) *  exp ( -2*Rk(nt) * ZK_S(iz) )
+        ! where  fOfp(JSEA)**2 is in the interval [Rk(nt), Rk(nt+1)[
         ! The look-up array is initialized in the procedure XSTOKES_INIT() 
-
-        ! Linear interpolation to nt+ntf between bins nt and nt+1.
-
-        !   SBDiaZ(:,nt)   * (1-ntf) + SBDiaZ(:,nt+1) * ntf
-        ! + SBDiaZ(:,nt+1) * (1-ntf) + SBDiaZ(:,nt+2) * ntf
-        ! + ...
-        ! = SBDiaZ(:,nt)   * (1-ntf)
-        ! + SBDiaZ(:,nt+1)
-        ! + SBDiaZ(:,nt+2)
-        ! + ...
 
         ! The normalized ( tail Stokes drift profile ) / Dsn is
 
@@ -1054,14 +955,14 @@
                ' U10 =', U10(JSEA), ' Ts =', Ts
           WRITE (NDSV, 906), &
                ' ft/fP =', fOfp(JSEA), ' StkDiag0 =', StkDiag(1)*Dsn, &
-               ' StT0 = ', StT0*Dsn, ' Mdiag = ', Mdiag
+               ' Mdiag = ', Mdiag ! , ' StT0 = ', StT0*Dsn, 
         end if
 
-        if ( ntr > NP ) then
+        ! if ( ntr > NP ) then
            
-          !
-          ! Add remaining 'tail of the tail'. See discussion
-          ! '4. Tail of the tail' in SUBROUTINE diag_DE_init
+          ! 
+          ! Ignored for now:  remaining 'tail of the tail'. See discussion
+          ! '5b. Tail of the tail'
           !
           ! Simplified model. The surface magnitude StT0*Dsn should be small.
           ! Parameters estimated in diag_DE_init(): The normalized
@@ -1069,26 +970,15 @@
           ! StTail(ZK) = StT0 * exp ( -StTE * ZK ). StT0 and StTE are 
           ! estimated by a fit at two points, ZK=(0.0,0.05) .
           
-          k_scl = -StTE * ( SIG(IKT) /TPI * Ts / fOfP(JSEA) )**2
+          ! Rk = -StTE * ( SIG(IKT) /TPI * Ts / fOfP(JSEA) )**2
 
-          StkDiag(:) = StkDiag(:) + StT0 * exp ( ZK_S(:)*k_scl )
+          ! StkDiag(:) = StkDiag(:) + StT0 * exp ( ZK_S(:)*Rk )
 
-          ! This may be faster:
-          ! xkzm1_scl=(XZK-1.)*k_scl
-          ! tt=StT0
-          ! StkDiag(1) = StkDiag(1) + tt
-          ! do IZ = 2,XSND
-          !    if ( tt < 1.e-3*StkDiag(IZ) ) exit
-          !    tt = tt*exp((ZK_S(IZ)+1)*xkzm1_scl)
-          !    ! or: tt = tt*(1+(ZK_S(IZ)+1)*xkzm1_scl)
-          !    StkDiag(IZ) = StkDiag(IZ) + tt
-          !    
-          ! end do
 
-          if ( xsto_verbose .gt. 2 ) &
-             WRITE (NDSV, 906), 'k_scl =', k_scl, 'nt =', nt
+          ! if ( xsto_verbose .gt. 2 ) &
+          !    WRITE (NDSV, 906), 'Rk =', Rk, 'nt =', nt
 
-          end if
+        !   end if
 
         ! Multiply with the normalization factor (spectral level * U10)
         StkDiag(:) = StkDiag(:) * Dsn
@@ -1111,7 +1001,6 @@
       MprogX = 0.
       MprogY = 0.
 
-      ! When calculating exp(2 K Z) it may be faster to increment from IK-1
       ! In XSTOKES_INIT:
       DWN(1) = WN(1,ISEA)
       DWN(2:NK) = WN(2:NK,ISEA) - WN(1:NK-1,ISEA)
@@ -1144,18 +1033,6 @@
 
         EZTK(:) = EZTK(:) * EXP( DWN(IK) * TZ_S(:) )
 
-        ! Not confirmed:
-        ! It may be even faster to increment from IZ-1, use Depth intervals * 2:
-        ! TDZ(1)=0
-        ! TDZ(2:XSND) = 2.0 * ( ZK_S(2:XSND) - ZK_S(1:XSND-1) ) / K_S
-        !
-        ! EDWTZ=1.
-        ! DO IZ = 2,XSND
-        !   DDWTZ = DWN(IK) * TDZ(IZ) ! where TDZ(IZ)= 2 * depth intervals
-        !   EDWTZ = EDWTZ * EXP(-DDWTZ)
-        !   EZTK(IZ) = EZTK(IZ) * EDWTZ
-        !   END DO
-        
         ! Action spectrum at frequency bin IK projected on x and y
         AX = 0.
         AY = 0.
@@ -1239,15 +1116,6 @@
         
         EZTK(:) = EZTK(:) * EXP( DWN(IK) * TZ_S(:) )
 
-        ! (Not confirmed:) It may be faster to increment from IZ-1:
-        ! EDWTZ=1.
-        ! DO IZ = 2,XSND
-        !   DDWTZ = DWN(IK,JSEA) * TDZ(IZ) ! where TDZ(IZ)= 2 * depth intervals
-        !   EDWTZ = EDWTZ*EXP(-DDWTZ)
-        !   EZTK(IZ) = EZTK(IZ)*EDWTZ
-        !   END DO
-
-
         ! Action-to-Stokes profile factor
         A2S(:) = A2S0 * EZTK(:)
         
@@ -1311,19 +1179,6 @@
              SUM ( StkDiag(1:numDepths) * DZK_S(1:numDepths)/K_S ) &
              - 0.25 * ( StkDiag(1) - StkDiag(2) ) * DZK_S(1)/K_S
       end if
-        
-      WRITE (NDSV, 915), ' Mres_rel   = ', sqrt(Mres_rel)
-      if ( numDepths < XSND  ) WRITE (NDSV, 915), ' Shallow KD = ', KDPT
-          
-      if ( xsto_verbose .gt. 2 ) then
-        if ( numDepths < XSND  ) then      
-          Ares_rel = 1. + 0.5 * log ( Mres_rel )  / KDPT
-        else
-          Ares_rel = 1. + 0.5 * log ( Mres_rel )  / ZK_S(numDepths)
-          end if
-        WRITE (NDSV, 915), 'Ares_rel = ', Ares_rel
-
-        end if
           
 ! Formats
 !
@@ -1341,22 +1196,19 @@
       
       SUBROUTINE diag_DE_init(Np)
         
-      ! Stokes drift for the diagnostic tail of Donelan_Ewans spectrum.
-      ! Set parameters in Ewans' formulas
-      ! Pre-calculate for XSTOKES_INIT and CALC_XSTOKES:
+      !  Stokes drift for the diagnostic tail of Donelan_Ewans spectrum.
+      !  Set parameters in Ewans' formulas
+      !  Pre-calculate for XSTOKES_INIT and CALC_XSTOKES:
       !   - A normalized array DStkOsn(1:NK+1)
       !   - Table Im(1:Np) of normalized integrated momemtum
-      !   - StT0, StTE: Parameters in a simplified 'tail of the tail'
-      ! Here is the explicit procedure to be performed:
-      
-      ! The surface Stokes drift for every spectral bin is multiplied with 
-      ! the depth factor EXP( -2 K Z), Assuming deep water formulation at 
-      ! the high frequencies.
-      
-      !--------------------
+      !   - Ignored for now: StT0, StTE: Parameters in a simplified
+      !     'tail of the tail'
       !
-      !
-      !  1. The tail directional spreading
+      !  The surface Stokes drift for every spectral bin is multiplied with 
+      !  the depth factor EXP( -2 K Z), assuming deep water dispersion relation
+      !  at the high frequencies.
+      
+      !  Calculation of the tail directional spreading:
       !  
       !  Given a spectrum of shape 
       !  S(omega) = H(omega,theta) * alpha * U * g * omega^{-4}
@@ -1369,7 +1221,7 @@
       !  The first circular moment is defined as
       !    m1 = int_{-pi}^pi cos(theta) H(omega,theta) d theta
       !  Ewans (1997) provides an expression given as a function 
-      !  m1t(f/fP), based on at fit to observations (the 'Maui'
+      !  m1E(f/fP), based on at fit to observations (the 'Maui'
       !  experiment).
       !   
       !  The binned contribution to the stokes drift is influenced by the first
@@ -1379,200 +1231,20 @@
       !  With Ewans' expression for the directional spread: 
       !     sigma = sa - sb * (fP/f)**2              
       !     theta_m1 = ta * exp( tb * fP/f )        
-      !     m1 = cos(theta_m1) * exp( -(sigma**2)/2 )
+      !     m1E = cos(theta_m1) * exp( -(sigma**2)/2 )
       !  
       !  In the vicinity of fh=f/fP ~ fh0 ~ 2.5, this may be approximated as
-      !     m1(fh) = m1(fh=1) * exp( phih * (fh - 1.) )
+      !     m1t(fh) = m1E(fh=1) * exp( aa sinh(phih * (fh - 1.)) )
       !  where 
-      !     phih = (fh/m1) * {d m1 / d fh} 
-      !  m1(fh) converges to zero at high frequences.
+      !     phih = (1/(aa m1) * {d m1 / d fh} 
+      !  m1t(fh) converges to zero at high frequences.
       !  
-      !  A similar overall, and converging, approximation to d Stokes(f) is
-      !     d Stokes(f) / (alpha U) = exp( shfac * sinh(phih*(fh - 1.)) ) *dSOsn
-      !  where shfac is an order 1 amplification, and multiplied by a common
-      !  factor
-      !     dSOsn = 2. * m1(fh=1) * d f / f
-      !  and where phih is chosen for the range between fh ~ 1 to fh2 ~ 2
-      !     phih = (fh1 / shfac / m1(fh=fh1)) * (d m1(fh=fh2) /d fh )
-      !   
       !  Choices of these parameters were compared graphically in a Python
-      !  program 
-      !       /home/cha/projects/wave/WW3ToSTWStokes/python_work/Ewans_m1.py
-      !  and we end up with a good overall fit choosing
+      !  program and we end up with a good overall fit choosing
       !  
-      !  ftOfP = 1. ! =ft/fP
-      !  ftOfPd = 2.
-      !  shfac = 1.25
+      !  phih=-0.187
+      !  aa = 1.25
       !  
-      !  phih = ftOfP / shfac / m1t_Ew97( ftOfPd ) * m1deriv_Ew97( ftOfPd )
-      !  
-      !  See the formulas below.
-      !
-      !
-      !  2. Integrated pseudo-momentun over the diagnostic spectral tail
-      !
-      !  Construct a look-up array
-      !  Im(n), where ft/fP = fhn = DFH**n, n = 1, ..., Np
-      !  Im(n) = sum_fhn^fhcut m1t(fh) fh^-2 log(DFH)
-      !  The integrated momentum of the spectral tail is
-      !  M(ft) = GRAV * Dsn sigP^-2 Im(n), n = log(ft/fP)/log(DFH)
-      !
-      !  M is a first 'kv/sig'-moment - like the the first spectral moment
-      !  (that determines the mean wave period) but considered a vector sum.
-      !  kv is the wave number vector, kv = k * (cos(theta), sin(theta))
-      !
-      !
-      !  3. Diagnostic tail until Ncut
-      !
-      !  Indexing the tail: fh = DFH**(nt-1)
-      !  Value of fh just beyond prognostic tail:
-      !  fht = DFH**Np
-      !
-      !  How would a direct (no-lookup) calculation of the tail be?
-      !
-      !  Surface only, DStkOsn(:):
-      !  iz = 1
-      !  lStokes = lStokes0  ! Take a copy of the 0-array
-      !  k2zh = 0. ! = 2. * (dkz_scl ** (iz-1) - 1.)
-      !  ! Very high frequency tail, beyond usage indexing
-      !  
-      !  fh = fht 
-      !  do ntt = Np+1, Ncut
-      !        DStkOsn(ntt) = exp( sinh(phih * (fh - 1.)) )
-      !        Sum = Sum + DStkOsn(ntt)
-      !        fh = fh * DFH
-      !  end do
-      !  DStkOsn(Np+1)=Sum
-      !
-      !  XKH = DFH**2
-      !
-      !  k_scl = fOfp(JSEA)**2
-      !  ! Loop over spectral bins
-      !  do ntt = NP + 1, Ncut
-      !    ! Surface Stokes drift for the spectral bin
-      !    SBDia = DStkOsn(ntt)
-      !    ! Loop over depth bins
-      !    do iz = 1,NZ
-      !      ! Assume no shallow water effect at high frequencies
-      !      A2S = EXP( - 2. * k_scl * ZK_S(iz) )
-      !      StkDiag(iz) = StkDiag(iz) + SBDia * A2S
-      !      end do
-      !    ! Increment the k scale
-      !    k_scl = k_scl * XKH
-      !    end do
-      !
-      !  Construction of k_scl(ntt) and ZK_S(iz) to allow pre-calculation of
-      !  a common array DStkOsn(ntt) rpresenting the tail contribution at Z=0:
-      !
-      !  XKH = DFH**2
-      !  do ntt = nt, Np
-      !    k_scl(ntt) =  [ to be determined ]
-      !    end do
-      !  ! Loop over spectral bins
-      !  do ntt = nt, Np
-      !    ! Surface Stokes drift for the spectral bin
-      !    SBDia = DStkOsn(ntt)
-      !    ! Loop over depth bins
-      !    do iz = 1,NZ
-      !      ! Assume no shallow water effect at high frequencies
-      !      A2S = EXP( - 2. * k_scl(ntt) * ZK_S(iz) )
-      !      StkDiag(iz) = StkDiag(iz) + SBDia * A2S
-      !      end do
-      !    end do
-      !
-      !
-      !  How is k_scl * ZK_S organized (bin-wise) in the above?
-      !
-      !  We consider a binned extension of the tail beyond a cut-off wave
-      !  number WN(nt). At bin index ntt,
-      !  K(ntt) = WN(nt) * XKH**(ntt-nt)
-      !  K(ntt) * Z = ZK_S * fOfp(JSEA)**2 * XKH**(ntt-nt)
-      !             = ZK_S * fOfp(JSEA)**2 / XKH**nt * XKH**ntt
-      !
-      !  To determine k_scl(ntt) (nt=nt..Np) we try the construction:
-      !  k_scl(ntt) = k_scl0 * XKH**(ntt-nt)
-      !
-      !  We have a special construction of the binned ZK_S(iz):
-      !  ZK_S(iz) = XZK ** (iz-1) - 1.
-      !  XZK = (1. + XSDS)**(1./(XSND-1.))
-      !  ZK_S(iz+1) = XZK ** iz - 1
-      !
-      !  With this construction we have for A2S(iz) in the above procedure,
-      !  A2S(iz+1) = exp(k_scl(ntt)) * exp( - 2 * k_scl(ntt) * XZK ** iz )
-      !         
-      !  Now, approximately within a bin, k_scl0 = XKH**nt, and
-      !  
-      !  k_scl(ntt) = XKH**ntt for ntt in (1..Np)
-      !  
-      !  k_scl(ntt) * ZK_S(iz) = XKH**ntt * (XZK**(iz-1) - 1)
-      !  
-      !  A2S = exp (-2 * k_scl(ntt) * ZK_S(iz)) 
-      !      = exp( -2 * XKH**ntt * (XZK**(iz-1)- 1) )
-      !
-      !
-      !  4. Tail of the tail
-      !
-      !  ! The following derivation is consistent with the code above
-      !
-      !  A supplement tail is appended at the *end* of the discretized
-      !  diagnostic range. That is, always at the 'Ewans peak' fP times XKH**Np,
-      !  where Np is the number of bins in the tail-lookup array, and
-      !  XKH = DFH**2 
-      !  is the wavenumber increment factor from bin-to-bin, and
-      !  fP = ft/fOfP, ft = SIG(IKT)/TPI.
-      !  Consider the normalized depth at the base of the supplement tail,  
-      !  ZK = XKH**Np * ZK_S.
-      !  Here, the integral scale (ZK_S) is defined from an integral frequency
-      !  Fs, which is related to fP. The depth scale is modified accordingly by
-      !  a factor (fP/Fs)**2. From the above expressions, 
-      !  fP/Fs = SIG(IKT)/TPI/fOfP/Fs
-      !  
-      !  The exponential decay with depth of the spectral component at the base
-      !  of the tail-of-tail is a factor EXP( -k_c * ZK_S(iz) ), where
-      !  k_c = 2. * XKH**Np * fP/Fs**2
-      !
-      !  Let an overall parameter be
-      !  k2T = 2. * XKH**Np
-      !  Then for each local value of fOfp,
-      !  k_c = k2T / (fOfP*Fs)**2 * (SIG(IKT)/TPI)**2
-      !         
-      !  A normalized Stokes drift for the tail StTOsn(iz) is calculated as
-      !  follows:
-      !  fht = DFH**Np
-      !  do iz = 1,NZ
-      !    fh = fht
-      !    k_c = k2T
-      !    Sum = 0.
-      !    do ntt = NP + 1, Ncut
-      !      Sum = Sum + exp( sinh(phih * (fh - 1.)) - k_c * ZK_S(iz) )
-      !      fh = fh * DFH
-      !      k_c = k_c * XKH
-      !      end do
-      !    StTOsn(iz) = Sum * SOsn
-      !    end do
-      !
-      !  For arbitrary local values of fOfp, Fs:
-      !  k_ct = k2T / (fOfP*Fs)**2 * (SIG(IKT)/TPI)**2, where
-      !  k2T = 2. * DFH**(2*Np)
-      !
-      !  For each iz we consider the nearest integer iz_scl such that
-      !  (Eq. 1)   k2T * ZK_S(iz_scl) = k_ct * ZK_S(iz)
-      !  KZ_STK has been constructed (see diag_DE_init()) such that
-      !            ZK_S(iz_scl) = XZK**(iz_scl -1) - 1
-      !  The tail contribution to StkDiag(iz) is StokesTailOsn(iz_scl)
-      !
-      !  Let us derive iz_scl from Eq. 1. Add 1 and 
-      !  take the log of both sides
-      !            (iz_scl - 1) * log(XZK) = log ( k_ct/k2T * ZK_S(IZ) + 1 )
-      !  Thus, truncated to integer part,
-      !  iz_scl = int(log ( k_ct/k2T * ZK_S(IZ) + 1. )/log(XZK)) + 1
-      !  
-      !  Compare this with the expressions above
-      !  k_scl = ( SIG(IKT) /TPI * Ts / fOfP(JSEA) )**2 is equivalent to:
-      !  k_scl = k_ct/k2T
-      !  log_XZK = log(XZK) ! Note that generally log_dkz_scl != log(XZK)
-      !  iz_scl = int( log( ZK_S(iz)*k_scl + 1 ) / log_XZK ) + 1
-      !
 
 !/
 !/ ------------------------------------------------------------------- /
@@ -1583,9 +1255,8 @@
       integer, intent(in)        :: Np
 
       ! local variables 
-      real                       :: ftOfP, ftOfPd, shfac, m1pr
-      real                       :: phih,SOsn,logdf,StT1
-      real                       :: logdkz, Sum, fht, fh, k2T, k_c
+      real                       :: aa,phih,logdf ! ,SOsn ,StT1
+      real                       :: fht, fh !, k2T, k_c
       real                       :: dfhi
       real                       :: fhPm2, idf2, df2, ImS
 
@@ -1609,45 +1280,38 @@
       ! Smallest fOfp valid for our approximations to Ewans' formulas
       fOfp_min = sqrt(sa/sb)
       
-      ! A practical asymptotic value for small fOfp in m1t_Ew97():     
-      m_deriv_min = m1deriv_Ew97( fOfp_min )
+      ! A practical asymptotic value for small fOfp in m1_Ew98():     
+      m_deriv_min = m1deriv_Ew98( fOfp_min )
       
       ! First circular moment at fOfp_min
-      m1_max = m1t_Ew97( fOfp_min )
+      m1_max = m1_Ew98( fOfp_min )
       
       logdf = log(DFH) ! Log of the increment frequency factor
                        ! Be aware: DFH may *differ* from the prognostic bin 
                        ! increment factor XFR
       
-      ! fOfpCut is an order of magnitude cut-off at the upper limit of 
-      ! validity for the directional distribution formula. The associated 
-      ! bin number is
+      ! The bin number associated with fOfpCut is
       Npcut = Np + int( log(fOfpCut)/logdf )
 
       ! Inverted integration frequency increment
       dfhi = 1./DFH
 
-      ! Under the above '1. The tail directional spreading', we argue that
-      
-      ftOfP = 1. ! =ft/fP
-      ftOfPd = 2.
-      shfac = 1.25
-
-      phih = ftOfP / shfac / m1t_Ew97( ftOfPd ) * m1deriv_Ew97( ftOfPd ) 
+      ! Suggested approximation, parameter values      
+      aa = 1.25
+      phih = -0.187
       
       fh = 1.
       do nt = 1,Np
-        DStkOsn(nt) = exp( shfac * sinh(phih * (fh - 1.)) )        
+        DStkOsn(nt) = exp( aa * sinh(phih * (fh - 1.)) )        
         fh = fh * DFH
         end do
+
+      ! A discrete array representing d Stokes(f) / (alpha U) then becomes
+      ! (with d f / f = logdf)
         
-      ! With d f / f = logdf,
-      SOsn = 2. * m1t_Ew97(1.) * logdf
-      ! and a discrete array representing d Stokes(f) / (alpha U) becomes
-      DStkOsn = DStkOsn * SOsn
+      DStkOsn = m1_Ew98(1.) * DStkOsn * 2. * logdf      
       
-      
-      ! Lookup table Im(1:Np) (above '2. Integrated pseudo-momentun')
+      ! Lookup table Im(1:Np) (See '4. Integrated pseudo-momentun')
        
       fht = DFH**Np ! Value of fh just beyond the prognostic tail
 
@@ -1658,7 +1322,7 @@
       do ntt = Np + 1, Npcut
         fhPm2 = fhPm2 * idf2 != 1./(fh*DFH)**2 = fh ^ -2
         fh = fh * DFH
-        ImS = ImS + exp( shfac * sinh(phih * (fh - 1.)) ) * fhPm2 
+        ImS = ImS + exp( aa * sinh(phih * (fh - 1.)) ) * fhPm2 
         end do
       
       Im(Np) = ImS
@@ -1668,52 +1332,49 @@
       fhPm2 = 1./fht**2
       df2 = DFH**2
       do nt = Np-1,1,-1
-        Im(nt) = Im(nt+1) + exp( shfac * sinh(phih * (fh - 1.)) ) * fhPm2 
+        Im(nt) = Im(nt+1) + exp( aa * sinh(phih * (fh - 1.)) ) * fhPm2 
         fhPm2 = fhPm2 * df2 != 1./(fh/DFH)**2 = fh ^ -2
         fh = fh * dfhi        
         end do
       
       ! Im(Np+1) = ImS * 2 - Im(Np-1) ! Used in extended linear interpolation
       Im(Np+1) = 0. ! When used in extended linear interpolation
-      Im(:) = Im(:) * ( m1t_Ew97(1.) * logdf )
+      Im(:) = Im(:) * ( m1_Ew98(1.) * logdf )
 
       if ( xsto_verbose .gt. 2 ) WRITE (NDSV, *), 'Im(:) =', Im(:)
 
-     
-      ! Supplemental tail beyond nt = Np ( above point '4. Tail of the tail')
+      ! Ignored for now: 
+      ! Supplemental tail beyond nt = Np
       
       ! A two-parameter, simplified  model is applied
       ! StTail(ZK) = StT0 * exp ( -StTE * ZK ).
       ! StT0 and StTE are estimated by a fit at two points, ZK=(0.0,0.05) .
       ! See also the explanation where StT0 and StTE are used, starting with:
       
-      ! XKH is the wavenumber increment factor from bin-to-bin
-      XKH = DFH**2
-            
-      StT0 = 0.
-      StT1 = 0.
-      fht = DFH**Np ! Value of fh just beyond the prognostic tail
-      k2T = 2. * XKH**Np
+      ! StT0 = 0.
+      ! StT1 = 0.
+      ! fht = DFH**Np ! Value of fh just beyond the prognostic tail
+      ! k2T = 2. * XKH**Np
       
       ! Fit at two points, ZK=(0.0,0.05) .
-      fh = fht ! Value of fh just beyond the prognostic tail
-      k_c = k2T
-      do ntt = Np + 1, Npcut
-         StT0 = StT0 + exp( shfac * sinh(phih * (fh - 1.)) )
-         fh = fh * DFH
-         end do
-      fh = fht
-      k_c = k2T
-      do ntt = Np + 1, Npcut
-         StT1 = StT1 + exp( -k_c * 0.05 + shfac * sinh(phih * (fh - 1.)) )
-         fh = fh * DFH
-         k_c = k_c * XKH
-         end do
+      ! fh = fht ! Value of fh just beyond the prognostic tail
+      ! k_c = k2T
+      ! do ntt = Np + 1, Npcut
+      !    StT0 = StT0 + exp( aa * sinh(phih * (fh - 1.)) )
+      !    fh = fh * DFH
+      !    end do
+      ! fh = fht
+      ! k_c = k2T
+      ! do ntt = Np + 1, Npcut
+      !    StT1 = StT1 + exp( -k_c * 0.05 + aa * sinh(phih * (fh - 1.)) )
+      !    fh = fh * DFH
+      !    k_c = k_c * XKH
+      !    end do
          
-      StTE = -log(StT1/StT0) / 0.05
-      StT0 = StT0 * SOsn
-      if ( xsto_verbose .gt. 2 ) WRITE (NDSV, *), &
-              '   StT0, StTE =', StT0, StTE
+      ! StTE = -log(StT1/StT0) / 0.05
+      ! StT0 = StT0 * SOsn
+      ! if ( xsto_verbose .gt. 2 ) WRITE (NDSV, *), &
+      !         '   StT0, StTE =', StT0, StTE
             
       if ( xsto_verbose .gt. 2 ) &
         WRITE (NDSV, 906), 'Ewans parameters: sa =', sa, &
@@ -1851,25 +1512,24 @@
       
 ! cha 20110523 notes:
 !    This conversion to energy is similar to 
-!              w3iogomd.ftn and the 'Test output' in w3updtmd.ftn.
-!              In w3iogomd it is:  ET = (sum over)A * DDEN/CG 
-!              In 'Test output': ETOT = (sum over)A * DSIP * SIG/CG*  DTH
-!              
-!              The parameters are set running ww3_grid.ftn. Here,
-!              DSIP = SIGMA * SXFR, where SXFR = 0.5 * (XFR-1./XFR) (~ 0.1)
-!              DDEN = DTH * DSIP * SIG
+!    w3iogomd.ftn and the 'Test output' in w3updtmd.ftn.
+!    In w3iogomd it is:  ET = sum( A * DDEN(IK) / CG(IK,ISEA) )
+!    In 'Test output': ETOT = sum( A * DSIP(IK) * SIG(IK) / CG(IK,ISEA) * DTH )
+!    
+!    The parameters are set running ww3_grid.ftn. Here,
+!    DSIP(IK) = SIGMA * SXFR(IK), where SXFR = 0.5 * (XFR-1./XFR) (~ 0.1)
+!    DDEN(IK) = DTH * DSIP(IK) * SIG(IK)
 !
-!    This conversion to energy differs from 'the WAM book' (Komen et al. 1994).
-!              Wave-number and frequency energy spectrum are related as
-!              (User manual for WW3, MMAB_276.pdf, Eq. 2.4):
-!              F(k,th) dth dk = S(\sigma,th) dth d\sigma
-!              Thus, wave-number action spectrum, A(k) = F(k)/\sigma, is:
-!              A(k,th) dth dk = S(\sigma,th) / \sigma dth d\sigma
+!    Wave-number and frequency energy spectrum are related as
+!    (User manual for WW3, MMAB_276.pdf, Eq. 2.4):
+!    F(k,th) dth dk = S(\sigma,th) dth d\sigma
+!    Thus, wave-number action spectrum, A(k) = F(k)/\sigma, is:
+!    A(k,th) dth dk = S(\sigma,th) / \sigma dth d\sigma
 !
-!              Komen et al., 1994 (the WAM Book) has a different definition 
-!              of spectral density in the wavenumber domain (Eq. 1.137):
-!              F(k,th) k dth dk = S(\sigma,th) dth d\sigma
-!              
+!    Komen et al., 1994 (the WAM Book) has a different definition 
+!    of spectral density in the wavenumber domain (Eq. 1.137):
+!    F(k,th) k dth dk = S(\sigma,th) dth d\sigma
+!
   906 FORMAT ('  ',6(A,G9.2))
 
       END SUBROUTINE prog_edge_DE
@@ -1881,7 +1541,7 @@
       SUBROUTINE equivalent_tail(m1,fOfpE,fOfp0,fOfp1,xacc,stat)
       ! Given a first circular moment m1, determine an equivalent value of
       ! the spectral peak, f/fpE, that reproduces the Maui spectral shape 
-      ! (see function m1t_Ew97()).
+      ! (see function m1_Ew98()).
       
       IMPLICIT NONE
       
@@ -1903,7 +1563,7 @@
       if ( present(xacc)) xacc_=xacc
       
       ! Determine the value of the equivalent peak (fp) from a root fOfpE of
-      ! m1Ed_Ew97(fOfp) = ( m1t_Ew97( fOfp ) - m1 ). First set a global
+      ! m1Ed_Ew98(fOfp) = ( m1_Ew98( fOfp ) - m1 ). First set a global
       ! representation of m1 as a limited value m1E:
       
       if ( m1 > m1_max ) then
@@ -1913,7 +1573,7 @@
         end if
       
       ! Determine the root fOfpE
-      fOfpE = rtnewt(m1Ed_Ew97, fOfpE, 0.0, fOfp1_, xacc_, status_)
+      fOfpE = rtnewt(m1Ed_Ew98, fOfpE, 0.0, fOfp1_, xacc_, status_)
 
       ! Validate the result
       if ( (fOfp0_-fOfpE)*(fOfpE-fOfp1_).lt.0.) then
@@ -1993,21 +1653,21 @@
 
 !/ ------------------------------------------------------------------- /
 !/      
-      SUBROUTINE m1Ed_Ew97(fOfp, f, df)
+      SUBROUTINE m1Ed_Ew98(fOfp, f, df)
       
       IMPLICIT NONE
       REAL, INTENT(IN)        :: fOfp
       REAL, INTENT(OUT)       :: f, df
       
-      f = m1t_Ew97(fOfp) - m1E
-      df = m1deriv_Ew97(fOfp)
+      f = m1_Ew98(fOfp) - m1E
+      df = m1deriv_Ew98(fOfp)
       
-      END SUBROUTINE m1Ed_Ew97
+      END SUBROUTINE m1Ed_Ew98
       
       
 !/ ------------------------------------------------------------------- /
 !/    
-      real function m1t_Ew97(fOfp)
+      real function m1_Ew98(fOfp)
       
         real, intent(in)        :: fOfp
         real                    :: m1, fpOf, sigma, theta_m1, fpD
@@ -2024,23 +1684,23 @@
         
         theta_m1 = ta * exp( tb * fpOf )
         
-        m1t_Ew97 = cos(theta_m1) * exp( -(sigma**2)/2 )
+        m1_Ew98 = cos(theta_m1) * exp( -(sigma**2)/2 )
         
         ! Define a practical asymptotic value for small fOfp:    
         if ( fpD .lt. 0.0 ) then
-            m1t_Ew97 = m1t_Ew97 + fpD * m_deriv_min
+            m1_Ew98 = m1_Ew98 + fpD * m_deriv_min
         end if
         
-      end function m1t_Ew97
+      end function m1_Ew98
       
       
-      real function m1deriv_Ew97(fOfp)
+      real function m1deriv_Ew98(fOfp)
       
       real, intent(in)        :: fOfp
       real                    :: fpOf, sigma, theta_m1
       
       if (fOfp .lt. fOfp_min) then
-        m1deriv_Ew97 = m_deriv_min
+        m1deriv_Ew98 = m_deriv_min
         return
         end if
       
@@ -2049,12 +1709,12 @@
            
       theta_m1 = ta * exp( tb * fpOf )
       
-      m1deriv_Ew97 = ( sin(theta_m1) * theta_m1 * tb &
+      m1deriv_Ew98 = ( sin(theta_m1) * theta_m1 * tb &
                         - cos(theta_m1) * sigma * 2. * fpOf * sb ) &
                       * exp( -(sigma**2)/2 ) * fpOf**2
       
       
-      end function m1deriv_Ew97
+      end function m1deriv_Ew98
 
 
 !/
