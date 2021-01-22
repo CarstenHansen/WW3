@@ -407,9 +407,13 @@ $
 $ In the 'Out of the box' test setup we run with sub-grid obstacles
 $ and with continuous ice treatment.
 $
-  &XSTO NDP = 7, DSC = 2.0, TYP = 'DoEw' /
+  &XSTO NDP = 11, DSC = 1.0, TYP = 'DE20' /
   &MISC CICE0 = 0.25, CICEN = 0.75, FLAGTR = 4 /
   &FLX3 CDMAX = 3.5E-3 , CTYPE = 0 /
+  &SDS4 SDSBCHOICE=3, SDSC2 = -3.8, SDSBR = 0.005, 
+       SDSSTRAIN =0., SDSSTRAIN2 = 0., FXFM3 = 20., SDSFACMTF = 400., 
+       SDSCUM=0., SDSC5 =0. /
+
 $ &SDB1 BJGAM = 1.26, BJFLAG = .FALSE. /
 $
 $ Mandatory string to identify end of namelist input section.
