@@ -257,7 +257,14 @@
   TYPE%FIELD%LIST     = 'HS DIR SPR WND ICE CUR LEV'
 /
 
+&FCUT_COUNT_NML
+  FCUT_COUNT%N_FIELD = 1
+/
 
+&FCUT_NML
+  FCUT(1)%FIELD    = 'XSP'
+  FCUT(1)%FREQ     = 2.0
+/
 
 ! -------------------------------------------------------------------- !
 ! Define output dates via OUTPUT_DATE_NML namelist

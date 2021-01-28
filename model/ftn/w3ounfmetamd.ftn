@@ -168,11 +168,14 @@
       INTEGER            :: NCVARTYPE   ! netCDF variable type
       CHARACTER(LEN=30)  :: DIRCOM      ! Direction convention comment
       CHARACTER(LEN=128) :: PARTCOM     ! Partitioning method comment
-
+!/MFIT!
+!/MFIT      LOGICAL            :: DO_MFIT = .FALSE.
+      
       CONTAINS 
 
 !/ ------------------------------------------------------------------- /
-      SUBROUTINE INIT_META()
+      SUBROUTINE INIT_META(FLG2D)
+!/MFIT! C Hansen note: FLG2D is for the fb_xsmf branch only
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -193,6 +196,9 @@
 !/XSTO       USE W3IOGOMD, ONLY: W3FLDTOIJ
       
       IMPLICIT NONE
+!/MFIT! C Hansen note: FLG2D is for the fb_xsmf branch only
+      LOGICAL, INTENT(IN) :: FLG2D(NOGRP,NGRPP)
+!/MFIT!      
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
@@ -200,7 +206,6 @@
       LOGICAL :: FLGNML
       INTEGER :: I, J
 !/XSTO      INTEGER :: K
-
       ! 1. Allocate nested GROUP, FIELD structure:
       ALLOCATE(GROUP(NOGRP))
       DO I = 1,NOGRP
@@ -229,25 +234,28 @@
 !/XSTO            ALLOCATE(GROUP(I)%FIELD(K)%META(2)) ! 2 components
 !/XSTO          ENDDO
 !/MFIT        CALL W3FLDTOIJ('MFIT  ', I, J, 1, 1, 1)
-!/MFIT        IF ( ALLOCATED(GROUP(I)%FIELD)) THEN      
-!/MFIT          ! C Hansen: Reallocate GROUP(10)%FIELD)
-!/MFIT          DO K = 1,NOGE(I)
-!/MFIT            DEALLOCATE(GROUP(I)%FIELD(K)%META)
+!/MFIT        DO_MFIT = .FALSE.
+!/MFIT        IF ( FLG2D(I, J) ) DO_MFIT = .TRUE.
+!/MFIT        IF ( DO_MFIT ) THEN
+!/MFIT          IF ( ALLOCATED(GROUP(I)%FIELD)) THEN      
+!/MFIT            ! C Hansen: Reallocate GROUP(10)%FIELD)
+!/MFIT            DO K = 1,NOGE(I)
+!/MFIT              DEALLOCATE(GROUP(I)%FIELD(K)%META)
+!/MFIT            ENDDO
+!/MFIT            DEALLOCATE(GROUP(I)%FIELD)
+!/MFIT          END IF      
+!/MFIT          ALLOCATE(GROUP(I)%FIELD(max(J+6,NOGE(I)+6)))      
+!/MFIT          DO K = 1,J+1
+!/MFIT            ALLOCATE(GROUP(I)%FIELD(K)%META(2)) ! 2 components
 !/MFIT          ENDDO
-!/MFIT          DEALLOCATE(GROUP(I)%FIELD)
-!/MFIT        END IF      
-!/MFIT        ALLOCATE(GROUP(I)%FIELD(max(J+6,NOGE(I)+6)))      
-!/MFIT        DO K = 1,J+1
-!/MFIT          ALLOCATE(GROUP(I)%FIELD(K)%META(2)) ! 2 components
-!/MFIT        ENDDO
-!/MFIT        DO K = J+2,J+6
-!/MFIT          ALLOCATE(GROUP(I)%FIELD(K)%META(1)) ! 1 component
-!/MFIT        ENDDO
-!/MFIT        ! Another user parameter, J = 2
-!/MFIT        DO K = J+7,8
-!/MFIT          ALLOCATE(GROUP(I)%FIELD(K)%META(3)) ! 3 components
-!/MFIT        ENDDO
-
+!/MFIT          DO K = J+2,J+6
+!/MFIT            ALLOCATE(GROUP(I)%FIELD(K)%META(1)) ! 1 component
+!/MFIT          ENDDO
+!/MFIT          ! Another user parameter, J = 2
+!/MFIT          DO K = J+7,8
+!/MFIT            ALLOCATE(GROUP(I)%FIELD(K)%META(3)) ! 3 components
+!/MFIT          ENDDO
+!/MFIT        END IF ! ( DO_MFIT )
       ! Allocate storage for Global meta-data
       ALLOCATE(GLOBAL_META(MAX_GBLMETA))
       N_GBLMETA = 0
@@ -2649,7 +2657,7 @@
 !/XSTO      META(1)%ENAME  = '.xsm'
 !/XSTO      META(1)%VARND = DIRCOM
 !/XSTO      META(1)%VARNG=''
-!/XSTO!/MFIT      IF ( .FALSE. ) THEN
+!/XSTO!/MFIT        IF ( .NOT. DO_MFIT ) THEN
 !/XSTO      META(1)%FSC    = 1.
 !/XSTO      META(1)%VMIN = -1000 
 !/XSTO      META(1)%VMAX =  1000
@@ -2667,16 +2675,16 @@
 !/XSTO!/MFIT        META(1)%VARNS=''
 !/XSTO!/MFIT        META(1)%VARNM='MKX'
 !/XSTO!/MFIT        META(1)%VARNL='Eastward wave pseudo-momentum * 2 * Kz'
-!/XSTO!/MFIT      END IF
+!/XSTO!/MFIT      END IF ! ( .NOT. DO_MFIT )
 !/XSTO      META(2)=META(1)
-!/XSTO!/MFIT      IF ( .FALSE. ) THEN
+!/XSTO!/MFIT        IF ( .NOT. DO_MFIT ) THEN
 !/XSTO      META(2)%VARNM='vxsm'
 !/XSTO      META(2)%VARNL='northward wave pseudo momentum'
 !/XSTO      META(2)%VARNS='northward_wave_pseudo_momentum'
 !/XSTO!/MFIT      ELSE
 !/XSTO!/MFIT        META(2)%VARNM='MKY'
 !/XSTO!/MFIT        META(2)%VARNL='Northward wave pseudo-momentum * 2 * Kz'
-!/XSTO!/MFIT      END IF
+!/XSTO!/MFIT      END IF ! ( .NOT. DO_MFIT )
 !
 !---------- GROUP 7 ----------------
 !   
@@ -2938,7 +2946,8 @@
 !
 ! IFI=10, IFJ=1
       META => GROUP(10)%FIELD(1)%META
-!/MFIT      ! The seven subfields (IFJ=1,2,3) are joined in the netCDF file
+!/MFIT      IF ( DO_MFIT ) THEN
+!/MFIT      ! The seven subfields (IFP=1..7) are joined in the netCDF file
 !/MFIT      META(1)%FSC    = 0.001
 !/MFIT      META(1)%UNITS  = '1'
 !/MFIT      META(1)%varnm = 'S0X'
@@ -2968,7 +2977,7 @@
 !/MFIT      META(2)%varnm = 'SdY'
 !/MFIT      META(2)%varnl = 'Northward deep part Stokes-drift / abs(MK)'
 !/MFIT      META(2)%varnc = 'Ud(0) = Sd * abs(MK)'
-! IFI=10, IFJ=1, IFP=3
+! IFI=10, IFJ=1, IFP=3..7
 !/MFIT      META => GROUP(10)%FIELD(3)%META
 !/MFIT      META(1) = GROUP(10)%FIELD(2)%META(1)
 !/MFIT      META(1)%VARND = ''
@@ -3000,9 +3009,10 @@
 !/MFIT      META(1)%FSC  = 1
 !/MFIT      META(1)%vmin = -32766
 !/MFIT      META(1)%vmax = 32766
+!/MFIT      END IF ! ( DO_MFIT )
 ! IFI=10, IFJ=2     
       META => GROUP(10)%FIELD(2)%META
-!/MFIT      META => GROUP(10)%FIELD(8)%META
+!/MFIT      IF ( DO_MFIT ) META => GROUP(10)%FIELD(8)%META
       META(1)%FSC    = 0.1
       META(1)%UNITS  = 'm'
       META(1)%VMIN = 0

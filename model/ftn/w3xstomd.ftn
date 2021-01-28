@@ -286,7 +286,9 @@
       USE W3ODATMD, ONLY: NDST, NDSO, NDSE, IAPROC, NAPROC, NAPOUT, XSVB
       USE W3DISPMD, ONLY: DSIE, N1MAX, ECG1, EWN1
 
-! TODO:
+      USE W3NMLSHELMD, ONLY: FCUT, FCUT_COUNT
+
+! TODO, like FCUT:
 !   XSND, XSDS and XSTY may be set at run init from WW3_shel.nml, and also:
 !   XSVB: Verboseness level [0..4] of XSTO output to NDSV  
 
@@ -396,7 +398,7 @@
 !/ Local parameters
 !/
 ! Location in spatial/spectral grid
-      integer                  :: JSEA, ISEA, IK, JK
+      integer                  :: JSEA, ISEA, IK
 ! Control integers
       integer                  :: IERR
             
@@ -566,7 +568,7 @@
       ! bin is multiplied with a depth factor EXP( -2 K Z), assuming deep water
       ! dispersion at the high frequencies. We apply a look-up array 
       !  SBDiaZ(1:NZ,1:NP) = DStkOsn(1:NP) * exp ( -2*Rk(1:NP)*ZK_S(1:NZ) )
-      ! where Rk is a discrete array representing f/fp**2        
+      ! where Rk is a discrete array representing (f/fp)**2        
         
       ! Let tRk = 2*Rk = 2 * XKH**ntt.
       
@@ -574,8 +576,7 @@
       ! F1 * DFH**NP == F1 * XFR**IKT or NP = ceiling(IKT * log(XFR)/log(DFH))
       ! If DFH==XFR, then NP=IKT
       ! Index shift to the next bin in DStkOsn: log(XFR) / log(DFH)
-      ! NP = ceiling(IKT * log(XFR) / log(DFH))
-      
+      ! NP = ceiling(IKT * log(XFR) / log(DFH))      
      
       if ( .not. allocated(SBDiaZ) ) allocate( SBDiaZ(XSND, NP), stat=IERR )
 
@@ -598,9 +599,18 @@
         end if
       
       ! CHA 20200603 temporary test output
-      write (NDSV, 916)  'XSTOKES_INIT:  XSTY:', XSTY
+      if ( xsto_verbose .gt. 0 ) &
+        write (NDSV, 916)  'XSTOKES_INIT:  XSTY:', XSTY
       ! CHA 20200603 If the tail is truncated at a specific frequency ftr,
-      if ( XSTY(1:2) == 'DE' ) then
+      DO IK=1,FCUT_COUNT%N_FIELD+1
+        IF (IK == FCUT_COUNT%N_FIELD+1) exit
+        IF (FCUT(IK)%FIELD == 'XSP') exit
+        END DO
+      IF (IK <= FCUT_COUNT%N_FIELD) THEN
+        FTR=FCUT(IK)%FREQ
+        if ( xsto_verbose .gt. 0 ) &
+          WRITE (NDSV, *), ' XSTOKES_INIT: CUT-OFF AT',FTR,'Hz'
+      else if ( XSTY(1:2) == 'DE' ) then
         read(XSTY(3:4),'(F2.0)') ftr
         ftr = 0.1 * ftr
         ! else ftr=10.0
@@ -687,12 +697,17 @@
 !/ Local parameters
 !/
       INTEGER                 :: ISEA, JSEA, IX, IY
+      INTEGER, SAVE           :: OSTEP = 0
 
 !     Generate data arrays for Stokes drift calculation
 !     including look-up tables for extended tail     
 !
       IF ( .NOT. ALLOCATED(DWN) ) CALL XSTOKES_INIT()
-      IF ( xsto_verbose .GT. 0 ) WRITE (NDSV, 912), 'Calculate Stokes drift ..'
+      IF ( xsto_verbose .GT. 0 ) THEN
+           WRITE (NDSV, 912), OSTEP, 'Calculate Stokes drift ..'
+           OSTEP = OSTEP + 1
+        END IF
+           
 !
 !
 ! -------------------------------------------------------------------- /
@@ -729,7 +744,7 @@
 !
          END DO
       
-  912 FORMAT ('  ',A)
+  912 FORMAT (2X,I3,1X,A)
 
       END SUBROUTINE CALC_XSTOKES
 
