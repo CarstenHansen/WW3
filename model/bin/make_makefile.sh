@@ -399,15 +399,15 @@
                TS='B4B'
                OK='B4B' ;;
 #sort:xsto:
-      xsto   ) TY='upto1'
+      xsto   ) TY='upto2'
                ID='Extended tail Stokes drift'
                TS='XSTO'
-               OK='XSTO' ;;
+               OK='XSTO FCLC' ;;
 #sort:xsmf:
-      xsmf   ) TY='upto1'
+      xsmf   ) TY='upto2'
                ID='Stokes drift Mfit'
                TS='MFIT'
-               OK='MFIT' ;;
+               OK='MFIT FCLC' ;;
 #sort:bd:
       bd     ) TY='upto2'
                ID='Second b.d. file for strait'
@@ -1018,9 +1018,9 @@
                data="wmmdatmd $memcode w3gdatmd w3wdatmd w3adatmd w3idatmd w3odatmd"
                prop=
              source="$pdlibcode $pdlibyow $db $bt $setupcode w3parall w3triamd $stx $nlx $btx  $is $uostmd"
-                 IO='w3iogrmd w3iogomd w3iorsmd w3iopomd w3xstomd w3xsmfmd'
+                 IO='w3iogrmd w3iogomd w3iorsmd w3iopomd'
                 aux="constants w3servmd w3timemd w3arrymd w3dispmd w3gsrumd"
-                aux="$aux w3nmlounfmd $smco w3ounfmetamd" ;;
+                aux="$aux w3nmlounfmd $smco w3ounfmetamd w3nmlshelmd" ;;
      ww3_outp) IDstring='Point output'
                core=
                data="wmmdatmd w3parall w3triamd $memcode w3gdatmd w3wdatmd w3adatmd w3idatmd w3odatmd"

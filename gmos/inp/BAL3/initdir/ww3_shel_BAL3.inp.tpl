@@ -298,8 +298,6 @@ $ FIMR, 3 stations: 'HelsinkiBu', 'NorthernBa', 'BothnianSe'
    10.267    54.500 'LTKiel    '
    10.931    58.489 'Vaderoarna'
    13.154    55.008 'FINO2     '
-$   17.617    57.217 'Knollsgrun'
-$ Corrected 2017-02-15
    17.617    57.516 'Knollsgrun'
    18.606    60.893 'Finngrunde'
    19.160    58.936 'HuvudskarO'
@@ -307,7 +305,7 @@ $ Corrected 2017-02-15
    21.000    59.250 'NorthernBa'
    24.732    59.712 'Tallinnama'
    25.235    59.965 'HelsinkiBu'
-$ Old known sites, 5 st.:
+$ Old known sites, 2 st.:
 $ FIMR:
    22.8500   59.5500  'Hanko     '
    23.7667   65.2167  'Bothnian_B'

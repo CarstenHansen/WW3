@@ -1216,8 +1216,8 @@
 !/XSTO ! Stokes drift with extended tail
 !/XSTO ! It would be nice to be able to use double switch '!/XSTO!/MPI'
 !/XSTO ! to avoid linking w3xstomd into ww3_ounf
-!/XSTO      USE W3XSTOMD, ONLY: CALC_XSTOKES
-!/MFIT      USE W3XSMFMD, ONLY: CALC_MFIT
+!/XSTO!/FCLC      USE W3XSTOMD, ONLY: CALC_XSTOKES
+!/MFIT!/FCLC      USE W3XSMFMD, ONLY: CALC_MFIT
 !
       IMPLICIT NONE
 !/
@@ -1927,8 +1927,8 @@
 !/MFIT!  NZO = 1 (for profile fit only), or
 !/XSTO!  NZO = XSND (for full profile).
 !/MFIT!  For profile fitting, also USERO(JSEA,1:7) are set by CALC_MFIT()
-!/XSTO!  CALC_XSTOKES(A) has its own loop over JSEA and thus called
-!/XSTO!  after the present loop
+!/XSTO!/FCLC!  CALC_XSTOKES(A) has its own loop over JSEA and thus called
+!/XSTO!/FCLC!  after the present loop
           END IF
         END DO
 !
@@ -2307,18 +2307,18 @@
 
         END IF
 
-!/XSTO!  Stokes drift with extended tail
-!/XSTO!  UXSP(JSEA,1:3+2*NZO) is set by CALC_XSTOKES(A), where
-!/XSTO!  NZO is either 0 (no Stokes profile output), or
-!/MFIT!  NZO = 1 (surface drift and integral values for MFIT), or
-!/XSTO!  NZO = XSND (for full profile).
-!/XSTO       IF ( FLOLOC(6,13)        &
-!/MFIT            .OR.  FLOLOC(10,1)  &
-!/MFIT                         ) THEN
-!/XSTO           CALL CALC_XSTOKES(A)
-!/MFIT         END IF
-!/MFIT       IF ( FLOLOC(10,1) ) CALL CALC_MFIT()
-!/XSTO!        
+!/XSTO!/FCLC!  Stokes drift with extended tail
+!/XSTO!/FCLC!  UXSP(JSEA,1:3+2*NZO) is set by CALC_XSTOKES(A), where
+!/XSTO!/FCLC!  NZO is either 0 (no Stokes profile output), or
+!/MFIT!/FCLC!  NZO = 1 (surface drift and integral values for MFIT), or
+!/XSTO!/FCLC!  NZO = XSND (for full profile).
+!/XSTO!/FCLC       IF ( FLOLOC(6,13)        &
+!/MFIT!/FCLC            .OR.  FLOLOC(10,1)  &
+!/MFIT!/FCLC                         ) THEN
+!/XSTO!/FCLC           CALL CALC_XSTOKES(A)
+!/MFIT!/FCLC         END IF
+!/MFIT!/FCLC       IF ( FLOLOC(10,1) ) CALL CALC_MFIT()
+!/XSTO!/FCLC!        
       IF (FLOLOC( 6, 8)) THEN
         CALL CALC_U3STOKES(A,1)
       END IF
@@ -2810,9 +2810,9 @@
                 IF ( FLOGRD( 6, 10) ) TAUICE(ISEA,:) = UNDEF
                 IF ( FLOGRD( 6, 11) ) PHICE(ISEA) = UNDEF
                 IF ( FLOGRD( 6, 12) ) USSP(ISEA,:) = UNDEF
-!/XSTO                IF ( FLOGRD( 6, 13) ) UXSP(ISEA,:) = UNDEF
-!/MFIT                IF ( FLOGRD( 10, 1) .AND. .NOT. FLOGRD( 6, 13) )  &
-!/MFIT                                      UXSP(ISEA,:) = UNDEF
+!/XSTO!/FCLC                IF ( FLOGRD( 6, 13) ) UXSP(ISEA,:) = UNDEF
+!/MFIT!/FCLC                IF ( FLOGRD( 10, 1) .AND. .NOT. FLOGRD( 6, 13) )  &
+!/MFIT!/FCLC                                      UXSP(ISEA,:) = UNDEF
                 IF ( FLOGRD( 7, 1) ) THEN
                                      ABA   (ISEA) = UNDEF
                                      ABD   (ISEA) = UNDEF
@@ -2876,11 +2876,11 @@
             END DO
 !
         ELSE
-!/XSTO          ! NZO is required for use in W3MPIO and W3DIMA
-!/XSTO          IF ( FLOGRD(6,13) .AND. .NOT. NZO == XSND ) &
-!/XSTO             WRITE (NDSE,*) 'ERROR: NZO=',NZO,' should be equal to ',XSND
-!/MFIT          IF ( FLOGRD(10,1) .AND. .NOT.FLOGRD(6,13) .AND. .NOT.NZO==1 ) &
-!/MFIT             WRITE (NDSE,*) 'ERROR: NZO=',NZO,' should be equal to 1'
+!/XSTO!/FCLC     ! NZO is required for use in W3MPIO and W3DIMA
+!/XSTO!/FCLC     IF ( FLOGRD(6,13) .AND. .NOT. NZO == XSND ) &
+!/XSTO!/FCLC        WRITE (NDSE,*) 'ERROR: NZO=',NZO,' should be equal to ',XSND
+!/MFIT!/FCLC     IF ( FLOGRD(10,1) .AND. .NOT.FLOGRD(6,13) .AND. .NOT.NZO==1 ) &
+!/MFIT!/FCLC        WRITE (NDSE,*) 'ERROR: NZO=',NZO,' should be equal to 1'
           IF (.NOT.DINIT) CALL W3DIMW ( IGRD, NDSE, NDST, .TRUE. )
           IF (.NOT.AINIT) CALL W3DIMA ( IGRD, NDSE, NDST, .TRUE. )
         END IF
@@ -3102,8 +3102,8 @@
                  ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 12 ) THEN
                     WRITE ( NDSOG ) USSP(1:NSEA,   1:USSPF(2))
                     WRITE ( NDSOG ) USSP(1:NSEA,NK+1:NK+USSPF(2))
-!/XSTO                 ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 13 ) THEN
-!/XSTO                    WRITE ( NDSOG ) UXSP(1:NSEA,1:3+XSND*2)
+!/XSTO!/FCLC                 ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 13 ) THEN
+!/XSTO!/FCLC                    WRITE ( NDSOG ) UXSP(1:NSEA,1:3+XSND*2)
 !
 !     Section 7)
 !
@@ -3176,18 +3176,18 @@
 !     Section 10)
 !
                   ELSE IF ( IFI .EQ. 10 ) THEN
-!/MFIT              IF ( IFJ .EQ. 1 ) THEN
-!/MFIT !               write (ndst,*) '  Writing mfit params to file'      
-!/MFIT                WRITE ( NDSOG ) USERO(1:NSEA,1:NOEXTR-1)
-!/MFIT !               write (ndst,*) '  Done mfit params to file'      
-!/MFIT                IF ( .NOT. FLOGRD(6,13) ) WRITE ( NDSOG ) UXSP(1:NSEA,1:5)
-!/MFIT                ! Only the integral and surface variables
-!/MFIT                ! We presume that UXSP(:,3+2*NZO) point to XUXSP(:,5)
-!/MFIT            ELSE IF ( IFJ .EQ. 2 ) THEN
-!/MFIT              WRITE ( NDSOG ) USERO(1:NSEA,NOEXTR)
-!/MFIT            ELSE IF ( .FALSE. ) THEN
+!/MFIT!/FCLC        IF ( IFJ .EQ. 1 ) THEN
+!/MFIT!/FCLC !         write (ndst,*) '  Writing mfit params to file'      
+!/MFIT!/FCLC          WRITE ( NDSOG ) USERO(1:NSEA,1:NOEXTR-1)
+!/MFIT!/FCLC !         write (ndst,*) '  Done mfit params to file'      
+!/MFIT!/FCLC          IF ( .NOT. FLOGRD(6,13) ) WRITE ( NDSOG ) UXSP(1:NSEA,1:5)
+!/MFIT!/FCLC          ! Only the integral and surface variables
+!/MFIT!/FCLC          ! We presume that UXSP(:,3+2*NZO) point to XUXSP(:,5)
+!/MFIT!/FCLC      ELSE IF ( IFJ .EQ. 2 ) THEN
+!/MFIT!/FCLC        WRITE ( NDSOG ) USERO(1:NSEA,NOEXTR)
+!/MFIT!/FCLC      ELSE IF ( .FALSE. ) THEN
                     WRITE ( NDSOG ) USERO(1:NSEA,IFJ)
-!/MFIT              END IF
+!/MFIT!/FCLC        END IF
 !
                   END IF
 !

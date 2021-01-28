@@ -213,7 +213,15 @@
   fi
   echo ' '
   echo "[INFO] list of the programs selected : $all_programs"
+  echo "       switch_file=$switch_file"
 
+  # Programs that use w3iogomd which, if switch FCLC is set, would use other
+  # modules to calculate output fields
+    if [ -n "$(grep FCLC $switch_file)" ]
+    then
+      sin_programs="ww3_ounf"
+    fi
+    
   for prog in $all_programs
   do
     # skip to next prog if no NETCDF env and prog in cdf_programs list
@@ -237,11 +245,15 @@
     then
       par_programs="$par_programs ww3_prnc ww3_prep ww3_prtide"
     fi
+      
     if [ -n "$(grep MPI $switch_file)" ] || [ -n "$(grep OMPG $switch_file)" ] || [ -n "$(grep PDLIB $switch_file)"]
     then
       if [ ! -z "$(echo $par_programs | grep $prog)" ]
       then
         par_progs="$par_progs $prog"
+      elif [ ! -z "$(echo $sin_programs | grep $prog)" ]
+      then
+        sin_progs="$sin_progs $prog"  
       else
         seq_progs="$seq_progs $prog"
       fi
@@ -250,6 +262,9 @@
       then
         seq_progs="$seq_progs ww3_prnc"
       fi
+    elif [ ! -z "$(echo $sin_programs | grep $prog)" ]
+      then
+      sin_progs="$sin_progs $prog"  
     else
       seq_progs="$seq_progs $prog"
     fi
@@ -298,6 +313,26 @@
     MODES="SEQ $MODES"
   fi
 
+  if [ ! -z "$sin_progs" ]
+  then
+    MODES="SIN $MODES"
+  fi
+
+  # Remove output-only switch(es) for SIN mode
+  if [ "${MODES:0:3}" == "SIN" ]
+  then
+    mkdir -p $main_dir/work_SIN
+    ./sort_switch -s -r switch
+    sed -e 's/DIST/SHRD/g' \
+        -e 's/PDLIB //g'    \
+        -e 's/OMPG //g'    \
+        -e 's/PDLIB //g'    \
+        -e 's/OMPH //g'    \
+        -e 's/OMPX //g'    \
+        -e 's/MPI //g'    \
+        -e 's/FCLC //g' switch > $main_dir/work_SIN/switch.SIN
+  fi
+
   # create sequential switch if needed
   if [ "$MODES" != "SEQ" ]
   then
@@ -323,7 +358,10 @@
   for MODE in $MODES
   do
 
-    if [ "$MODE" == "SEQ" ]
+    if [ "$MODE" == "SIN" ]
+    then
+      progs=$sin_progs
+    elif [ "$MODE" == "SEQ" ]
     then
       progs=$seq_progs
     else
@@ -332,7 +370,7 @@
 
     if [ "$MODES" == "SEQ" ]
     then
-      progs="$seq_progs $par_progs"
+      progs="$sin_progs $seq_progs $par_progs"
     fi
 
     echo ' '
@@ -359,7 +397,7 @@
       rm -f *.l
     fi
 
-    # clean up ftp
+    # clean up ftn
     rm -f $main_dir/ftn/makefile
 
     # clean up exe

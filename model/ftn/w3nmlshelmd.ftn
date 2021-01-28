@@ -149,17 +149,146 @@
     REAL                        :: VALUE2
     REAL                        :: VALUE3
   END TYPE NML_HOMOG_INPUT_T
-
+!/XSTO
+!/XSTO  TYPE NML_FCUT_COUNT_T
+!/XSTO    INTEGER                     :: N_FIELD  
+!/XSTO  END TYPE NML_FCUT_COUNT_T
+!/XSTO  
+!/XSTO  TYPE NML_FCUT_T
+!/XSTO    CHARACTER(LEN=6)            :: FIELD
+!/XSTO    REAL                        :: FREQ
+!/XSTO  END TYPE NML_FCUT_T
 
   ! miscellaneous
   CHARACTER(256)                :: MSG
   INTEGER                       :: NDSN
-
-
+!/XSTO
+!/XSTO  TYPE(NML_FCUT_T), ALLOCATABLE    :: FCUT(:)
+!/XSTO  TYPE(NML_FCUT_COUNT_T)           :: FCUT_COUNT
 
   CONTAINS
 
 !/ ------------------------------------------------------------------- /
+
+!/XSTO  SUBROUTINE READ_FCUT_NML (NDSI)
+!/XSTO
+!/XSTO!  1. Purpose :
+!/XSTO!
+!/XSTO!     Read high frequency cut-off namelist
+!/XSTO!    
+!/XSTO! 10. Source code :
+!/XSTO!
+!/XSTO!/ ------------------------------------------------------------------- /
+!/XSTO
+!/XSTO    USE WMMDATMD, ONLY: MDSE
+!/XSTO    USE W3SERVMD, ONLY: EXTCDE
+!/XSTO!/S      USE W3SERVMD, ONLY: STRACE
+!/XSTO
+!/XSTO    IMPLICIT NONE
+!/XSTO
+!/XSTO    INTEGER, INTENT(IN)               :: NDSI
+!/XSTO
+!/XSTO    ! locals
+!/XSTO    INTEGER                           :: I,J,K,IERR, N_NOTAIL = 2
+!/XSTO    
+!/XSTO    ! Preset no-tail fields
+!/XSTO    CHARACTER(len=32)  :: FIELDS_NOTAIL = 'TUS UUS'
+!/XSTO    CHARACTER(LEN=6)   :: NOTAIL_FIELDS(2)
+!/XSTO    
+!/XSTO    NAMELIST /FCUT_COUNT_NML/ FCUT_COUNT
+!/XSTO    NAMELIST /FCUT_NML/ FCUT
+!/XSTO!/S      INTEGER, SAVE                           :: IENT = 0
+!/XSTO
+!/XSTO    IERR = 0
+!/XSTO!/S      CALL STRACE (IENT, 'READ_DOMAIN_NML')
+!/XSTO
+!/XSTO    READ (FIELDS_NOTAIL,*) NOTAIL_FIELDS
+!/XSTO    
+!/XSTO    ! read fields count namelist
+!/XSTO    REWIND (NDSI)
+!/XSTO    READ (NDSI, nml=FCUT_COUNT_NML, iostat=IERR, iomsg=MSG)
+!/XSTO    IF (IERR.GT.0) THEN
+!/XSTO      WRITE (MDSE,'(A,/A)') &
+!/XSTO        'ERROR: READ_FCUT_NML: namelist FCUT_COUNT read error', &
+!/XSTO        'ERROR: '//TRIM(MSG)
+!/XSTO      CALL EXTCDE (8)
+!/XSTO    END IF
+!/XSTO    ALLOCATE(FCUT(FCUT_COUNT%N_FIELD + N_NOTAIL + 1))
+!/XSTO
+!/XSTO    ! set default values
+!/XSTO    DO I=1,FCUT_COUNT%N_FIELD + N_NOTAIL + 1
+!/XSTO      FCUT(I)%FIELD      = 'DFLT'
+!/XSTO      FCUT(I)%FREQ      = 99.
+!/XSTO    END DO
+!/XSTO
+!/XSTO    ! read cut-off frequency namelist
+!/XSTO    REWIND (NDSI)
+!/XSTO    READ (NDSI, nml=FCUT_NML, iostat=IERR, iomsg=MSG)
+!/XSTO    IF (IERR.GT.0) THEN
+!/XSTO      WRITE (MDSE,'(A,/A)') &
+!/XSTO        'ERROR: READ_FCUT_NML: namelist FCUT_NML read error', &
+!/XSTO        'ERROR: '//TRIM(MSG)
+!/XSTO      CALL EXTCDE (9)
+!/XSTO    END IF
+!/XSTO    
+!/XSTO    ! No-tail fields
+!/XSTO    I=FCUT_COUNT%N_FIELD
+!/XSTO    DO J=1,N_NOTAIL      
+!/XSTO      DO K=1,FCUT_COUNT%N_FIELD+1
+!/XSTO        if (K > FCUT_COUNT%N_FIELD) exit
+!/XSTO        ! FCUT(K) preceeds over NOTAIL fields
+!/XSTO        if (trim(NOTAIL_FIELDS(J)) == trim(FCUT(K)%FIELD)) exit
+!/XSTO      END DO
+!/XSTO      if (K <= FCUT_COUNT%N_FIELD) continue
+!/XSTO      I=I+1
+!/XSTO      FCUT(I)%FIELD      = NOTAIL_FIELDS(J)
+!/XSTO      FCUT(I)%FREQ      = -99.
+!/XSTO    END DO
+!/XSTO    
+!/XSTO    ! Infinite-tail fields
+!/XSTO    I=I+1
+!/XSTO    FCUT(I)%FIELD      = 'DFLT'
+!/XSTO    FCUT(I)%FREQ      = 99.
+!/XSTO    FCUT_COUNT%N_FIELD = I
+!/XSTO    
+!/XSTO  END SUBROUTINE READ_FCUT_NML
+!/XSTO  
+!/XSTO
+!/XSTO  SUBROUTINE REPORT_FCUT_NML ()
+!/XSTO
+!/XSTO!/ ...
+!/XSTO! 10. Source code :
+!/XSTO!
+!/XSTO!/ ------------------------------------------------------------------- /
+!/XSTO    
+!/XSTO!/S      USE W3SERVMD, ONLY: STRACE
+!/XSTO
+!/XSTO    IMPLICIT NONE
+!/XSTO
+!/XSTO    ! locals
+!/XSTO    INTEGER              :: I
+!/XSTO!/S      INTEGER, SAVE                           :: IENT = 0
+!/XSTO
+!/XSTO!/S      CALL STRACE (IENT, 'REPORT_FCUT_NML')
+!/XSTO
+!/XSTO    WRITE (MSG,'(A)') 'FCUT_COUNT % '
+!/XSTO    WRITE (NDSN,'(A)')
+!/XSTO    WRITE (NDSN,11) TRIM(MSG),'N_FIELD       = ', FCUT_COUNT%N_FIELD
+!/XSTO    
+!/XSTO      DO I=1,FCUT_COUNT%N_FIELD
+!/XSTO        WRITE (MSG,'(A,I5,A)') 'FCUT(',I,') % '
+!/XSTO        WRITE (NDSN,'(A)')
+!/XSTO        WRITE (NDSN,10) TRIM(MSG),'FIELD     = ', TRIM(FCUT(I)%FIELD)
+!/XSTO        WRITE (NDSN,11) TRIM(MSG),'FREQ      = ', FCUT(I)%FREQ
+!/XSTO        WRITE (NDSN,'(A)')
+!/XSTO      END DO
+!/XSTO      
+!/XSTO 10  FORMAT (A,2X,A,A)
+!/XSTO 11  FORMAT (A,2X,A,F5.1)
+!/XSTO
+!/XSTO  END SUBROUTINE REPORT_FCUT_NML
+!/XSTO!/ ------------------------------------------------------------------- /
+    
   SUBROUTINE W3NMLSHEL (MPI_COMM, NDSI, INFILE, NML_DOMAIN,            &
                         NML_INPUT, NML_OUTPUT_TYPE, NML_OUTPUT_DATE,   &
                         NML_HOMOG_COUNT, NML_HOMOG_INPUT, IERR)
@@ -302,7 +431,11 @@
     ! read homogeneous namelist
     CALL READ_HOMOGENEOUS_NML (NDSI, NML_HOMOG_COUNT, NML_HOMOG_INPUT)
     IF ( IMPROC .EQ. NMPLOG ) CALL REPORT_HOMOGENEOUS_NML (NML_HOMOG_COUNT, NML_HOMOG_INPUT)
-
+!/XSTO
+!/XSTO    ! read high frequency cut-off namelist
+!/XSTO    CALL READ_FCUT_NML (NDSI)
+!/XSTO    IF ( IMPROC .EQ. NMPLOG ) CALL REPORT_FCUT_NML ()
+    
     ! close namelist files
     CLOSE (NDSI)
     IF ( NMPLOG .EQ. IMPROC ) CLOSE (NDSN)
