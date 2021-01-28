@@ -42,8 +42,6 @@
 !/    15-Jan-2021 : Extend handling of 3'rd dimension   ( version 7.XX )
 !/    15-Jan-2021 : XSTO option: Stokes drift profile   ( version 7.XX )
 !/                  for extended spectral tail
-!/    15-Jan-2021 : MFIT+XSTO options: Stokes drift     ( version 7.XX )
-!/                  profile parametric fit
 !/
 !/    Copyright 2009-2013 National Weather Service (NWS),
 !/       National Oceanic and Atmospheric Administration.  All rights
@@ -792,7 +790,7 @@
       INTEGER, INTENT(IN)     :: NX, NY, IX1, IXN, IY1, IYN, NSEA,     &
                                  E3DF(3,5), P2MSF(3), US3DF(3),        & 
                                  USSPF(2), NCTYPE, NCVARTYPEI
-      CHARACTER(30)           :: FILEPREFIX
+      CHARACTER*30,INTENT(IN) :: FILEPREFIX
       LOGICAL, INTENT(IN)     :: TOGETHER
       LOGICAL, INTENT(IN)     :: FLG2D(NOGRP,NGRPP)
       INTEGER, INTENT(INOUT)  :: NCIDS(NOGRP,NGRPP,NFPMAX), S3
@@ -1006,7 +1004,6 @@
         DO IFJ=1, NGRPP
 
           IF ( .NOT. FLG2D(IFI,IFJ) ) CYCLE
-
           ! Here, the flag for the field IFI of the group IFJ is .TRUE.
           
           ! Instanciates the partition array
@@ -1015,9 +1012,9 @@
           ! NFP: Number of partitions or sub-fields under each fields flag.
           ! Is to be incremented by one for each partition or extra subfield
           NFP = 1
-          ! Subfield index, to be incremented
+          ! Subfield index, to be incremented:
           IFP = 0
-          ! Current attribute meta index under (IFI,IFJ), to be incremented
+          ! Current attribute meta index under (IFI,IFJ), to be incremented:
           IFK = 0
           DO WHILE ( IFP .LT. NFP )
             IFP = IFP + 1
@@ -1961,7 +1958,7 @@
 !/XSTO          ! For an XSTO spectral tail
 !/XSTO          DIM3NAME='zk'
 !/XSTO          NFIELD=2
-!/XSTO          IFK=1
+!/XSTO          IFK=IFK+1
 !/XSTO          I1F=1
 !/XSTO          I2F=NZO
 !/XSTO          DO IK = 4,NZO+3
@@ -1984,7 +1981,12 @@
 !/XSTO          ! This variable is nearly the same as TUS, the
 !/XSTO          ! 'Stokes transport', but with the XSTO extended tail
 !/XSTO          NFIELD=2
-!/XSTO          IFK = 2
+!/XSTO          IFK=IFK+1
+!/XSTO! NOTE: The magnitude of wave pseudo momentum spans from O(1e-3) to O(1e+3)
+!/XSTO!       Thus it cannot be scaled to a 16-bit integer
+!/XSTO!       We might alternatively consider to store xsm * ksc
+!/XSTO          IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
+!/XSTO!
 !/XSTO!/RTD          ! Rotate x,y vector back to standard pole
 !/XSTO!/RTD          IF ( FLAGUNR ) CALL W3XYRTN(NSEA, UXSP(1:NSEA,2), &
 !/XSTO!/RTD                                      UXSP(1:NSEA,3), AnglD)
@@ -1995,11 +1997,6 @@
 !/XSTO            CALL W3S2XY ( NSEA, NSEA, NX+1, NY, UXSP(1:NSEA,2), MAPSF, XX )
 !/XSTO            CALL W3S2XY ( NSEA, NSEA, NX+1, NY, UXSP(1:NSEA,3), MAPSF, XY )
 !/XSTO          ENDIF ! SMCGRD
-!/XSTO! NOTE: The magnitude of wave pseudo momentum spans from O(1e-3) to O(1e+3)
-!/XSTO!       Thus it cannot be scaled to a 16-bit integer
-!/XSTO!       We might alternatively consider to store xsm * ksc
-!/XSTO          IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
-!/XSTO!
 !/XSTO          END IF ! IFP .EQ. 3
 !/XSTO!
 !
@@ -3195,8 +3192,9 @@
             WRITE(NDSE,*) 'Hardcoded configuration error: NFP > NFPMAX'
             CALL EXTCDE(1)
             END IF
+!
           END DO ! WHILE IFP .LE. NFP
-!      
+!
         END DO  ! IFJ=1, NGRPP
       END DO  ! IFI=1, NOGRP
 !
