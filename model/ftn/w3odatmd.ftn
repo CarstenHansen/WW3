@@ -328,6 +328,10 @@
       LOGICAL                 :: UNIPTS = .FALSE., UPPROC = .FALSE.
 !/
 !/ Set NOGE and IDOUT identifiers in W3NOUT
+!/XSTO!
+!/XSTO! Definition of I, J for parameter 'XSP' here.
+!/XSTO! TO FIX: group, field = 6, JXSP+1 and 6, JXSP+2 also set in w3ounfmetamd
+!/XSTO      INTEGER                         :: IXSP=6, JXSP=14
 !/
 !/ Data structures
 !/
@@ -775,7 +779,8 @@
 ! 6) Wave-ocean layer
 !
       NOGE(6) = 12 
-!/XSTO      NOGE(6) = 13
+!/XSTO! Definition of I, J for parameter 'XSP' in IXSP,JXSP above.
+!/XSTO      NOGE(IXSP) = JXSP
 !
       IDOUT( 6, 1)  = 'Radiation stresses  '
       IDOUT( 6, 2)  = 'Wave-ocean mom. flux'
@@ -789,7 +794,7 @@
       IDOUT( 6,10)  = 'Wave-ice mom. flux  '
       IDOUT( 6,11)  = 'Wave-ice energy flux'
       IDOUT( 6,12)  = 'Split Surface Stokes'
-!/XSTO      IDOUT( 6,13)  = 'Stokes drift profile'
+!/XSTO      IDOUT( IXSP,JXSP)  = 'Stokes drift profile'
 !
 ! 7) Wave-bottom layer
 !

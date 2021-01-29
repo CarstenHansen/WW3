@@ -2067,7 +2067,7 @@
 !/MPI          IF ( FLGRDALL( 6, 8) ) NRQMAX = NRQMAX + 2*NK
 !/MPI          IF ( FLGRDALL( 6,12) ) NRQMAX = NRQMAX + 2*NK
 !
-!/XSTO!/MPI          IF ( NZ2 .GT. 0 ) NRQMAX = NRQMAX + NZ2 ! FLGRDALL( 6, 13)
+!/XSTO!/MPI          IF ( NZ2 .GT. 0 ) NRQMAX = NRQMAX + NZ2 ! FLGRDALL( 6, 1[N])
 !/XSTO!
 !/MPI          IF ( NRQMAX .GT. 0 ) THEN 
 !/MPI              ALLOCATE ( OUTPTS(IMOD)%OUT1%IRQGO(NRQMAX) )
@@ -2690,7 +2690,7 @@
 !/MPI                    END DO
 !/MPI                END IF 
 !
-!/XSTO!/MPI !              IF ( FLGRDALL( 6, 13) ) THEN ! <==> NZ2 > 0
+!/XSTO!/MPI !              IF ( FLGRDALL( 6, 1[N]) ) THEN ! <==> NZ2 > 0
 !/XSTO!/MPI                  DO K=1,NZ2
 !/XSTO!/MPI                    IH     = IH + 1
 !/XSTO!/MPI                    IT     = IT + 1

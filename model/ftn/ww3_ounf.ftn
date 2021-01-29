@@ -779,7 +779,8 @@
 !/RTD ! Rotated pole data from the mod_def file
 !/RTD      USE W3GDATMD, ONLY : POLAT, POLON, FLAGUNR, AnglD
 !/T      USE W3ODATMD, ONLY : NDST
-!/XSTO      USE W3ODATMD, ONLY : NZO
+!/XSTO      USE W3ODATMD, ONLY : NZO ! Could also get IXSP, JXSP from here
+!/XSTO      USE W3IOGOMD, ONLY: W3FLDTOIJ
       USE NETCDF
       IMPLICIT NONE
 
@@ -799,6 +800,7 @@
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
+!/XSTO       INTEGER                ::  IXSP, JXSP
       INTEGER                 :: IFI, IFJ, MFILL, I, J, ISEA, IX, IY,  &
                                  I1, J1, IPART, INDEXIPART
       INTEGER, SAVE           :: NTIM = 1
@@ -824,9 +826,9 @@
 !
       REAL                    :: CABS, UABS, MFILLR
 !/BT4   REAL, PARAMETER            :: LOG2=LOG(2.)
+!/XSTO      INTEGER                 :: IZ
+!/XSTO      REAL                    :: XZK, zki
 !
-!/XSTO      INTEGER                            :: IZ
-!/XSTO      REAL                               :: XZK, zki
       REAL,DIMENSION(:),  ALLOCATABLE    :: LON, LAT, DIM3VAR
       REAL,DIMENSION(:,:),  ALLOCATABLE  :: LON2D, LAT2D, ANGLD2D
 !/RTD      REAL,DIMENSION(:,:),  ALLOCATABLE  :: LON2DEQ, LAT2DEQ
@@ -892,8 +894,9 @@
           IF ( FLG2D(3,IFJ)  ) N3 = NK
         END DO
       END IF
+!/XSTO      CALL W3FLDTOIJ('XSP   ', IXSP, JXSP, 1, 1, 1)
 !/XSTO      ! If a vertical Stokes profile dimension 'zk' is requested,
-!/XSTO      IF ( FLG2D(6,13) ) N3 = max(N3,NZO) ! size(UXSP,2) == 3 + 2*NZO
+!/XSTO      IF ( FLG2D(IXSP, JXSP) ) N3 = max(N3,NZO) ! size(UXSP,2) == 3 + 2*NZO
 
       ! Allocate output storage. This is required with the introduction
       ! of the SMC grid output as the regridded output grid dimensions could
@@ -1934,7 +1937,7 @@
                 XYK(:,:,IK)=XY
               END DO
 !
-!/XSTO     ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 13 ) THEN
+!/XSTO     ELSE IF ( IFI .EQ. IXSP .AND. IFJ .EQ. JXSP ) THEN
 !/XSTO        ! The three subfields (NFP=3) are joined in the netCDF file
 !/XSTO        NFP = 3 ! Number of subfields loop over IFP=1,NFP
 !/XSTO!

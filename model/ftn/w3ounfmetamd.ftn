@@ -1565,8 +1565,10 @@
 !     the netCDF variable type is NF90_SHORT.
 !
 !/ ------------------------------------------------------------------- /
+!/XSTO      USE W3IOGOMD, ONLY: W3FLDTOIJ
       IMPLICIT NONE
       TYPE(META_T), POINTER :: META(:)
+!/XSTO      INTEGER :: I, J
 !
 !----------GROUP 1 ----------------
 !
@@ -2590,8 +2592,9 @@
       META(2)%VARNS='northward_partitioned_surface_stokes_drift'
       META(2)%VARNG='northward_partitioned_surface_stokes_drift'
       META(2)%VARNC='usp=sqrt(ussp**2+vssp**2)'
-! IFI=6, IFJ=13,14,15 
-!/XSTO      META => GROUP(6)%FIELD(13)%META
+! IFI=I, IFJ=J,J+1,J+2
+!/XSTO      CALL W3FLDTOIJ('XSP   ', I, J, 1, 1, 1)
+!/XSTO      META => GROUP(I)%FIELD(J)%META
 !/XSTO      ! First sub-field 'Wavenumber of the zero-upcrossing period'
 !/XSTO      META(1)%FSC  = 0.0002
 !/XSTO      META(1)%VMIN = 0.0002
@@ -2606,7 +2609,7 @@
 !/XSTO      META(1)%VARND=''
 !/XSTO!
 !/XSTO! Second sub-field 'Vertical profile of Stokes drift'
-!/XSTO      META => GROUP(6)%FIELD(14)%META
+!/XSTO      META => GROUP(I)%FIELD(J+1)%META
 !/XSTO      META(1)%FSC    = 1./30000.
 !/XSTO      META(1)%ENAME  = '.svp'
 !/XSTO      META(1)%VMIN = -1. 
@@ -2625,7 +2628,7 @@
 !/XSTO      META(2)%VARNC='u(Z) + jv(Z) = (u(0) + jv(0)) e^{j B zk} e^{A zk^0.5}'
 !/XSTO!
 !/XSTO! Third sub-field 'Total Stokes drift'
-!/XSTO      META => GROUP(6)%FIELD(15)%META
+!/XSTO      META => GROUP(I)%FIELD(J+2)%META
 !/XSTO      META(1)%ENAME  = '.xsm'
 !/XSTO      META(1)%VARND = DIRCOM
 !/XSTO      META(1)%VARNG=''
