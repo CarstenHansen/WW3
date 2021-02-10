@@ -286,10 +286,10 @@
 !     b2) In subroutine W3FLGRDUPDT
 !     !/XSTO      ! Set NZO for use in W3DIMA, W3DIMX
 !     !/XSTO      NZO = 0
-!     !/XSTO      IF ( FLGRD(6,13) ) NZO = XSND
-!     !/MFIT      ! For FLGRD(10,1), if FLGRD( 6, 13) is False, only the
+!     !/XSTO      IF ( FLGRD(IXSP,JXSP) ) NZO = XSND
+!     !/MFIT      ! For FLGRD(10,1), if FLGRD( IXSP, JXSP) is False, only the
 !     !/MFIT      ! surface and integral variables are in UXSP(1:NSEA,1:5)
-!     !/MFIT      IF ( FLGRD(10,1) .AND. .NOT. FLGRD(6,13) ) NZO = 1
+!     !/MFIT      IF ( FLGRD(10,1) .AND. .NOT. FLGRD(IXSP, JXSP) ) NZO = 1
 !        
 !     b3) In subroutine W3OUTG:
 !     Declare use of CALC_MFIT()
@@ -305,7 +305,7 @@
 !
 !     b4) Later in  W3OUTG() just following CALL CALC_XSTOKES():
 !     !/XSTO ! Stokes drift with extended tail
-!     !/XSTO       IF ( FLOLOC(6,13)        &
+!     !/XSTO       IF ( FLOLOC(IXSP,JXSP)        &
 !     !/MFIT            .OR.  FLOLOC(10,1)  &
 !     !/XSTO                         ) THEN
 !     !/XSTO           CALL CALC_XSTOKES(A)

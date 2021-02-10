@@ -6,10 +6,12 @@
 !/                  |           C. Bunney               |
 !/                  |                                   |
 !/                  |                        FORTRAN 90 |
-!/                  | Last update :         02-Nov-2020 |
+!/                  | Last update :         26-Jan-2021 |
 !/                  +-----------------------------------+
 !/
 !/    02-Nov-2020 : Creation                            ( version 7.12 )
+!/    26-Jan-2021 : Added TP and alternative dir/mag    ( version 7.12 ) 
+!/                  metadata for directional fields.
 !/    15-Jan-2021 : Extra (subfield-)components under switch XSTO
 !/                                           (C.Hansen) ( version 7.XX )
 !/
@@ -113,7 +115,7 @@
 
       PUBLIC
 
-      LOGICAL :: DEBUG = .FALSE.
+      LOGICAL, PRIVATE :: DEBUG = .FALSE.
 
       CHARACTER(LEN=*), PARAMETER :: FN_META = "ounfmeta.inp"
 
@@ -169,12 +171,14 @@
       CHARACTER(LEN=30)  :: DIRCOM      ! Direction convention comment
       CHARACTER(LEN=128) :: PARTCOM     ! Partitioning method comment
 !/MFIT!
-!/MFIT      LOGICAL            :: DO_MFIT = .FALSE.
+!/MFIT      LOGICAL, PRIVATE   :: DO_MFIT = .FALSE.
       
+      LOGICAL, PRIVATE   :: VECTOR      ! Vector or dir/mag for dir fields?
+
       CONTAINS 
 
 !/ ------------------------------------------------------------------- /
-      SUBROUTINE INIT_META(FLG2D)
+      SUBROUTINE INIT_META(FLG2D,VEC)
 !/MFIT! C Hansen note: FLG2D is for the fb_xsmf branch only
 !/
 !/                  +-----------------------------------+
@@ -182,10 +186,11 @@
 !/                  |           C. Bunney               |
 !/                  |                                   |
 !/                  |                        FORTRAN 90 |
-!/                  | Last update :         09-Nov-2020 |
+!/                  | Last update :         25-Jan-2021 |
 !/                  +-----------------------------------+
 !/
 !/    09-Nov-2020 : Creation                            ( version 7.12 )
+!/    26-Jan-2021 : Added vector flag                   ( version 7.12 )
 !/
 !
 !  1. Purpose :
@@ -196,9 +201,11 @@
 !/XSTO       USE W3IOGOMD, ONLY: W3FLDTOIJ
       
       IMPLICIT NONE
+
 !/MFIT! C Hansen note: FLG2D is for the fb_xsmf branch only
       LOGICAL, INTENT(IN) :: FLG2D(NOGRP,NGRPP)
 !/MFIT!      
+      LOGICAL, INTENT(IN), OPTIONAL  :: VEC
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
@@ -206,6 +213,10 @@
       LOGICAL :: FLGNML
       INTEGER :: I, J
 !/XSTO      INTEGER :: K
+
+      VECTOR = .TRUE.
+      IF(PRESENT(VEC)) VECTOR = VEC
+
       ! 1. Allocate nested GROUP, FIELD structure:
       ALLOCATE(GROUP(NOGRP))
       DO I = 1,NOGRP
@@ -496,10 +507,12 @@
 !/                  |           C. Bunney               |
 !/                  |                                   |
 !/                  |                        FORTRAN 90 |
-!/                  | Last update :         09-Nov-2020 |
+!/                  | Last update :         26-Jan-2021 |
 !/                  +-----------------------------------+
 !/
 !/    09-Nov-2020 : Creation                            ( version 7.12 )
+!/    26-Jan-2021 : Added TP and alternative dir/mag    ( version 7.12 ) 
+!/                  metadata for directional fields.
 !/
 !
 !  1. Purpose :
@@ -1593,8 +1606,10 @@
 !     the netCDF variable type is NF90_SHORT.
 !
 !/ ------------------------------------------------------------------- /
+!/XSTO      USE W3IOGOMD, ONLY: W3FLDTOIJ
       IMPLICIT NONE
       TYPE(META_T), POINTER :: META(:)
+!/XSTO      INTEGER :: I, J
 !
 !----------GROUP 1 ----------------
 !
@@ -1613,46 +1628,90 @@
       META(1)%VMAX = 70000
 ! IFI=1, IFJ=2        
       META => GROUP(1)%FIELD(2)%META
-      META(1)%FSC    = 0.01
       META(1)%ENAME  = '.cur'
-      META(1)%UNITS  = 'm s-1'
-      META(1)%VMIN = -9.9
-      META(1)%VMAX =  9.9
-      META(1)%VARNM='ucur'
-      META(1)%VARNL='eastward current'
-      META(1)%VARNS='eastward_sea_water_velocity'
-      META(1)%VARNG='eastward_sea_water_velocity'
-      META(1)%VARNC='cur=sqrt(U**2+V**2)'
-      META(1)%VARND = DIRCOM
-      
-      ! Second component
-      META(2) = META(1)
-      META(2)%VARNM='vcur'
-      META(2)%VARNL='northward current'
-      META(2)%VARNS='northward_sea_water_velocity'
-      META(2)%VARNG='northward_sea_water_velocity'
-      META(2)%VARNC='cur=sqrt(U**2+V**2)'
+      IF(VECTOR) THEN
+        META(1)%FSC    = 0.01
+        META(1)%UNITS  = 'm s-1'
+        META(1)%VMIN = -9.9
+        META(1)%VMAX =  9.9
+        META(1)%VARNM='ucur'
+        META(1)%VARNL='eastward current'
+        META(1)%VARNS='eastward_sea_water_velocity'
+        META(1)%VARNG='eastward_sea_water_velocity'
+        META(1)%VARNC='cur=sqrt(U**2+V**2)'
+        META(1)%VARND = DIRCOM
+        
+        ! Second component
+        META(2) = META(1)
+        META(2)%VARNM='vcur'
+        META(2)%VARNL='northward current'
+        META(2)%VARNS='northward_sea_water_velocity'
+        META(2)%VARNG='northward_sea_water_velocity'
+        META(2)%VARNC='cur=sqrt(U**2+V**2)'
+      ELSE
+        META(1)%FSC    = 0.01
+        META(1)%UNITS  = 'm s-1'
+        META(1)%VMIN = 0
+        META(1)%VMAX = 10.0
+        META(1)%VARNM='cspd'
+        META(1)%VARNL='current speed'
+        META(1)%VARNS='sea_water_speed'
+        META(1)%VARNG='sea_water_speed'
+  
+        ! Second component
+        META(2) = META(1)
+        META(2)%FSC = 0.1
+        META(2)%VARNM='cdir'
+        META(2)%UNITS= 'degrees'
+        META(2)%VARNL='current direction (toward)'
+        META(2)%VARNS='direction_of_sea_water_velocity'
+        META(2)%VARNG='direction_of_sea_water_velocity'
+        META(2)%VMIN = 0
+        META(2)%VMAX = 360.0
+      ENDIF ! VECTOR
 ! IFI=1, IFJ=3         
       META => GROUP(1)%FIELD(3)%META
-      META(1)%FSC    = 0.1
       META(1)%ENAME  = '.wnd'
-      META(1)%UNITS  = 'm s-1'
-      META(1)%VARNM='uwnd'
-      META(1)%VARNL='eastward_wind'
-      META(1)%VARNS='eastward_wind'
-      META(1)%VARNG='eastward_wind'
-      META(1)%VARNC='wind=sqrt(U10**2+V10**2)'
-      META(1)%VMIN = -99.0
-      META(1)%VMAX =  99.0
-      META(1)%VARND = DIRCOM
+      IF(VECTOR) THEN
+        META(1)%FSC    = 0.1
+        META(1)%UNITS  = 'm s-1'
+        META(1)%VARNM='uwnd'
+        META(1)%VARNL='eastward_wind'
+        META(1)%VARNS='eastward_wind'
+        META(1)%VARNG='eastward_wind'
+        META(1)%VARNC='wind=sqrt(U10**2+V10**2)'
+        META(1)%VMIN = -99.0
+        META(1)%VMAX =  99.0
+        META(1)%VARND = DIRCOM
+  
+        ! Second component
+        META(2) = META(1)
+        META(2)%VARNM='vwnd'
+        META(2)%VARNL='northward_wind'
+        META(2)%VARNS='northward_wind'
+        META(2)%VARNG='northward_wind'
+        META(2)%VARNC='wind=sqrt(U10**2+V10**2)'
+      ELSE
+        META(1)%FSC = 0.01
+        META(1)%UNITS= 'm s-1'
+        META(1)%VARNM='wspd'
+        META(1)%VARNL='wind speed'
+        META(1)%VARNS='wind_speed'
+        META(1)%VARNG='wind_speed'
+        META(1)%VMIN = 0.0
+        META(1)%VMAX = 100.0
 
-      ! Second component
-      META(2) = META(1)
-      META(2)%VARNM='vwnd'
-      META(2)%VARNL='northward_wind'
-      META(2)%VARNS='northward_wind'
-      META(2)%VARNG='northward_wind'
-      META(2)%VARNC='wind=sqrt(U10**2+V10**2)'
+        ! Second component
+        META(2) = META(1)
+        META(2)%FSC = 0.1
+        META(2)%VARNM='wdir'
+        META(2)%UNITS='degrees'
+        META(2)%VARNL='wind direction (from)'
+        META(2)%VARNS='wind_from_direction'
+        META(2)%VARNG='wind_from_direction'
+        META(2)%VMIN = 0.0
+        META(2)%VMAX = 360.0
+      ENDIF ! VECTOR
 ! IFI=1, IFJ=4
       META => GROUP(1)%FIELD(4)%META
       META(1)%FSC    = 0.1
@@ -1925,6 +1984,17 @@
       META(1)%VARNG='dominant_wave_breaking_probability'
       META(1)%VMIN = 0
       META(1)%VMAX = 1
+! IFI=2, IFJ=18, TP
+      META => GROUP(2)%FIELD(18)%META
+      META(1)%FSC    = 0.01
+      META(1)%UNITS  = 's'
+      META(1)%ENAME  = '.tp'
+      META(1)%VARNM='tp'
+      META(1)%VARNL='wave peak period'
+      META(1)%VARNS='sea_surface_wave_peak_period'
+      META(1)%VARNG='dominant_wave_period'
+      META(1)%VMIN = 0
+      META(1)%VMAX = 50
 !
 !---------- GROUP 3 ----------------
 !
@@ -2618,8 +2688,9 @@
       META(2)%VARNS='northward_partitioned_surface_stokes_drift'
       META(2)%VARNG='northward_partitioned_surface_stokes_drift'
       META(2)%VARNC='usp=sqrt(ussp**2+vssp**2)'
-! IFI=6, IFJ=13,14,15 
-!/XSTO      META => GROUP(6)%FIELD(13)%META
+! IFI=I, IFJ=J,J+1,J+2
+!/XSTO      CALL W3FLDTOIJ('XSP   ', I, J, 1, 1, 1)
+!/XSTO      META => GROUP(I)%FIELD(J)%META
 !/XSTO      ! First sub-field 'Wavenumber of the zero-upcrossing period'
 !/XSTO      META(1)%FSC  = 0.0002
 !/XSTO      META(1)%VMIN = 0.0002
@@ -2634,7 +2705,7 @@
 !/XSTO      META(1)%VARND=''
 !/XSTO!
 !/XSTO! Second sub-field 'Vertical profile of Stokes drift'
-!/XSTO      META => GROUP(6)%FIELD(14)%META
+!/XSTO      META => GROUP(I)%FIELD(J+1)%META
 !/XSTO      META(1)%FSC    = 1./30000.
 !/XSTO      META(1)%ENAME  = '.svp'
 !/XSTO      META(1)%VMIN = -1. 
@@ -2653,7 +2724,7 @@
 !/XSTO      META(2)%VARNC='u(Z) + jv(Z) = (u(0) + jv(0)) e^{j B zk} e^{A zk^0.5}'
 !/XSTO!
 !/XSTO! Third sub-field 'Total Stokes drift'
-!/XSTO      META => GROUP(6)%FIELD(15)%META
+!/XSTO      META => GROUP(I)%FIELD(J+2)%META
 !/XSTO      META(1)%ENAME  = '.xsm'
 !/XSTO      META(1)%VARND = DIRCOM
 !/XSTO      META(1)%VARNG=''
