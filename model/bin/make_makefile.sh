@@ -1013,7 +1013,7 @@
                data="wmmdatmd $memcode w3gdatmd w3wdatmd w3adatmd w3idatmd w3odatmd"
                prop=
              source="$pdlibcode $pdlibyow $db $bt $setupcode w3parall w3triamd $stx $nlx $btx  $is $uostmd"
-                 IO='w3iogrmd w3iogomd w3iorsmd w3iopomd w3xstomd w3xsmfmd'
+                 IO='w3iogrmd w3iogomd w3iorsmd w3iopomd w3xstomd w3xsmfmd w3nmlshelmd'
                 aux="constants w3servmd w3timemd w3arrymd w3dispmd w3gsrumd"
                 aux="$aux w3nmlounfmd $smco w3ounfmetamd" ;;
      ww3_outp) IDstring='Point output'

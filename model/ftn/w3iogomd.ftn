@@ -136,12 +136,12 @@
 !
 !/ ------------------------------------------------------------------- /
 !/S      USE W3SERVMD, ONLY : STRACE
-!/
-      PUBLIC
-      CHARACTER(LEN=1024)                   :: FLDOUT
 !/XSTO!/      
 !/XSTO! Definition of I, J for parameter 'XSP' in W3ODATMD:
 !/XSTO      USE W3ODATMD, ONLY: IXSP, JXSP
+!/
+      PUBLIC
+      CHARACTER(LEN=1024)                   :: FLDOUT
 !/
 !/ Private parameter statements (ID strings)
 !/
