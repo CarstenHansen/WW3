@@ -258,14 +258,17 @@
   TYPE%FIELD%LIST     = 'HS DIR SPR WND ICE CUR LEV'
 /
 
-&FCUT_COUNT_NML
-  FCUT_COUNT%N_FIELD = 1
-/
-
-&FCUT_NML
-  FCUT(1)%FIELD    = 'XSP'
-  FCUT(1)%FREQ     = 2.0
-/
+! -------------------------------------------------------------------- !
+! Define high-frequency limit FCUT for output fields via namelists
+! FCUT_COUNT and FCUT
+! 
+! &FCUT_COUNT_NML
+! FCUT_COUNT%N_FIELD = 1     [ Number of fields where FCUT%FREQ is not infinite ]
+! /
+! &FCUT_NML
+! FCUT(1)%FIELD      = 'XSP' [ Name of field no. 1 ]
+! FCUT(1)%FREQ       = 2.0   [ Cut-off frequency for field no. 1.
+! /                            May be higher than FREQ(NK) ]
 
 ! -------------------------------------------------------------------- !
 ! Define output dates via OUTPUT_DATE_NML namelist
