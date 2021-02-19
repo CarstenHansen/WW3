@@ -5981,7 +5981,7 @@
 !/RTD               '        BPLON =',9(F6.1,","),' /')
 !/XSTO
 !/XSTO 2988 FORMAT ( '  &XSTO XSND =',I3,' XSDS =',F5.2,' XSTY ="',A,'" /')
-
+      
  3000 FORMAT (/'  The spatial grid: '/                                &
                ' --------------------------------------------------'/ &
               /'       Grid type                   : ',A)

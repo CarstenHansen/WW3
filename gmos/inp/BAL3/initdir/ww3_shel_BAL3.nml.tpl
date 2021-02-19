@@ -22,8 +22,8 @@
 !     DOMAIN%STOP   = '19680607 000000'  ! Stop date for the entire model
 ! -------------------------------------------------------------------- !
 &DOMAIN_NML
-  DOMAIN%START  = '20100101 120000'
-  DOMAIN%STOP   = '20101231 000000'
+  DOMAIN%START  = '__SIMSTART__'
+  DOMAIN%STOP   = '__SIMSTOP__'
 /
 
 
@@ -61,8 +61,7 @@
 ! -------------------------------------------------------------------- !
 &INPUT_NML
   INPUT%FORCING%WINDS = 'T'
-  INPUT%FORCING%WATER_LEVELS  = 'C'
-  INPUT%FORCING%CURRENTS      = 'C'
+  INPUT%FORCING%ICE_CONC  = 'F'
 /
 
 
@@ -124,7 +123,6 @@
 !  T  T  2    15   HMAXD      SDMH  St Dev of MXC (STE)
 !  T  T  2    16   HCMAXD     SDMHC St Dev of MXHC (STE)
 !  F  T  2    17   WBT        WBT   Dominant wave breaking probability bT
-!  F  F  2    18   FP0        TP    Peak period (from peak freq)
 !   -------------------------------------------------
 !        3                          Spectral Parameters (first 5)
 !   -------------------------------------------------
@@ -255,20 +253,17 @@
 !
 ! -------------------------------------------------------------------- !
 &OUTPUT_TYPE_NML
-  TYPE%FIELD%LIST     = 'HS DIR SPR WND ICE CUR LEV'
+  TYPE%FIELD%LIST     = 'DPT WND HS T02 T0M1 FP DIR SPR DP TUS USS XSP DTD FC CFX CFD CFK'
 /
 
-! -------------------------------------------------------------------- !
-! Define high-frequency limit OFCUT for output fields via namelists
-! OFCUT_COUNT and OFCUT
-! 
-! &OFCUT_COUNT_NML
-! OFCUT_COUNT%N_FIELD = 1     [ Number of fields where OFCUT%FREQ is not infinite ]
-! /
-! &OFCUT_NML
-! OFCUT(1)%FIELD      = 'XSP' [ Name of field no. 1 ]
-! OFCUT(1)%FREQ       = 2.0   [ Cut-off frequency for field no. 1.
-! /                            May be higher than FREQ(NK) ]
+&FCUT_COUNT_NML
+  FCUT_COUNT%N_FIELD = 1
+/
+
+&FCUT_NML
+  FCUT(1)%FIELD    = 'XSP'
+  FCUT(1)%FREQ     = 2.0
+/
 
 ! -------------------------------------------------------------------- !
 ! Define output dates via OUTPUT_DATE_NML namelist
@@ -304,18 +299,19 @@
 !     DATE%RESTART             =  '19680606 000000' '0' '19680607 000000'
 ! -------------------------------------------------------------------- !
 &OUTPUT_DATE_NML
-  DATE%FIELD%START         = '20100101 000000'
-  DATE%FIELD%STRIDE        = '3600'
-  DATE%FIELD%STOP          = '20101231 000000'
-  DATE%POINT%START         = '20100101 000000'
-  DATE%POINT%STRIDE        = '3600'
-  DATE%POINT%STOP          = '20101231 000000'
-
-  DATE%RESTART             = '20101231 000000' '43200' '20501231 000000'
+  DATE%FIELD%START         =  '__SIMSTART__'
+  DATE%FIELD%STRIDE        =  3600
+  DATE%FIELD%STOP          =  '__SIMSTOP__'
+  DATE%POINT%START         =  '__SIMSTART__'
+  DATE%POINT%STRIDE        =  1200
+  DATE%POINT%STOP          =  '__SIMSTOP__'
+  DATE%RESTART%START       =  '__SIMSTART__'
+  DATE%RESTART%STRIDE      =  '__HOTDELTA__'
+  DATE%RESTART%STOP        =  '__SIMSTOP__'
+  DATE%BOUNDARY%START      =  '__SIMSTART__'
+  DATE%BOUNDARY%STRIDE     =  1200
+  DATE%BOUNDARY%STOP       =  '__SIMSTOP__'
 /
-
-
-
 
 ! -------------------------------------------------------------------- !
 ! Define homogeneous input via HOMOG_COUNT_NML and HOMOG_INPUT_NML namelist
@@ -362,26 +358,26 @@
 !     HOMOG_INPUT(I)%VALUE2         =  0
 !     HOMOG_INPUT(I)%VALUE3         =  0
 ! -------------------------------------------------------------------- !
-&HOMOG_COUNT_NML
-  HOMOG_COUNT%N_WND        = 2
-  HOMOG_COUNT%N_LEV        = 1
-/
-
-&HOMOG_INPUT_NML
-  HOMOG_INPUT(1)%NAME       = 'WND'
-  HOMOG_INPUT(1)%DATE       ='20100610 000000'
-  HOMOG_INPUT(1)%VALUE1     = 5.
-  HOMOG_INPUT(1)%VALUE2     = 90.
-
-  HOMOG_INPUT(2)%NAME       = 'WND'
-  HOMOG_INPUT(2)%DATE       = '20100610 060000'
-  HOMOG_INPUT(2)%VALUE1     = 25.
-  HOMOG_INPUT(2)%VALUE2     = 120.
-
-  HOMOG_INPUT(3)%NAME       = 'LEV'
-  HOMOG_INPUT(3)%DATE       = '20100610 060000'
-  HOMOG_INPUT(3)%VALUE1     = 5.
-/
+! &HOMOG_COUNT_NML
+!   HOMOG_COUNT%N_WND        = 2
+!   HOMOG_COUNT%N_LEV        = 1
+! /
+! 
+! &HOMOG_INPUT_NML
+!   HOMOG_INPUT(1)%NAME       = 'WND'
+!   HOMOG_INPUT(1)%DATE       ='20100610 000000'
+!   HOMOG_INPUT(1)%VALUE1     = 5.
+!   HOMOG_INPUT(1)%VALUE2     = 90.
+! 
+!   HOMOG_INPUT(2)%NAME       = 'WND'
+!   HOMOG_INPUT(2)%DATE       = '20100610 060000'
+!   HOMOG_INPUT(2)%VALUE1     = 25.
+!   HOMOG_INPUT(2)%VALUE2     = 120.
+! 
+!   HOMOG_INPUT(3)%NAME       = 'LEV'
+!   HOMOG_INPUT(3)%DATE       = '20100610 060000'
+!   HOMOG_INPUT(3)%VALUE1     = 5.
+! /
 
 
 ! -------------------------------------------------------------------- !
