@@ -286,9 +286,9 @@
       USE W3ODATMD, ONLY: NDST, NDSO, NDSE, IAPROC, NAPROC, NAPOUT, XSVB
       USE W3DISPMD, ONLY: DSIE, N1MAX, ECG1, EWN1
 
-      USE W3NMLSHELMD, ONLY: FCUT, FCUT_COUNT
+      USE W3NMLSHELMD, ONLY: OFCUT, OFCUT_COUNT
 
-! TODO, like FCUT:
+! TODO, like OFCUT:
 !   XSND, XSDS and XSTY may be set at run init from WW3_shel.nml, and also:
 !   XSVB: Verboseness level [0..4] of XSTO output to NDSV  
 
@@ -602,12 +602,12 @@
       if ( xsto_verbose .gt. 0 ) &
         write (NDSV, 916)  'XSTOKES_INIT:  XSTY:', XSTY
       ! CHA 20200603 If the tail is truncated at a specific frequency ftr,
-      DO IK=1,FCUT_COUNT%N_FIELD+1
-        IF (IK == FCUT_COUNT%N_FIELD+1) exit
-        IF (FCUT(IK)%FIELD == 'XSP') exit
+      DO IK=1,OFCUT_COUNT%N_FIELD+1
+        IF (IK == OFCUT_COUNT%N_FIELD+1) exit
+        IF (OFCUT(IK)%FIELD == 'XSP') exit
         END DO
-      IF (IK <= FCUT_COUNT%N_FIELD) THEN
-        FTR=FCUT(IK)%FREQ
+      IF (IK <= OFCUT_COUNT%N_FIELD) THEN
+        FTR=OFCUT(IK)%FREQ
         if ( xsto_verbose .gt. 0 ) &
           WRITE (NDSV, *), ' XSTOKES_INIT: CUT-OFF AT',FTR,'Hz'
       else if ( XSTY(1:2) == 'DE' ) then
