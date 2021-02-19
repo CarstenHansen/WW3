@@ -253,16 +253,28 @@
 !
 ! -------------------------------------------------------------------- !
 &OUTPUT_TYPE_NML
-  TYPE%FIELD%LIST     = 'DPT WND HS T02 T0M1 FP DIR SPR DP TUS USS XSP DTD FC CFX CFD CFK'
+  TYPE%FIELD%LIST     = 'DPT WND HS T02 T0M1 FP DIR SPR DP TUS USS XSP DTD FC CFX CFD CFK MFIT'
 /
 
-&FCUT_COUNT_NML
-  FCUT_COUNT%N_FIELD = 1
+! -------------------------------------------------------------------- !
+! Define high-frequency limit OFCUT for output fields via namelists
+! OFCUT_COUNT and OFCUT
+! 
+! &OFCUT_COUNT_NML
+! OFCUT_COUNT%N_FIELD = 1     [ Number of fields where OFCUT%FREQ is not infinite ]
+! /
+! &OFCUT_NML
+! OFCUT(1)%FIELD      = 'XSP' [ Name of field no. 1 ]
+! OFCUT(1)%FREQ       = 2.0   [ Cut-off frequency for field no. 1.
+! /                            May be higher than FREQ(NK) ]
+! -------------------------------------------------------------------- !
+&OFCUT_COUNT_NML
+  OFCUT_COUNT%N_FIELD = 1
 /
 
-&FCUT_NML
-  FCUT(1)%FIELD    = 'XSP'
-  FCUT(1)%FREQ     = 2.0
+&OFCUT_NML
+  OFCUT(1)%FIELD    = 'XSP'
+  OFCUT(1)%FREQ     = 2.0
 /
 
 ! -------------------------------------------------------------------- !

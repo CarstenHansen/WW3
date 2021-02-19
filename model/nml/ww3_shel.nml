@@ -269,6 +269,8 @@
 ! OFCUT(1)%FIELD      = 'XSP' [ Name of field no. 1 ]
 ! OFCUT(1)%FREQ       = 2.0   [ Cut-off frequency for field no. 1.
 ! /                            May be higher than FREQ(NK) ]
+! -------------------------------------------------------------------- !
+
 
 ! -------------------------------------------------------------------- !
 ! Define output dates via OUTPUT_DATE_NML namelist
