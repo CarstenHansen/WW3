@@ -61,7 +61,7 @@
 ! -------------------------------------------------------------------- !
 &INPUT_NML
   INPUT%FORCING%WINDS = 'T'
-  INPUT%FORCING%ICE_CONC  = 'F'
+  INPUT%FORCING%ICE_CONC  = 'T'
 /
 
 
@@ -253,7 +253,7 @@
 !
 ! -------------------------------------------------------------------- !
 &OUTPUT_TYPE_NML
-  TYPE%FIELD%LIST     = 'DPT WND HS T02 T0M1 FP DIR SPR DP TUS USS XSP DTD FC CFX CFD CFK'
+  TYPE%FIELD%LIST     = 'DPT WND ICE HS T02 T0M1 FP DIR SPR DP TUS USS XSP DTD FC CFX CFD CFK'
 /
 
 &FCUT_COUNT_NML
