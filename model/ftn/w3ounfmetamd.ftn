@@ -220,19 +220,19 @@
       DO I = 1,NOGRP
         ALLOCATE(GROUP(I)%FIELD(NOGE(I)))
         DO J = 1,NOGE(I)
-          NSP=0
+          NSP = 0
           IF ( I == 6 ) THEN
             IF ( J == 7 ) NSP=2 ! P2S
           ELSEIF ( I == 7 ) THEN 
             IF ( J == 3 ) NSP=2 ! BED
           ENDIF
-          IF ( NSP=0 ) 
+          IF ( NSP == 0 ) THEN
             ALLOCATE(GROUP(I)%FIELD(J)%META(3)) ! Hardcode to 3 components for the moment
           ELSE 
             NSPMAX = MAX( NSPMAX, NSP )
-            ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(NSP)
+            ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(NSP))
             DO S = 1,NSP
-              ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(S)%META(2) ! Hardcode to 2 cmp.
+              ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(S)%META(2)) ! Hardcode to 2 components
             ENDDO
           ENDIF
         ENDDO
@@ -305,13 +305,13 @@
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
-      INTEGER :: I, J
+      INTEGER :: I, J, S
 
       DO I = 1,NOGRP
         DO J = 1,NOGE(I)
           IF ( ALLOCATED(GROUP(I)%FIELD(J)%SUBFIELD) ) THEN
             DO S = 1,SIZE(GROUP(I)%FIELD(J)%SUBFIELD)
-              DEALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(S)%META
+              DEALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(S)%META)
             ENDDO
             DEALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD)            
           ELSE
@@ -1157,13 +1157,13 @@
 !
 !/ ------------------------------------------------------------------- /
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: IFI, IFJ, IFS
+      INTEGER, INTENT(IN) :: IFI, IFJ
       INTEGER, INTENT(IN), OPTIONAL :: ICOMP, IPART, ISUB
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
-      INTEGER :: IFP, IFC
+      INTEGER :: IFP, IFC, IFS
       TYPE(META_T) :: META ! Not pointer as we might need to modify it
             
       IFC = 1

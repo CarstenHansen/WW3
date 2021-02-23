@@ -1048,7 +1048,6 @@
           ! Instanciates the partition array
           INDEXIPART=1
           ! IPART=TABIPART(INDEXIPART)
-          VARNS(:)=''
 
           ! NSP: Number of swell partitions or sub-parameters under (IFI,IFJ).
           ! NSP will be incremented by one for each partition or sub-parameter
@@ -2347,7 +2346,7 @@
             NEW3D = .FALSE.
 
             ! If there is a third dimension:            
-            IF ( ( TRIM(DIM3NAME) .NE. '' ) THEN
+            IF ( TRIM(DIM3NAME) .NE. '' ) THEN
               EXTRADIM = 1
               TDIM = TDIM + 1
 
@@ -2380,20 +2379,19 @@
 
             ! If we need the third dimension in a netCDF file already open,
             ! check if the third dimension exists, and if it matches
-            IF ( NEW3D .AND. .NOT.FLSEP ) THEN
+            IF ( NEW3D .AND. FLJOIN ) THEN
               ! Tentative id. if already open
-              OLDNCID=NCJID
+              OLDNCID = NCIDS(IFI,IFJ,1)
               ! If all variables in the same file
-              IF ( NCJID .EQ. 0 )  OLDNCID = NCIDS(1,1,1)
+              IF ( TOGETHER ) OLDNCID = NCIDS(1,1,1)
               
               CALL W3NCINQ3( OLDNCID, DIM3NAME, DIMID3, DIMLN(4), VCHCK=DIM3VAR )
               IF ( DIMID3 .EQ. -1 ) THEN
                 ! If DIM3NAME is defined in the netCDF but doesn't match
-                ! DIM3VAR, then nullify the NCJID and write to separate file
+                ! DIM3VAR, then write to separate file
                 WRITE(NDSE,*) ' Must output to a separate file for IFI,IFJ=',&
                                 IFI,IFJ
-                FLSEP = .TRUE.
-                NCJID = 0
+                FLJOIN = .FALSE.
                 ! Note: DIM3VAR is kept allocated as long as NEW3D is True
               ELSE IF ( DIMID3 .GE. 1 ) THEN
                 ! DIM3NAME already exists in netCDF, and matches the dim var
@@ -3001,7 +2999,7 @@
             CALL T2D(TIME,CURDATE,IERR)
             OUTJULDAY=TSUB(REFDATE,CURDATE)
 
-            IF ( NCJID .NE. 0 ) FNAMENC(:)='(id.)'
+            IF ( NCIDS(IFI,IFJ,1) .NE. 0 ) FNAMENC(:)='(id.)'
             WRITE(NDSO,'(A,A9,A,I6,A,I4,A,I2.2,A,I2.2,A,I2.2,A,I2.2,A,I2.2,2A)')        &
                     'Writing new record ', META(1)%ENAME(2:) ,'number ',NTIM,    &
                     ' for ',CURDATE(1),':',CURDATE(2),':',CURDATE(3),'T',CURDATE(5),&
