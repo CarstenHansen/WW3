@@ -150,7 +150,7 @@
 !     Note that FLJOIN is NOT set to True for swell partitions
 !     
 !     A parameter with ISP == 1 can be forced to a separate file by setting
-!     FLJOIN = .FALSE., but forcing FLJOIN to True only makes sense for ISP > 1.
+!     FLJOIN to False. Setting FLJOIN to True makes sense for ISP > 1, only.
 !
 !  8. Structure :
 !
@@ -227,7 +227,6 @@
                                  IOUT, S3, IRET, HASNC4,               &
                                  NBIPART, CNTIPART, NCVARTYPEI, IPART, &
                                  RTDNX, RTDNY
-      INTEGER                 :: NFPMAX = 3 ! Depends on the hard-coded max
       INTEGER                 :: TOUT(2), TDUM(2), STOPDATE(8)
 !
       INTEGER, ALLOCATABLE    :: TABIPART(:), NCIDS(:,:,:)
@@ -610,8 +609,8 @@
       IF (NOGE(4).GE.1 .AND. .NOT.TOGETHER) THEN
         IFI = 4
         DO IFJ=1, NOGE(IFI)
-          IF ( ALL(NCIDS(IFI,IFJ,2:NFPMAX).EQ.0 ) ) CYCLE
-          DO IPART=2,NFPMAX
+          IF ( ALL(NCIDS(IFI,IFJ,2:NSPMAX).EQ.0 ) ) CYCLE
+          DO IPART=2,NSPMAX
             IF (NCIDS(IFI,IFJ,IPART).NE.0) THEN
               IRET = NF90_REDEF(NCIDS(IFI,IFJ,IPART))
               CALL CHECK_ERR(IRET)
@@ -881,6 +880,7 @@
       CHARACTER*30            :: FORMAT1
       CHARACTER*30            :: STRSTARTDATE
       CHARACTER               :: FNAMENC*50
+      CHARACTER               :: WRITETO*50
       CHARACTER, SAVE         :: OLDTIMEID*16 = '0000000000000000'
       CHARACTER, SAVE         :: TIMEID*16 = '0000000000000000'
 !
@@ -1375,6 +1375,7 @@
             ELSE IF ( IFI .EQ. 3 .AND. IFJ .EQ. 1 ) THEN
               ! Information for spectral
               FLJOIN = .FALSE.
+              ! FLJOIN = .TRUE. ! Try this to include ef in file TOGETHER
               FLFRQ  = .TRUE.
               I1F=E3DF(2,1)
               I2F=E3DF(3,1)
@@ -1911,7 +1912,7 @@
               ISUB=ISP
 !
               IF ( ISP .EQ. 1 ) THEN
-                !ENAME  = '.p2s'
+                IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
 !/SMC                IF( SMCGRD ) THEN
 !/SMC                  CALL W3S2XY_SMC( PRMS(1:NSEA), X1 )
 !/SMC                ELSE
@@ -2999,11 +3000,14 @@
             CALL T2D(TIME,CURDATE,IERR)
             OUTJULDAY=TSUB(REFDATE,CURDATE)
 
-            IF ( NCIDS(IFI,IFJ,1) .NE. 0 ) FNAMENC(:)='(id.)'
+            WRITETO=FNAMENC
+            ! If a sub-parameter and not TOGETHER, we forgot the file name
+            IF ( NCIDS(IFI,IFJ,ISP) .EQ. 0 .AND. NCIDS(IFI,IFJ,1) .NE. 0) &
+                 WRITETO(:)='(id.)'
             WRITE(NDSO,'(A,A9,A,I6,A,I4,A,I2.2,A,I2.2,A,I2.2,A,I2.2,A,I2.2,2A)')        &
                     'Writing new record ', META(1)%ENAME(2:) ,'number ',NTIM,    &
                     ' for ',CURDATE(1),':',CURDATE(2),':',CURDATE(3),'T',CURDATE(5),&
-                    ':',CURDATE(6),':',CURDATE(7),' in file ',TRIM(FNAMENC)
+                    ':',CURDATE(6),':',CURDATE(7),' in file ',TRIM(WRITETO)
 
             ! Defines starting point and size of arrays to be written
             START(1)=1
