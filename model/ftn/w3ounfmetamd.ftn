@@ -226,20 +226,19 @@
       VECTOR = .TRUE.
       IF(PRESENT(VEC)) VECTOR = VEC
 
-      ! 1. Allocate nested GROUP, FIELD structure:
-      ALLOCATE(GROUP(NOGRP))
-      NSPMAX=0
-
       ! Sub-parameter id.'s
       DO K = 1,SIZE(SPS)
          CALL W3FLDTOIJ(SPS(K), I, J, 1, 1, 1)
          SPIJ2(K) = I*NGRPP+J
       ENDDO   
          
+      ! 1. Allocate nested GROUP, FIELD structure:
+      ALLOCATE(GROUP(NOGRP))
+      NSPMAX=0
+      
       DO I = 1,NOGRP
         ALLOCATE(GROUP(I)%FIELD(NOGE(I)))
         DO J = 1,NOGE(I)
-          NSP = 0
           ! Does it have sub-parameters?
           K = FINDLOC( SPIJ2 , I*NGRPP+J)
           IF ( K == 0 ) THEN
@@ -2576,16 +2575,16 @@
       ! First subfield
       IF ( NCVARTYPE .EQ. 2 ) THEN
         ! C Hansen: In ww3_ounf.ftn: IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
-        ! If you force it to short data type, you may loose accuracy
-        META(1)%FSC    = 0.0001
-        META(1)%VMIN = 0.
-        META(1)%VMAX = 1.
+        ! For short data type, you get only high seas results
+        META(1)%FSC    = 0.01
+        META(1)%VMIN = -150
+        META(1)%VMAX = 320
       ELSE
         META(1)%FSC  = 1.
         META(1)%VMIN = 0.
         META(1)%VMAX = 1.e6         
       ENDIF
-         
+
       META(1)%ENAME  = '.p2s'
       META(1)%UNITS  = 'm4'
       
