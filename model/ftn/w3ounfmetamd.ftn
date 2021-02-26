@@ -221,16 +221,16 @@
       VECTOR = .TRUE.
       IF(PRESENT(VEC)) VECTOR = VEC
 
-      ! 1. Allocate nested GROUP, FIELD structure:
-      ALLOCATE(GROUP(NOGRP))
-      
       ! Sub-parameter id.'s
       DO K = 1,SIZE(SPS)
          CALL W3FLDTOIJ(SPS(K), I, J, 1, 1, 1)
          SPIJ2(K) = I*NGRPP+J
       ENDDO   
          
+      ! 1. Allocate nested GROUP, FIELD structure:
+      ALLOCATE(GROUP(NOGRP))
       NSPMAX=0
+      
       DO I = 1,NOGRP
         ALLOCATE(GROUP(I)%FIELD(NOGE(I)))
         DO J = 1,NOGE(I)
