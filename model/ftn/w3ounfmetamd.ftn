@@ -148,11 +148,18 @@
         CHARACTER(LEN=6) :: FLDID = ''
       ENDTYPE META_T
 
+      ! Storage for meta data in sub-fields ...
+      TYPE SUBFIELD_T
+        TYPE(META_T), POINTER :: META(:)
+      END TYPE SUBFIELD_T         
+       
       ! Storage for meta data aggregated by component (NFIELD) ...
       TYPE FIELD_T
         TYPE(META_T), POINTER :: META(:)
+        ! Sub-fields one level deeper ...
+        TYPE(SUBFIELD_T), ALLOCATABLE :: SUBFIELD(:)
       END TYPE FIELD_T
-       
+      
       ! ... field (IFJ) ...
       TYPE GROUP_T
         TYPE(FIELD_T), ALLOCATABLE :: FIELD(:)
@@ -166,6 +173,7 @@
       TYPE(META_PAIR_T), ALLOCATABLE :: GLOBAL_META(:)
       INTEGER, PARAMETER :: MAX_GBLMETA = 30
       INTEGER            :: N_GBLMETA
+      INTEGER            :: NSPMAX ! Max number of sub-parameters
 
       INTEGER            :: NCVARTYPE   ! netCDF variable type
       CHARACTER(LEN=30)  :: DIRCOM      ! Direction convention comment
@@ -205,39 +213,46 @@
 !/ Local parameters
 !/
       LOGICAL :: FLGNML
-      INTEGER :: I, J
-!/XSTO      INTEGER :: K
+      INTEGER :: I, J, K, S
+!/XSTO! Add 'XSP' to SPS
+!/XSTO! C Hansen: Before PR: Let extended-tail-tus a separate parameter 'xts'
+      ! These parameters have sub-parameters
+      CHARACTER (LEN=6), DIMENSION(3) :: SPS = /( 'P2S   ', 'BED   ', 'XSP   ' )/
+      ! Number of sub-parameters for each element in SPS
+      INTEGER, DIMENSION(3)           :: NSPS = /( 2,        2,        3 )/
+      ! Sub-parameter unique integer id.'s
+      INTEGER, DIMENSION(3) :: SPIJ2
 
       VECTOR = .TRUE.
       IF(PRESENT(VEC)) VECTOR = VEC
 
       ! 1. Allocate nested GROUP, FIELD structure:
       ALLOCATE(GROUP(NOGRP))
+      NSPMAX=0
+
+      ! Sub-parameter id.'s
+      DO K = 1,SIZE(SPS)
+         CALL W3FLDTOIJ(SPS(K), I, J, 1, 1, 1)
+         SPIJ2(K) = I*NGRPP+J
+      ENDDO   
+         
       DO I = 1,NOGRP
         ALLOCATE(GROUP(I)%FIELD(NOGE(I)))
         DO J = 1,NOGE(I)
-          ALLOCATE(GROUP(I)%FIELD(J)%META(3)) ! Hardcode to 3 components for the moment
+          NSP = 0
+          ! Does it have sub-parameters?
+          K = FINDLOC( SPIJ2 , I*NGRPP+J)
+          IF ( K == 0 ) THEN
+            ALLOCATE(GROUP(I)%FIELD(J)%META(3)) ! Hardcode to 3 components for the moment
+          ELSE 
+            NSPMAX = MAX( NSPMAX, NSPS(K) )
+            ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(NSPS(K)))
+            DO S = 1,NSPS(K)
+              ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(S)%META(2)) ! Hardcode to 2 components
+            ENDDO
+          ENDIF
         ENDDO
       ENDDO
-!/XSTO!
-!/XSTO        CALL W3FLDTOIJ('XSP   ', I, J, 1, 1, 1)
-!/XSTO! C Hansen: Before PR: Let extended-tail-tus a separate parameter 'xts'
-!/XSTO! C Hansen: Before PR: Allocate for a list of the true flags only, plus
-!/XSTO!        the sub-parameter zk
-!/XSTO        IF ( ALLOCATED(GROUP(I)%FIELD) .AND. J+2 .GT. NOGE(I) ) THEN
-!/XSTO          ! C Hansen: Reallocate GROUP(6)%FIELD)
-!/XSTO          DO J = 1,NOGE(I)
-!/XSTO            DEALLOCATE(GROUP(I)%FIELD(J)%META)
-!/XSTO          ENDDO
-!/XSTO          DEALLOCATE(GROUP(I)%FIELD)
-!/XSTO        END IF      
-!/XSTO          ALLOCATE(GROUP(I)%FIELD(J+2))
-!/XSTO          DO K = 1,NOGE(I)
-!/XSTO            ALLOCATE(GROUP(I)%FIELD(K)%META(3)) ! 3 components
-!/XSTO          ENDDO
-!/XSTO          DO K = NOGE(I)+1,J+2
-!/XSTO            ALLOCATE(GROUP(I)%FIELD(K)%META(2)) ! 2 components
-!/XSTO          ENDDO
 
       ! Allocate storage for Global meta-data
       ALLOCATE(GLOBAL_META(MAX_GBLMETA))
@@ -306,11 +321,18 @@
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
-      INTEGER :: I, J
+      INTEGER :: I, J, S
 
       DO I = 1,NOGRP
         DO J = 1,NOGE(I)
-          DEALLOCATE(GROUP(I)%FIELD(J)%META)
+          IF ( ALLOCATED(GROUP(I)%FIELD(J)%SUBFIELD) ) THEN
+            DO S = 1,SIZE(GROUP(I)%FIELD(J)%SUBFIELD)
+              DEALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(S)%META)
+            ENDDO
+            DEALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD)            
+          ELSE
+            DEALLOCATE(GROUP(I)%FIELD(J)%META)
+          END IF
         ENDDO
         DEALLOCATE(GROUP(I)%FIELD)
       ENDDO 
@@ -1114,7 +1136,7 @@
       END SUBROUTINE READ_GLOBAL_META
 
 !/ ------------------------------------------------------------------- /
-      FUNCTION GETMETA(IFI, IFJ, ICOMP, IPART) RESULT(META)
+      FUNCTION GETMETA(IFI, IFJ, ICOMP, IPART, ISUB) RESULT(META)
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -1125,11 +1147,12 @@
 !/                  +-----------------------------------+
 !/
 !/    09-Nov-2020 : Creation                            ( version 7.12 )
+!/    22-Feb-2021 : ISUB > 0 for sub-parameters         ( version X.XX )
 !/
 !
 !  1. Purpose :
 !
-!     Returns a META_T type containig the netCDF matadata for the 
+!     Returns a META_T type containig the netCDF metadata for the 
 !     requested field
 !
 !  2. Method :
@@ -1151,18 +1174,20 @@
 !/ ------------------------------------------------------------------- /
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: IFI, IFJ
-      INTEGER, INTENT(IN), OPTIONAL :: ICOMP, IPART
+      INTEGER, INTENT(IN), OPTIONAL :: ICOMP, IPART, ISUB
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
-      INTEGER :: IFP, IFC
+      INTEGER :: IFP, IFC, IFS
       TYPE(META_T) :: META ! Not pointer as we might need to modify it
             
       IFC = 1
       IFP = 1
+      IFS = 0
       IF(PRESENT(ICOMP)) IFC = ICOMP
       IF(PRESENT(IPART)) IFP = IPART
+      IF(PRESENT(ISUB))  IFS = ISUB
 
       ! Error checking on size of IFJ, ICOMP, IPART.
       IF(IFI .LT. 1 .OR. IFI .GT. NOGRP) THEN
@@ -1179,9 +1204,13 @@
         WRITE(NDSE,1002)
         CALL EXTCDE(1)
       ENDIF
-
-      META = GROUP(IFI)%FIELD(IFJ)%META(IFC)
-
+      
+      IF ( IFS == 0 ) THEN
+        META = GROUP(IFI)%FIELD(IFJ)%META(IFC)
+      ELSE
+        META = GROUP(IFI)%FIELD(IFJ)%SUBFIELD(IFS)%META(IFC)
+      ENDIF
+      
       ! For partitioned data, expand in the partition number:
       IF(IFI .EQ. 4) THEN
         CALL ADD_PARTNO(META, IFP)
@@ -1580,7 +1609,7 @@
 !/XSTO      USE W3IOGOMD, ONLY: W3FLDTOIJ
       IMPLICIT NONE
       TYPE(META_T), POINTER :: META(:)
-!/XSTO      INTEGER :: I, J
+!/XSTO      INTEGER :: IFI, IFJ
 !
 !----------GROUP 1 ----------------
 !
@@ -1984,8 +2013,8 @@
       END IF
       META(1)%ENAME  = '.ef'
       META(1)%VARNG = META(1)%VARNS
-      META(1)%VMIN = -12
-      META(1)%VMAX = -12.8
+      META(1)%VMIN = -13
+      META(1)%VMAX = 13
 ! IFI=3, IFJ=2
       META => GROUP(3)%FIELD(2)%META
       ! Information for spectral
@@ -2543,26 +2572,39 @@
       META(2)%VARNG='northward_surface_stokes_drift'
       WRITE(META(2)%VARNC,'(A,F8.4,A,F8.4,A)') 'Frequency range ',SIG(1)*TPIINV,' to ',SIG(NK)*TPIINV,' Hz'
 ! IFI=6, IFJ=7
-      META => GROUP(6)%FIELD(7)%META
-      META(1)%FSC    = 0.01
+      META => GROUP(6)%FIELD(7)%SUBFIELD(1)%META
+      ! First subfield
+      IF ( NCVARTYPE .EQ. 2 ) THEN
+        ! C Hansen: In ww3_ounf.ftn: IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
+        ! If you force it to short data type, you may loose accuracy
+        META(1)%FSC    = 0.0001
+        META(1)%VMIN = 0.
+        META(1)%VMAX = 1.
+      ELSE
+        META(1)%FSC  = 1.
+        META(1)%VMIN = 0.
+        META(1)%VMAX = 1.e6         
+      ENDIF
+         
       META(1)%ENAME  = '.p2s'
       META(1)%UNITS  = 'm4'
-      META(1)%VMIN = -150
-      META(1)%VMAX = 320
       
-      ! First component
       META(1)%VARNL='power spectral density of equivalent surface pressure'
       META(1)%VARNS='power_spectral_density_of_equivalent_surface_pressure'
       META(1)%VARNG='power_spectral_density_of_equivalent_surface_pressure'
       META(1)%VARNM='fp2s'
 
-      ! Second component
-      META(2) = META(1)
-      META(2)%VARNM='pp2s'
-      META(2)%UNITS= 's-1'
-      META(2)%VARNL='peak period of power spectral density of equivalent surface pressure'
-      META(2)%VARNS='peak_period_of_power_spectral_density_of_equivalent_surface_pressure'
-      META(2)%VARNG='peak_period_of_power_spectral_density_of_equivalent_surface_pressure'
+      ! Second subfield
+      META => GROUP(6)%FIELD(7)%SUBFIELD(2)%META
+      META(1)%FSC    = 0.01
+      META(1)%ENAME  = '.pp2s'
+      META(1)%UNITS= 's-1'
+      META(1)%VMIN = -150
+      META(1)%VMAX = 320
+      META(1)%VARNM='pp2s'
+      META(1)%VARNL='peak period of power spectral density of equivalent surface pressure'
+      META(1)%VARNS='peak_period_of_power_spectral_density_of_equivalent_surface_pressure'
+      META(1)%VARNG='peak_period_of_power_spectral_density_of_equivalent_surface_pressure'
       
 ! IFI=6, IFJ=8
       META => GROUP(6)%FIELD(8)%META
@@ -2659,10 +2701,11 @@
       META(2)%VARNS='northward_partitioned_surface_stokes_drift'
       META(2)%VARNG='northward_partitioned_surface_stokes_drift'
       META(2)%VARNC='usp=sqrt(ussp**2+vssp**2)'
-! IFI=I, IFJ=J,J+1,J+2
-!/XSTO      CALL W3FLDTOIJ('XSP   ', I, J, 1, 1, 1)
-!/XSTO      META => GROUP(I)%FIELD(J)%META
-!/XSTO      ! First sub-field 'Wavenumber of the zero-upcrossing period'
+! Parameter 'XSP'
+!/XSTO      CALL W3FLDTOIJ('XSP   ', IFI, IFJ, 1, 1, 1)
+!/XSTO!
+!/XSTO      META => GROUP(IFI)%FIELD(IFJ)%SUBFIELD(1)%META
+!/XSTO      ! First sub-field ksc:'Wavenumber of the zero-upcrossing period'
 !/XSTO      META(1)%FSC  = 0.0002
 !/XSTO      META(1)%VMIN = 0.0002
 !/XSTO      META(1)%VMAX = 6.5532 ! 32766*0.0002             
@@ -2675,8 +2718,8 @@
 !/XSTO      META(1)%VARNC='Profile depths Z = zk / ksc'
 !/XSTO      META(1)%VARND=''
 !/XSTO!
-!/XSTO! Second sub-field 'Vertical profile of Stokes drift'
-!/XSTO      META => GROUP(I)%FIELD(J+1)%META
+!/XSTO! Second sub-field svp:'Vertical profile of Stokes drift'
+!/XSTO      META => GROUP(IFI)%FIELD(IFJ)%SUBFIELD(2)%META
 !/XSTO      META(1)%FSC    = 1./30000.
 !/XSTO      META(1)%ENAME  = '.svp'
 !/XSTO      META(1)%VMIN = -1. 
@@ -2694,8 +2737,8 @@
 !/XSTO      META(2)%VARNS='northward_stokes_drift_profile'
 !/XSTO      META(2)%VARNC='u(Z) + jv(Z) = (u(0) + jv(0)) e^{j B zk} e^{A zk^0.5}'
 !/XSTO!
-!/XSTO! Third sub-field 'Total Stokes drift'
-!/XSTO      META => GROUP(I)%FIELD(J+2)%META
+!/XSTO! Third sub-field xsm:'Total Stokes drift'
+!/XSTO      META => GROUP(IFI)%FIELD(IFJ)%SUBFIELD(3)%META
 !/XSTO      META(1)%ENAME  = '.xsm'
 !/XSTO      META(1)%VARND = DIRCOM
 !/XSTO      META(1)%VARNG=''
@@ -2747,6 +2790,7 @@
       META(1)%VARND = DIRCOM
 
       ! First component
+      META(2) = META(1)
       META(1)%VARNM='uubr'
       META(1)%VARNL='rms of bottom velocity amplitude zonal'
       META(1)%VARNS='rms_of_bottom_velocity_amplitude_zonal'
@@ -2754,13 +2798,13 @@
       META(1)%VARNC='ubr=sqrt(uubr**2+vubr**2)'
 
       ! Second component
-      META(2) = META(1)
       META(2)%VARNM='vubr'
       META(2)%VARNL='rms of bottom velocity amplitude meridional'
       META(2)%VARNS='rms_of_bottom_velocity_amplitude_meridional'
       META(2)%VARNG='rms_of_bottom_velocity_amplitude_meridional'
 ! IFI=7, IFJ=3
-      META => GROUP(7)%FIELD(3)%META
+      ! First subfield
+      META => GROUP(7)%FIELD(3)%SUBFIELD(1)%META
       META(1)%FSC    = 0.001
       META(1)%UNITS  = 'm'
       META(1)%ENAME  = '.bed'
@@ -2768,28 +2812,34 @@
       META(1)%VMAX = 30
       META(1)%VARND = DIRCOM
 
-      ! First component
       META(1)%VARNM='bed'
       META(1)%VARNL='bottom roughness'
       META(1)%VARNS='sea bottom roughness length'
       META(1)%VARNG='ripple_wavelength'
       META(1)%VARNC='ripple_length=sqrt(ripplex**2+rippley**2)'
       
+      ! Second subfield
+      META => GROUP(7)%FIELD(3)%SUBFIELD(2)%META
+      META(1)%FSC    = 0.001
+      META(1)%UNITS  = 'm'
+      META(1)%ENAME  = '.ripple'
+      META(1)%VMIN = -30.
+      META(1)%VMAX = 30.
+      META(1)%VARND = DIRCOM
+      ! First component
+      META(1)%VARNM='ripplex'
+      META(1)%VARNL='eastward sea bottom ripple wavelength'
+      META(1)%VARNS='eastward_ripple_wavelength'
+      META(1)%VARNG='eastward_ripple_wavelength'
+      META(1)%VARNC='ripple_length=sqrt(ripplex**2+rippley**2)'
+
       ! Second component
       META(2) = META(1)
-      META(2)%VARNM='ripplex'
-      META(2)%VARNL='eastward sea bottom ripple wavelength'
-      META(2)%VARNS='eastward_ripple_wavelength'
-      META(2)%VARNG='eastward_ripple_wavelength'
+      META(2)%VARNM='rippley'
+      META(2)%VARNL='northward sea bottom ripple wavelength'
+      META(2)%VARNS='northward_ripple_wavelength'
+      META(2)%VARNG='northward_ripple_wavelength'
       META(2)%VARNC='ripple_length=sqrt(ripplex**2+rippley**2)'
-
-      ! Third component
-      META(3) = META(1)
-      META(3)%VARNM='rippley'
-      META(3)%VARNL='northward sea bottom ripple wavelength'
-      META(3)%VARNS='northward_ripple_wavelength'
-      META(3)%VARNG='northward_ripple_wavelength'
-      META(3)%VARNC='ripple_length=sqrt(ripplex**2+rippley**2)'
 ! IFI=7, IFJ=4
       META => GROUP(7)%FIELD(4)%META
       META(1)%FSC    = 0.1
