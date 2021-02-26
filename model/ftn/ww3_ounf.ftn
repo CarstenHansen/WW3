@@ -1890,10 +1890,12 @@
               ! by joining sub-parameters into into a common netCDF Id:
               ! NCID = NCIDS(IFI, IFJ, 1)
               NSP = 2 ! Number of sub-parameters in loop over ISP=1,NSP
+                      ! Hardcode! Check that NSP equals w3ounfmetamd SPIJ2(K)
               ISUB=ISP
 !
               IF ( ISP .EQ. 1 ) THEN
                 !ENAME  = '.p2s'
+                IF (NCVARTYPEI.EQ.3) NCVARTYPE=4 ! Else will miss low-seas values
 !/SMC                IF( SMCGRD ) THEN
 !/SMC                  CALL W3S2XY_SMC( PRMS(1:NSEA), X1 )
 !/SMC                ELSE
@@ -1903,6 +1905,7 @@
 !
               ELSE ! ISP==2
                 ! This sub-parameter goes to the netCDF file id. NCIDS(6,7,1)
+                ! even if TOGETHER is set as .FALSE.
                 FLJOIN = .TRUE.
                 !ENAME  = '.pp2s'
 !/SMC                IF( SMCGRD ) THEN
