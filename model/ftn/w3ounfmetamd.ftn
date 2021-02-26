@@ -216,10 +216,11 @@
       INTEGER :: I, J, K, S
 !/XSTO! Add 'XSP' to SPS
 !/XSTO! C Hansen: Before PR: Let extended-tail-tus a separate parameter 'xts'
-      ! These parameters have sub-parameters
-      CHARACTER (LEN=6), DIMENSION(3) :: SPS = /( 'P2S   ', 'BED   ', 'XSP   ' )/
+      ! These parameters have sub-parameters I,J = (6,7)  , (7,3),    (6, ???)
+      CHARACTER (LEN=6), DIMENSION(3) :: SPS = (/ 'P2S   ', 'BED   ', 'XSP   ' /)
       ! Number of sub-parameters for each element in SPS
-      INTEGER, DIMENSION(3)           :: NSPS = /( 2,        2,        3 )/
+      INTEGER, DIMENSION(3)           :: NSPS = (/ 2,        2,        3 /)
+      
       ! Sub-parameter unique integer id.'s
       INTEGER, DIMENSION(3) :: SPIJ2
 
@@ -240,8 +241,11 @@
         ALLOCATE(GROUP(I)%FIELD(NOGE(I)))
         DO J = 1,NOGE(I)
           ! Does it have sub-parameters?
-          K = FINDLOC( SPIJ2 , I*NGRPP+J)
-          IF ( K == 0 ) THEN
+          S=I*NGRPP+J
+          DO K=1,size(SPIJ2)
+            IF ( SPIJ2(K) .EQ. S ) EXIT
+          ENDDO
+          IF ( SPIJ2(K) .NE. S ) THEN
             ALLOCATE(GROUP(I)%FIELD(J)%META(3)) ! Hardcode to 3 components for the moment
           ELSE 
             NSPMAX = MAX( NSPMAX, NSPS(K) )
