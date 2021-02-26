@@ -201,6 +201,8 @@
 !     Allocates space for the META_T arrays and sets some constants.
 !
 !/ ------------------------------------------------------------------- /
+      USE W3IOGOMD, ONLY: W3FLDTOIJ
+
       IMPLICIT NONE
 
       LOGICAL, INTENT(IN), OPTIONAL  :: VEC
