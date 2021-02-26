@@ -209,29 +209,39 @@
 !/ Local parameters
 !/
       LOGICAL :: FLGNML
-      INTEGER :: I, J, S, NSP
+      INTEGER :: I, J, K, S
+      
+      ! These parameters have sub-parameters I,J = (6,7)  , (7,3)
+      CHARACTER (LEN=6), DIMENSION(2) :: SPS = /( 'P2S   ', 'BED   ' )/
+      ! Number of sub-parameters for each element in SPS
+      INTEGER, DIMENSION(2)           :: NSPS = /( 2,        2 )/
+      ! Sub-parameter unique integer id.'s
+      INTEGER, DIMENSION(2) :: SPIJ2
 
       VECTOR = .TRUE.
       IF(PRESENT(VEC)) VECTOR = VEC
 
       ! 1. Allocate nested GROUP, FIELD structure:
       ALLOCATE(GROUP(NOGRP))
+      
+      ! Sub-parameter id.'s
+      DO K = 1,SIZE(SPS)
+         CALL W3FLDTOIJ(SPS(K), I, J, 1, 1, 1)
+         SPIJ2(K) = I*NGRPP+J
+      ENDDO   
+         
       NSPMAX=0
       DO I = 1,NOGRP
         ALLOCATE(GROUP(I)%FIELD(NOGE(I)))
         DO J = 1,NOGE(I)
-          NSP = 0
-          IF ( I == 6 ) THEN
-            IF ( J == 7 ) NSP=2 ! P2S
-          ELSEIF ( I == 7 ) THEN 
-            IF ( J == 3 ) NSP=2 ! BED
-          ENDIF
-          IF ( NSP == 0 ) THEN
+          ! Does it have sub-parameters?
+          K = FINDLOC( SPIJ2 , I*NGRPP+J)
+          IF ( K == 0 ) THEN
             ALLOCATE(GROUP(I)%FIELD(J)%META(3)) ! Hardcode to 3 components for the moment
           ELSE 
-            NSPMAX = MAX( NSPMAX, NSP )
-            ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(NSP))
-            DO S = 1,NSP
+            NSPMAX = MAX( NSPMAX, NSPS(K) )
+            ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(NSPS(K)))
+            DO S = 1,NSPS(K)
               ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(S)%META(2)) ! Hardcode to 2 components
             ENDDO
           ENDIF
@@ -2556,16 +2566,16 @@
       ! First subfield
       IF ( NCVARTYPE .EQ. 2 ) THEN
         ! C Hansen: In ww3_ounf.ftn: IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
-        ! If you force it to short data type, you may loose accuracy
-        META(1)%FSC    = 0.0001
-        META(1)%VMIN = 0.
-        META(1)%VMAX = 1.
+        ! For short data type, you get only high seas results
+        META(1)%FSC    = 0.01
+        META(1)%VMIN = -150
+        META(1)%VMAX = 320
       ELSE
         META(1)%FSC  = 1.
         META(1)%VMIN = 0.
         META(1)%VMAX = 1.e6         
       ENDIF
-         
+
       META(1)%ENAME  = '.p2s'
       META(1)%UNITS  = 'm4'
       

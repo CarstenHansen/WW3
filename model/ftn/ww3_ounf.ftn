@@ -1085,7 +1085,7 @@
 !
 ! 2.1 Set output arrays and parameters
 !
-            ! Initializes the flag for optional 3'rd dimension
+            ! Initializes the flag for freq dimension
             FLFRQ = .FALSE.
             DIM3NAME = ''
             ! Initializes the flag for azimuth direction (OBSOLETE)
@@ -1847,8 +1847,10 @@
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, TUSY(1:NSEA)      &
                                                         , MAPSF, XY )
               ENDIF ! SMCGRD
+! X1, X2 will not be output when NFIELD == 2
+! ( Like for .cur, .wnd, .ust, .taw, and .uss ) (CHA at FCOO 2019-06-13): 
               !! Commented out unnecessary statements below for time being
-              !! like for CX,CY (IFI==1 .AND. IFJ==2), and others
+              !! (...) X1,X2 are not actually written out below
               ! DO ISEA=1, NSEA
               !   CABS   = SQRT(TUSX(ISEA)**2+TUSY(ISEA)**2)
               !   IF ( CABS .NE. UNDEF ) THEN
@@ -1909,10 +1911,12 @@
               ! by joining sub-parameters into into a common netCDF Id:
               ! NCID = NCIDS(IFI, IFJ, 1)
               NSP = 2 ! Number of sub-parameters in loop over ISP=1,NSP
+                      ! Hardcode! Check that NSP equals w3ounfmetamd SPIJ2(K)
               ISUB=ISP
 !
               IF ( ISP .EQ. 1 ) THEN
-                IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
+                !ENAME  = '.p2s'
+                IF (NCVARTYPEI.EQ.3) NCVARTYPE=4 ! Else will miss low-seas values
 !/SMC                IF( SMCGRD ) THEN
 !/SMC                  CALL W3S2XY_SMC( PRMS(1:NSEA), X1 )
 !/SMC                ELSE
@@ -1922,6 +1926,7 @@
 !
               ELSE ! ISP==2
                 ! This sub-parameter goes to the netCDF file id. NCIDS(6,7,1)
+                ! even if TOGETHER is set as .FALSE.
                 FLJOIN = .TRUE.
                 !ENAME  = '.pp2s'
 !/SMC                IF( SMCGRD ) THEN
