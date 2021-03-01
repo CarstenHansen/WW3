@@ -150,7 +150,8 @@
 !     Note that FLJOIN is NOT set to True for swell partitions
 !     
 !     A parameter with ISP == 1 can be forced to a separate file by setting
-!     FLJOIN to False. Setting FLJOIN to True makes sense for ISP > 1, only.
+!     FLJOIN to False. You cannot do the reverse: If you try to set FLJOIN to
+!     True for ISP == 1, it will be changed to the logical value of TOGETHER.
 !
 !  8. Structure :
 !
@@ -828,7 +829,7 @@
       INTEGER, INTENT(IN)     :: NX, NY, IX1, IXN, IY1, IYN, NSEA,     &
                                  E3DF(3,5), P2MSF(3), US3DF(3),        & 
                                  USSPF(2), NCTYPE, NCVARTYPEI
-      CHARACTER(30)           :: FILEPREFIX
+      CHARACTER*30,INTENT(IN) :: FILEPREFIX
       LOGICAL, INTENT(IN)     :: TOGETHER
       LOGICAL, INTENT(IN)     :: FLG2D(NOGRP,NGRPP)
       INTEGER, INTENT(INOUT)  :: NCIDS(NOGRP,NGRPP,NSPMAX), S3
@@ -1044,7 +1045,6 @@
           IF ( .NOT. FLG2D(IFI,IFJ) ) CYCLE
           ! Here, the flag for the field IFI of the group IFJ is .TRUE.
           
-          NFIELD=1 ! Default is one field
           ! Instanciates the partition array
           INDEXIPART=1
           ! IPART=TABIPART(INDEXIPART)
@@ -1060,6 +1060,8 @@
           DO WHILE ( ISP .LT. NSP )
             ISP = ISP + 1
 
+            NFIELD=1 ! Default is one field
+            
             ! Increment NSP by one if a following partition is requested
             ! (Loops over IPART for partition variables)
             ! ChrisBunney: Don't loop IPART for last two entries in section 4
@@ -1088,7 +1090,7 @@
             ! Initializes the flag for freq dimension
             FLFRQ = .FALSE.
             DIM3NAME = ''
-            ! Initializes the flag for azimuth direction (OBSOLETE)
+            ! Initializes the flag for two-dimensional, directional field
             FLDIR = .FALSE.
             ! Initializes a flag that the parameters should go together in the
             ! same file if the user input parameter NML_FIELD%SAMEFILE is True
@@ -1096,9 +1098,9 @@
             ! A parameter may be forced to a separate file by setting
             ! FLJOIN = .FALSE. in the settings below for each IFI,IFJ.
             ! For example, this is set presently for all parameters with a
-            ! frequency dimension. Unless ISP > 1 you are not allowed to do
-            ! the reverse logic: You cannot overrule a False value of TOGETHER,
-            ! since no 'samefile' exists.
+            ! frequency dimension. You cannot do the reverse: If you try to set
+            ! FLJOIN to True for ISP == 1, it will be changed to the logical
+            ! value of TOGETHER.
 
             ! With a few exceptions a netCDF variable of type short is permitted
             IF (NCVARTYPEI.EQ.3) NCVARTYPE=2
@@ -1911,7 +1913,7 @@
               ! by joining sub-parameters into into a common netCDF Id:
               ! NCID = NCIDS(IFI, IFJ, 1)
               NSP = 2 ! Number of sub-parameters in loop over ISP=1,NSP
-                      ! Hardcode! Check that NSP equals w3ounfmetamd SPIJ2(K)
+                      ! Hardcoded ! Check that NSP equals w3ounfmetamd SPIJ2(K)
               ISUB=ISP
 !
               IF ( ISP .EQ. 1 ) THEN
@@ -2344,7 +2346,7 @@
             ! variable having a third dimension or not.
             
             ! By default the variable has no third dimension:
-            DIMLN(4)=0
+            DIMLN(4) = 0
             EXTRADIM = 0
             
             ! By default we only add a new third dimension to the netCDF file
@@ -2378,7 +2380,7 @@
               ! e.g. segmented frequencies 'fs' like:
               ! ELSE IF ( TRIM(DIM3NAME) .EQ. 'fs' ) THEN
               !   DIM3VAR(:) = sqrt(GRAV*XXXX_WN(1:DIMLN(4)))*TPIINV
-              ! The netCDF attributes of DIM3VAR must be specified in the
+              ! The netCDF attributes of DIM3VAR are specified in the
               ! subroutine W3NCDEF3
               END IF ! FLFRQ
             END IF ! .NEW3D.
@@ -2485,9 +2487,6 @@
 
               ! Set the size of the 'level' dim
               DIMLN(1)=1
-
-              ! ! Initializes the time iteration counter n
-              ! N=1
 
 ! 2.5.1 Creates the NetCDF file 
               CALL W3CRNC(FNAMENC,NCID,DIMID,DIMLN,VARID, &
@@ -3188,6 +3187,7 @@
             WRITE(NDSE,*) 'Hardcoded configuration error: NSP > NSPMAX'
             CALL EXTCDE(1)
             END IF
+!
           END DO ! WHILE ISP .LE. NSP
 !      
         END DO  ! IFJ=1, NGRPP
