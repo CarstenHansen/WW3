@@ -152,7 +152,8 @@
 !     Note that FLJOIN is NOT set to True for swell partitions
 !     
 !     A parameter with ISP == 1 can be forced to a separate file by setting
-!     FLJOIN to False. Setting FLJOIN to True makes sense for ISP > 1, only.
+!     FLJOIN to False. You cannot do the reverse: If you try to set FLJOIN to
+!     True for ISP == 1, it will be changed to the logical value of TOGETHER.
 !
 !  8. Structure :
 !
@@ -1099,7 +1100,7 @@
             ! Initializes the flag for freq dimension
             FLFRQ = .FALSE.
             DIM3NAME = ''
-            ! Initializes the flag for azimuth direction (OBSOLETE)
+            ! Initializes the flag for two-dimensional, directional field
             FLDIR = .FALSE.
             ! Initializes a flag that the parameters should go together in the
             ! same file if the user input parameter NML_FIELD%SAMEFILE is True
@@ -1107,9 +1108,9 @@
             ! A parameter may be forced to a separate file by setting
             ! FLJOIN = .FALSE. in the settings below for each IFI,IFJ.
             ! For example, this is set presently for all parameters with a
-            ! frequency dimension. Unless ISP > 1 you are not allowed to do
-            ! the reverse logic: You cannot overrule a False value of TOGETHER,
-            ! since no 'samefile' exists.
+            ! frequency dimension. You cannot do the reverse: If you try to set
+            ! FLJOIN to True for ISP == 1, it will be changed to the logical
+            ! value of TOGETHER.
 
             ! With a few exceptions a netCDF variable of type short is permitted
             IF (NCVARTYPEI.EQ.3) NCVARTYPE=2
@@ -1922,7 +1923,7 @@
               ! by joining sub-parameters into into a common netCDF Id:
               ! NCID = NCIDS(IFI, IFJ, 1)
               NSP = 2 ! Number of sub-parameters in loop over ISP=1,NSP
-                      ! Hardcode! Check that NSP equals w3ounfmetamd SPIJ2(K)
+                      ! Hardcoded ! Check that NSP equals w3ounfmetamd SPIJ2(K)
               ISUB=ISP
 !
               IF ( ISP .EQ. 1 ) THEN
@@ -2049,11 +2050,12 @@
 !/XSTO     ELSE IF ( IFI .EQ. IXSP .AND. IFJ .EQ. JXSP ) THEN
 !/XSTO        ! The three subfields (NSP=3) are joined in the netCDF file
 !/XSTO        NSP = 3 ! Number of subfields loop over ISP=1,NSP
+!/XSTO        ISUB = ISP
+!/XSTO        FLJOIN = .TRUE.
 !/XSTO!
 !/XSTO        IF ( ISP .EQ. 1 ) THEN
 !/XSTO          ! 'Wavenumber of the zero-upcrossing period'
 !/XSTO          ! For an XSTO spectral tail
-!/XSTO          FLJOIN = .TRUE.
 !/XSTO          NFIELD=1
 !/XSTO      ! NOTE: The magnitude of ksc spans from O(1e-2) to O(1e+1)
 !/XSTO      !       It can be scaled to a 16-bit integer only with an
@@ -2070,9 +2072,7 @@
 !/XSTO          ! Vertical profile of Stokes drift
 !/XSTO          ! For an XSTO spectral tail
 !/XSTO          DIM3NAME='zk'
-!/XSTO          FLJOIN = .TRUE.
 !/XSTO          NFIELD=2
-!/XSTO          IFK=IFK+1
 !/XSTO          I1F=1
 !/XSTO          I2F=NZO
 !/XSTO          DO IK = 4,NZO+3
@@ -2094,9 +2094,7 @@
 !/XSTO          ! For an XSTO spectral tail
 !/XSTO          ! This variable is nearly the same as TUS, the
 !/XSTO          ! 'Stokes transport', but with the XSTO extended tail
-!/XSTO          FLJOIN = .TRUE.
 !/XSTO          NFIELD=2
-!/XSTO          IFK=IFK+1
 !/XSTO! NOTE: The magnitude of wave pseudo momentum spans from O(1e-3) to O(1e+3)
 !/XSTO!       Thus it cannot be scaled to a 16-bit integer
 !/XSTO!       We might alternatively consider to store xsm * ksc
