@@ -646,10 +646,12 @@
 !/XSTO ! XSND: Number of depths for Stokes profile U_S(1:XSND), V_S(1:XSND)
 !/XSTO ! XSDS: Depth scale specifying the largest depth Z(XSND) for the profile,
 !/XSTO !       Z(XSND) = XSDS / K , where K = ( 2 * PI / Tm02)**2 / GRAV   
+!/XSTO ! XSBP: Power of profile depth progression
 !/XSTO ! XSTY: Tail par. type. 'DoEw': Donelan-Ewans, 'None': Truncated spectrum
 !/XSTO
 !/XSTO        INTEGER               :: XSND
 !/XSTO        REAL                  :: XSDS       
+!/XSTO        REAL                  :: XSBP       
 !/XSTO        CHARACTER(LEN=4)      :: XSTY
 !/XSTO !
         REAL   , POINTER :: ZB(:)     ! BOTTOM GRID, DEFINED ON ISEA
@@ -1021,6 +1023,7 @@
 !/XSTO ! Namelist parameters for extended tail Stokes drift of Joint GeoMETOC DK
 !/XSTO      INTEGER, POINTER           :: XSND
 !/XSTO      REAL, POINTER              :: XSDS
+!/XSTO      REAL, POINTER              :: XSBP
 !/XSTO      CHARACTER(LEN=4), POINTER  :: XSTY
 !/XSTO      
       REAL, POINTER           :: ZB(:), CLATS(:)
@@ -2007,6 +2010,7 @@
 !/XSTO      
 !/XSTO      XSND  => GRIDS(IMOD)%XSND
 !/XSTO      XSDS  => GRIDS(IMOD)%XSDS
+!/XSTO      XSBP  => GRIDS(IMOD)%XSBP
 !/XSTO      XSTY  => GRIDS(IMOD)%XSTY
 !/XSTO      
       FICEN  => GRIDS(IMOD)%FICEN
