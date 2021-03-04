@@ -654,7 +654,7 @@
 !/RTD         WRITE (NDSM) PoLat, PoLon, AnglD, FLAGUNR
 !/RTD
 !/XSTO !  Add extended tail Stokes parameters to mod_def
-!/XSTO         WRITE (NDSM) XSND, XSDS, XSTY
+!/XSTO         WRITE (NDSM) XSND, XSDS, XSBP, XSTY
 !/XSTO
 !!        WRITE(NDSM)                                                 &
 !!             COUG_2D, COUG_RAD3D, COUG_US3D
@@ -806,7 +806,7 @@
 !/RTD
 !
 !/XSTO !  Read extended tail Stokes parameters from mod_def
-!/XSTO         READ (NDSM) XSND, XSDS, XSTY
+!/XSTO         READ (NDSM) XSND, XSDS, XSBP, XSTY
 !/XSTO
 !/DEBUGIOGR     WRITE(740+IAPROC,*) 'W3IOGR, step 7.17'
 !/DEBUGIOGR     FLUSH(740+IAPROC)

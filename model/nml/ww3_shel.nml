@@ -183,6 +183,7 @@
 !  F  F  6    10   TAUICE     TWI   Wave to sea ice stress
 !  F  F  6    11   PHICE      FIC   Wave to sea ice energy flux
 !  F  F  6    12   USSP       USP   Partitioned surface Stokes drift
+!  F  F  6    13   XSSP       XSP   Extended tail Stokes profile. Switch /XSTO required
 !   -------------------------------------------------
 !        7                          Wave-bottom layer 
 !   -------------------------------------------------
@@ -266,7 +267,7 @@
 ! OFCUT_COUNT%N_FIELD = 1     [ Number of fields where OFCUT%FREQ is not infinite ]
 ! /
 ! &OFCUT_NML
-! OFCUT(1)%FIELD      = 'XSP' [ Name of field no. 1 ]
+! OFCUT(1)%FIELD      = 'XSP' [ Name of field no. 1 ] [Switch /XSTO required for 'XSP']
 ! OFCUT(1)%FREQ       = 2.0   [ Cut-off frequency for field no. 1.
 ! /                            May be higher than FREQ(NK) ]
 ! -------------------------------------------------------------------- !

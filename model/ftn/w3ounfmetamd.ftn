@@ -204,7 +204,7 @@
 !
 !/ ------------------------------------------------------------------- /
       USE W3IOGOMD, ONLY: W3FLDTOIJ
-
+      
       IMPLICIT NONE
 
       LOGICAL, INTENT(IN), OPTIONAL  :: VEC
@@ -216,27 +216,26 @@
       INTEGER :: I, J, K, S
 !/XSTO! Add 'XSP' to SPS
 !/XSTO! C Hansen: Before PR: Let extended-tail-tus a separate parameter 'xts'
-      ! These parameters have sub-parameters I,J = (6,7)  , (7,3),    (6, ???)
+      ! These parameters have sub-parameters
       CHARACTER (LEN=6), DIMENSION(3) :: SPS = (/ 'P2S   ', 'BED   ', 'XSP   ' /)
       ! Number of sub-parameters for each element in SPS
       INTEGER, DIMENSION(3)           :: NSPS = (/ 2,        2,        3 /)
-      
       ! Sub-parameter unique integer id.'s
       INTEGER, DIMENSION(3) :: SPIJ2
 
       VECTOR = .TRUE.
       IF(PRESENT(VEC)) VECTOR = VEC
-
+         
       ! Sub-parameter id.'s
       DO K = 1,SIZE(SPS)
          CALL W3FLDTOIJ(SPS(K), I, J, 1, 1, 1)
          SPIJ2(K) = I*NGRPP+J
       ENDDO   
-         
+
       ! 1. Allocate nested GROUP, FIELD structure:
       ALLOCATE(GROUP(NOGRP))
       NSPMAX=0
-      
+
       DO I = 1,NOGRP
         ALLOCATE(GROUP(I)%FIELD(NOGE(I)))
         DO J = 1,NOGE(I)
@@ -2579,16 +2578,16 @@
       ! First subfield
       IF ( NCVARTYPE .EQ. 2 ) THEN
         ! C Hansen: In ww3_ounf.ftn: IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
-        ! For short data type, you get only high seas results
-        META(1)%FSC    = 0.01
-        META(1)%VMIN = -150
-        META(1)%VMAX = 320
+        ! If you force it to short data type, you may loose accuracy
+        META(1)%FSC    = 0.0001
+        META(1)%VMIN = 0.
+        META(1)%VMAX = 1.
       ELSE
         META(1)%FSC  = 1.
         META(1)%VMIN = 0.
         META(1)%VMAX = 1.e6         
       ENDIF
-
+         
       META(1)%ENAME  = '.p2s'
       META(1)%UNITS  = 'm4'
       
@@ -2711,7 +2710,7 @@
 !/XSTO      ! First sub-field ksc:'Wavenumber of the zero-upcrossing period'
 !/XSTO      META(1)%FSC  = 0.0002
 !/XSTO      META(1)%VMIN = 0.0002
-!/XSTO      META(1)%VMAX = 6.5532 ! 32766*0.0002             
+!/XSTO      META(1)%VMAX = 6.5532 ! 32766*0.0002
 !/XSTO      META(1)%UNITS  = 'm-1'
 !/XSTO      META(1)%ENAME  = '.ksc'
 !/XSTO      META(1)%VARNM='ksc'
@@ -2725,7 +2724,7 @@
 !/XSTO      META => GROUP(IFI)%FIELD(IFJ)%SUBFIELD(2)%META
 !/XSTO      META(1)%FSC    = 1./30000.
 !/XSTO      META(1)%ENAME  = '.svp'
-!/XSTO      META(1)%VMIN = -1. 
+!/XSTO      META(1)%VMIN = -1.
 !/XSTO      META(1)%VMAX =  1.
 !/XSTO      META(1)%UNITS   = 'm s-1'
 !/XSTO      META(1)%VARNM='usvp'
@@ -2746,7 +2745,7 @@
 !/XSTO      META(1)%VARND = DIRCOM
 !/XSTO      META(1)%VARNG=''
 !/XSTO      META(1)%FSC    = 1.
-!/XSTO      META(1)%VMIN = -1000 
+!/XSTO      META(1)%VMIN = -1000
 !/XSTO      META(1)%VMAX =  1000
 !/XSTO      META(1)%UNITS  = 'm2 s-1'
 !/XSTO      META(1)%VARNM='uxsm'
