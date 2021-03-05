@@ -161,6 +161,7 @@
 !      CFLKMAX   R.A.  Public   Max. CFL number for wavenumber shift.
 !
 !      UXSP      R.A.  Public   EXtended Spectrum Stokes drift Profile /XSTO
+!      XSMH      R.A.  Public   EXt. Stokes drift profile parametric fit /MFIT
 !
 !    Old parameters not yet in new structure ...
 !
@@ -450,6 +451,11 @@
 !
 ! Output fields group 10)
 !
+!/MFIT! XSMH(1,1) will always exist
+        REAL, POINTER         ::  XSMH(:,:)
+!/MFIT! XXSMH(1,1) will always exist
+        REAL, POINTER         ::  XXSMH(:,:)
+        
         REAL, POINTER         ::  USERO(:,:)
         REAL, POINTER         :: XUSERO(:,:)
 !
@@ -570,6 +576,7 @@
       REAL, POINTER           :: DTDYN(:), FCUT(:), CFLXYMAX(:),      &
                                  CFLTHMAX(:), CFLKMAX(:)
 !
+!/MFIT      REAL, POINTER           :: XSMH(:,:)
       REAL, POINTER           :: USERO(:,:)
 !
 !     REAL, POINTER           :: TAUWX(:), TAUWY(:)
@@ -845,6 +852,7 @@
                           USSPF, GTYPE, UNGTYPE
 !/XSTO      USE W3GDATMD, ONLY: XSND
 !/XSTO      USE W3ODATMD, ONLY: NZO
+!/MFIT      USE W3ODATMD, ONLY: NOXSM
       USE W3ODATMD, ONLY: IAPROC, NAPROC, NTPROC, NAPFLD,             &
                           NOSWLL, NOEXTR, UNDEF, FLOGRD, FLOGR2
       USE W3IDATMD, ONLY: FLCUR, FLWIND
@@ -1258,6 +1266,11 @@
 !
       WADATS(IMOD)%USERO  = UNDEF
 !
+      ALLOCATE ( WADATS(IMOD)%XSMH(NSEALM,NOXSM), STAT=ISTAT )
+      CHECK_ALLOC_STATUS ( ISTAT )
+!
+      WADATS(IMOD)%XSMH  = UNDEF
+!
       ALLOCATE ( WADATS(IMOD)%WN(0:NK+1,0:NSEA), STAT=ISTAT )
       CHECK_ALLOC_STATUS ( ISTAT )
 
@@ -1465,6 +1478,7 @@
                           USSPF, GTYPE, UNGTYPE
 !/XSTO      USE W3GDATMD, ONLY: XSND
 !/XSTO      USE W3ODATMD, ONLY: NZO
+!/MFIT      USE W3ODATMD, ONLY: NOXSM
       USE W3ODATMD, ONLY: IAPROC, NAPROC, NTPROC, NAPFLD,             &
                           NOSWLL, NOEXTR, UNDEF, FLOGRD, FLOGR2,      &
                           NOGRP, NGRPP
@@ -2258,10 +2272,22 @@
       WADATS(IMOD)%XCFLXYMAX = UNDEF
       WADATS(IMOD)%XCFLTHMAX = UNDEF
       WADATS(IMOD)%XCFLKMAX  = UNDEF
+!/MFIT!
+!/MFIT      IF (  OUTFLAGS(10, 1) ) THEN
+!/MFIT          ALLOCATE ( WADATS(IMOD)%XXSMH(NXXX,NOXSM), STAT=ISTAT )
+!/MFIT          CHECK_ALLOC_STATUS ( ISTAT )
+!/MFIT        ELSE
+!/MFIT          ! XXSMH(1,1) will always exist
+          ALLOCATE ( WADATS(IMOD)%XXSMH(1,1), STAT=ISTAT )
+          CHECK_ALLOC_STATUS ( ISTAT )
+!/MFIT        END IF 
+!
+      WADATS(IMOD)%XXSMH   = UNDEF
 !
       ISTAT=-1
       DO I = NOEXTR, 1, -1
-        IF ( OUTFLAGS(10, I) ) THEN
+        ! OUTFLAGS(10,1) is for MFIT output
+        IF ( OUTFLAGS(10, I+1) ) THEN
             ALLOCATE ( WADATS(IMOD)%XUSERO(NXXX,I), STAT=ISTAT )
             CHECK_ALLOC_STATUS ( ISTAT )
             EXIT
@@ -2904,16 +2930,18 @@
 !
 !/MPI      GSTORE => WADATS(IMOD)%GSTORE
 !/MPI      SSTORE => WADATS(IMOD)%SSTORE
-!
+!/XSTO
 !/XSTO          M_X => WADATS(IMOD)%M_X
 !/XSTO          M_Y => WADATS(IMOD)%M_Y
 !/XSTO          K_S => WADATS(IMOD)%K_S
-!
+!/XSTO
 !/XSTO          U_S => WADATS(IMOD)%U_S
 !/XSTO          V_S => WADATS(IMOD)%V_S
 !/XSTO          ZK_S => WADATS(IMOD)%ZK_S
 !/XSTO! For storage in out_grd.ww3: UXSP and XUXSP
           UXSP => WADATS(IMOD)%UXSP
+!/MFIT!
+          XSMH => WADATS(IMOD)%XSMH
 !
       RETURN
 !
@@ -3091,8 +3119,10 @@
           CFLKMAX =>  WADATS(IMOD)%XCFLKMAX
 !
           USERO  => WADATS(IMOD)%XUSERO
-!/XSTO!
+! /XSTO
           UXSP => WADATS(IMOD)%XUXSP
+! /MFIT
+          XSMH => WADATS(IMOD)%XXSMH
         END IF
 !
       RETURN

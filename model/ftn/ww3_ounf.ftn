@@ -207,6 +207,8 @@
                           WN, USSP, WBT
 !/XSTO! UXSP
       USE W3ADATMD, ONLY: UXSP
+!/MFIT! XSMH
+      USE W3ADATMD, ONLY: XSMH
       USE W3ODATMD, ONLY: NDSO, NDSE, SCREEN, NOGRP, NGRPP, IDOUT,     &
                           UNDEF, FLOGRD, FNMPRE, NOSWLL, NOGE
 !
@@ -215,7 +217,7 @@
       USE W3OUNFMETAMD, ONLY: INIT_META, TEARDOWN_META, GETMETA,       &
                               WRITE_META, WRITE_GLOBAL_META,           &
                               META_T, NCVARTYPE, NSPMAX
-!/MFIT      USE W3ODATMD, ONLY : IXSP,JXSP 
+!/MFIT      USE W3ODATMD, ONLY : IXSP,JXSP,NOXSM 
 !/MFIT      ! (Will also call W3IOGOMD: W3FLDTOIJ('XSP   ', IXSP, JXSP, 1, 1, 1))
 !
       USE NETCDF
@@ -2142,16 +2144,16 @@
 !/XSTO!/MFIT    UXSP(:,4) = UXSP(:,4)/M2K(:)
 !/XSTO!/MFIT    UXSP(:,4+NZO) = UXSP(:,4+NZO)/M2K(:)
 !/XSTO!/MFIT    ! "Sd": 'Deep' fit surface drift normalized by abs(2MK)
-!/XSTO!/MFIT    USERO(1:NSEA,1) = USERO(1:NSEA,1)/M2K(:)
-!/XSTO!/MFIT    USERO(1:NSEA,2) = USERO(1:NSEA,2)/M2K(:)
+!/XSTO!/MFIT    XSMH(1:NSEA,1) = XSMH(1:NSEA,1)/M2K(:)
+!/XSTO!/MFIT    XSMH(1:NSEA,2) = XSMH(1:NSEA,2)/M2K(:)
 !/XSTO!/MFIT    IF (NCVARTYPEI.LE.3) THEN
 !/XSTO!/MFIT      ! Apply a lower limiter to |M2K| if large short int output
 !/XSTO!/MFIT      MKfac = 1.
 !/XSTO!/MFIT      WHERE ( ABS(UXSP(:,4)) > 30. .OR. ABS(UXSP(:,4+NZO)) > 30. &
-!/XSTO!/MFIT        .OR. ABS(USERO(1:NSEA,1))>30. .OR. ABS(USERO(1:NSEA,2))>30.)&
+!/XSTO!/MFIT        .OR. ABS(XSMH(1:NSEA,1))>30. .OR. ABS(XSMH(1:NSEA,2))>30.)&
 !/XSTO!/MFIT        ! 2MK should be enlarged by a factor (stored in M2K):
 !/XSTO!/MFIT        MKfac = MAX( ABS(UXSP(:,4)), ABS(UXSP(:,4+NZO)), &
-!/XSTO!/MFIT                     ABS(USERO(1:NSEA,1)), ABS(USERO(1:NSEA,2)) ) &
+!/XSTO!/MFIT                     ABS(XSMH(1:NSEA,1)), ABS(XSMH(1:NSEA,2)) ) &
 !/XSTO!/MFIT                    / 30.
 !/XSTO!/MFIT      WHERE (MKfac .ne. 1. )
 !/XSTO!/MFIT        UXSP(:,2) = UXSP(:,2)*MKfac
@@ -2159,8 +2161,8 @@
 !/XSTO!/MFIT        ! One of the surface drift components / abs(2MK) is 30:
 !/XSTO!/MFIT        UXSP(:,4) = UXSP(:,4)/MKfac
 !/XSTO!/MFIT        UXSP(:,4+NZO) = UXSP(:,4+NZO)/MKfac
-!/XSTO!/MFIT        USERO(1:NSEA,1) = USERO(1:NSEA,1)/MKfac
-!/XSTO!/MFIT        USERO(1:NSEA,2) = USERO(1:NSEA,2)/MKfac
+!/XSTO!/MFIT        XSMH(1:NSEA,1) = XSMH(1:NSEA,1)/MKfac
+!/XSTO!/MFIT        XSMH(1:NSEA,2) = XSMH(1:NSEA,2)/MKfac
 !/XSTO!/MFIT      ENDWHERE
 !/XSTO!/MFIT    ENDIF
 !/XSTO!/MFIT    deallocate ( MKfac )
@@ -2330,7 +2332,7 @@
             ELSE IF ( IFI .EQ. 9 .AND. IFJ .EQ. 5 ) THEN
               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, CFLKMAX  , MAPSF, X1 )
 !
-!/MFIT          ELSE IF ( IFI .EQ. 10 .AND. IFJ .EQ. 1 ) THEN
+!/MFIT          ELSE IF ( IFI .EQ. 10 .AND. IFJ .EQ. NOEXTR+1 ) THEN
 !/MFIT              ! The seven subfields (ISP=1..7) are joined in netCDF file
 !/MFIT            NSP = 7 ! Number of subfields loop over ISP=1,NSP
 !/MFIT            ISUB = ISP
@@ -2348,25 +2350,22 @@
 !/MFIT              NFIELD=2
 !/MFIT              ! "Sd": Deep fit surface drift normalized by abs(2MK)+MK0
 !/MFIT              CALL W3S2XY ( NSEA, NSEA, NX+1, NY,                   &
-!/MFIT                            USERO(:,1), MAPSF, XX )
+!/MFIT                            XSMH(:,1), MAPSF, XX )
 !/MFIT              CALL W3S2XY ( NSEA, NSEA, NX+1, NY,                   &
-!/MFIT                            USERO(:,2), MAPSF, XY )
+!/MFIT                            XSMH(:,2), MAPSF, XY )
 !/MFIT            ! Profile shape parameters + quality measure
 !/MFIT            ELSE IF ( ISP .LE. 7 ) THEN
 !/MFIT              ! AM, PM, AMd, PMd, SIC
 !/MFIT              NFIELD=1
-!/MFIT              CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,IFP)      &
+!/MFIT              CALL W3S2XY ( NSEA, NSEA, NX+1, NY, XSMH(:,ISP)      &
 !/MFIT                                                       , MAPSF, X1 )
 !/MFIT            END IF ! ISP
 !/MFIT!
             ! User defined...
             ELSE IF ( IFI .EQ. 10 ) THEN
               !CB WRITE (ENAME,'(A2,I2.2)') '.u', IFJ
-!/MFIT              IF (.FALSE.) &
               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,IFJ)        &
                                                         , MAPSF, X1 )
-!/MFIT               CALL W3S2XY ( NSEA, NSEA, NX+1, NY, USERO(:,8)    &
-!/MFIT                                                        , MAPSF, X1 )
             ELSE
               WRITE (NDSE,999) IFI, IFJ
               CALL EXTCDE ( 1 )

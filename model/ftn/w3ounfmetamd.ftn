@@ -236,7 +236,7 @@
       VECTOR = .TRUE.
       IF(PRESENT(VEC)) VECTOR = VEC
       
-      ! Sub-parameter id.'s
+      ! Id.'s for parameters that have sub-members
       DO K = 1,SIZE(SPS)
          CALL W3FLDTOIJ(SPS(K), I, J, 1, 1, 1)
          SPIJ2(K) = I*NGRPP+J
@@ -255,8 +255,10 @@
             IF ( SPIJ2(K) .EQ. S ) EXIT
           ENDDO
           IF ( SPIJ2(K) .NE. S ) THEN
+            ! No sub-parameter
             ALLOCATE(GROUP(I)%FIELD(J)%META(3)) ! Hardcode to 3 components for the moment
-          ELSE 
+          ELSE
+            ! One or more sub-parameters
             NSPMAX = MAX( NSPMAX, NSPS(K) )
             ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(NSPS(K)))
             DO S = 1,NSPS(K)
@@ -1190,15 +1192,15 @@
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
-      INTEGER :: IFP, IFC, IFS
+      INTEGER :: IFP, IFC, ISP
       TYPE(META_T) :: META ! Not pointer as we might need to modify it
             
       IFC = 1
       IFP = 1
-      IFS = 0
+      ISP = 0
       IF(PRESENT(ICOMP)) IFC = ICOMP
       IF(PRESENT(IPART)) IFP = IPART
-      IF(PRESENT(ISUB))  IFS = ISUB
+      IF(PRESENT(ISUB))  ISP = ISUB
 
       ! Error checking on size of IFJ, ICOMP, IPART.
       IF(IFI .LT. 1 .OR. IFI .GT. NOGRP) THEN
@@ -1218,10 +1220,10 @@
         CALL EXTCDE(1)
       ENDIF
       
-      IF ( IFS == 0 ) THEN
+      IF ( ISP == 0 ) THEN
         META = GROUP(IFI)%FIELD(IFJ)%META(IFC)
       ELSE
-        META = GROUP(IFI)%FIELD(IFJ)%SUBFIELD(IFS)%META(IFC)
+        META = GROUP(IFI)%FIELD(IFJ)%SUBFIELD(ISP)%META(IFC)
       ENDIF
       
       ! For partitioned data, expand in the partition number:
@@ -3050,9 +3052,9 @@
 ! ------ Group 10 (User defined) -------
 !
 ! IFI=10, IFJ=1
-      META => GROUP(10)%FIELD(1)%META
+      META => GROUP(10)%FIELD(NOEXTR+1)%META
 !/MFIT      IF ( DO_MFIT ) THEN
-!/MFIT      ! The seven subfields (IFP=1..7) are joined in the netCDF file
+!/MFIT      ! The seven subfields (ISP=1..7) are joined in the netCDF file
 !/MFIT      META(1)%FSC    = 0.001
 !/MFIT      META(1)%UNITS  = '1'
 !/MFIT      META(1)%varnm = 'S0X'
@@ -3070,9 +3072,9 @@
 !/MFIT      META(2)%varnm = 'S0Y'
 !/MFIT      META(2)%varnl = 'Northward surface Stokes-drift / abs(MK)'
 !/MFIT      META(2)%varnc='Up(Z) = Up(0) exp( -AM (Z Kz)^PM )'
-! IFI=10, IFJ=1, IFP=2
-!/MFIT      META => GROUP(10)%FIELD(2)%META
-!/MFIT      META(1) = GROUP(10)%FIELD(1)%META(1)
+! IFI=10, IFJ=1, ISP=2
+!/MFIT      META => GROUP(10)%FIELD(NOEXTR+2)%META
+!/MFIT      META(1) = GROUP(10)%FIELD(NOEXTR+1)%META(1)
 !/MFIT      META(1)%varnm = 'SdX'
 !/MFIT      META(1)%varnl = 'Eastward deep part Stokes-drift / abs(MK)'
 !/MFIT      META(1)%ENAME = '.sd'
@@ -3082,32 +3084,32 @@
 !/MFIT      META(2)%varnm = 'SdY'
 !/MFIT      META(2)%varnl = 'Northward deep part Stokes-drift / abs(MK)'
 !/MFIT      META(2)%varnc = 'Ud(0) = Sd * abs(MK)'
-! IFI=10, IFJ=1, IFP=3..7
-!/MFIT      META => GROUP(10)%FIELD(3)%META
-!/MFIT      META(1) = GROUP(10)%FIELD(2)%META(1)
+! IFI=10, IFJ=1, ISP=3..7
+!/MFIT      META => GROUP(10)%FIELD(NOEXTR+3)%META
+!/MFIT      META(1) = GROUP(10)%FIELD(NOEXTR+1)%META(1)
 !/MFIT      META(1)%VARND = ''
 !/MFIT      META(1)%varnc = ''
 !/MFIT      META(1)%vmin = 0
 !/MFIT      META(1)%varnm = 'AM'
 !/MFIT      META(1)%varnl = 'MFIT parameter AM'
 !/MFIT      META(1)%ENAME = '.am'
-!/MFIT      META => GROUP(10)%FIELD(4)%META
-!/MFIT      META(1) = GROUP(10)%FIELD(3)%META(1)
+!/MFIT      META => GROUP(10)%FIELD(NOEXTR+4)%META
+!/MFIT      META(1) = GROUP(10)%FIELD(NOEXTR+3)%META(1)
 !/MFIT      META(1)%varnm = 'PM'
 !/MFIT      META(1)%varnl = 'MFIT parameter PM'
 !/MFIT      META(1)%ENAME = '.pm'
-!/MFIT      META => GROUP(10)%FIELD(5)%META
-!/MFIT      META(1) = GROUP(10)%FIELD(3)%META(1)
+!/MFIT      META => GROUP(10)%FIELD(NOEXTR+5)%META
+!/MFIT      META(1) = GROUP(10)%FIELD(NOEXTR+3)%META(1)
 !/MFIT      META(1)%varnm = 'AMd'
 !/MFIT      META(1)%varnl = 'MFIT parameter AMd'
 !/MFIT      META(1)%ENAME = '.amd'
-!/MFIT      META => GROUP(10)%FIELD(6)%META
-!/MFIT      META(1) = GROUP(10)%FIELD(3)%META(1)
+!/MFIT      META => GROUP(10)%FIELD(NOEXTR+6)%META
+!/MFIT      META(1) = GROUP(10)%FIELD(NOEXTR+3)%META(1)
 !/MFIT      META(1)%varnm = 'PMd'
 !/MFIT      META(1)%varnl = 'MFIT parameter PMd'
 !/MFIT      META(1)%ENAME = '.pmd'
-!/MFIT      META => GROUP(10)%FIELD(7)%META
-!/MFIT      META(1) = GROUP(10)%FIELD(3)%META(1)
+!/MFIT      META => GROUP(10)%FIELD(NOEXTR+7)%META
+!/MFIT      META(1) = GROUP(10)%FIELD(NOEXTR+3)%META(1)
 !/MFIT      META(1)%varnm = 'SIC'
 !/MFIT      META(1)%varnl = 'MFIT quality integer'
 !/MFIT      META(1)%ENAME = '.sic'
@@ -3115,18 +3117,19 @@
 !/MFIT      META(1)%vmin = -32766
 !/MFIT      META(1)%vmax = 32766
 !/MFIT      END IF ! ( DO_MFIT )
-! IFI=10, IFJ=2     
-      META => GROUP(10)%FIELD(2)%META
-!/MFIT      IF ( DO_MFIT ) META => GROUP(10)%FIELD(8)%META
+! IFI=10, IFJ=1..NOEXTR
+      DO J = 1,NOEXTR
+      META => GROUP(10)%FIELD(J)%META
       META(1)%FSC    = 0.1
       META(1)%UNITS  = 'm'
       META(1)%VMIN = 0
       META(1)%VMAX = 0
-      WRITE (META(1)%ENAME,'(A2,I2.2)') '.u'
-      WRITE (META(1)%VARNM,'(A1,I2.2)') 'u'
-      WRITE (META(1)%VARNL,'(A12,I2.2)') 'User_defined'
-      WRITE (META(1)%VARNS,'(A12,I2.2)') 'User_defined'
-      WRITE (META(1)%VARNG,'(A12,I2.2)') 'user_defined'
+      WRITE (META(1)%ENAME,'(A2,I2.2)') '.u',J
+      WRITE (META(1)%VARNM,'(A1,I2.2)') 'u',J
+      WRITE (META(1)%VARNL,'(A12,I2.2)') 'User_defined',J
+      WRITE (META(1)%VARNS,'(A12,I2.2)') 'User_defined',J
+      WRITE (META(1)%VARNG,'(A12,I2.2)') 'user_defined',J
+      ENDDO
 !
       END SUBROUTINE DEFAULT_META
 !/ ------------------------------------------------------------------- /

@@ -274,22 +274,22 @@
 !/MFIT!  NZO = 1 (for profile fit only), or
 !/XSTO!  NZO = XSND (for full profile)
 !/XSTO!  unless NZO is 0 (no Stokes profile output).
-!/MFIT!  For profile fit, also USERO(JSEA,1:7) are set by CALC_MFIT()
+!/MFIT!  For profile fit, also XSMF(JSEA,1:7) are set by CALC_MFIT()
 !/XSTO      IF ( XSND .LE. 0 ) THEN
 !/XSTO        IF (FLGRD(IXSP,JXSP).OR.FLGR2(I,J)) THEN
 !/XSTO          WRITE(NDSEN,1009) 'XSP','XSTO'
 !/XSTO        END IF
-!/MFIT        FLGRD(10,1) = .FALSE.
-!/MFIT        FLGR2(10,1) = .FALSE.
+!/MFIT        FLGRD(10,NOEXTR+1) = .FALSE.
+!/MFIT        FLGR2(10,NOEXTR+1) = .FALSE.
 !/XSTO        FLGRD(IXSP,JXSP)=.FALSE.
 !/XSTO        FLGR2(IXSP,JXSP)=.FALSE.
 !/XSTO      END IF
 !/XSTO      ! Set NZO for use in W3MPIO and W3DIMA
 !/XSTO      NZO = 0
 !/XSTO      IF ( FLGRD(IXSP,JXSP) ) NZO = XSND
-!/MFIT      ! For FLGRD(10,1), if FLGRD(IXSP,JXSP) is False, only the surface U_S
-!/MFIT      ! and integral variables Kz, M will be written to UXSP(1:NSEA,1:5)
-!/MFIT      IF ( FLGRD(10,1) .AND. .NOT. FLGRD(IXSP,JXSP) ) NZO = 1
+!/MFIT      ! For FLGRD(10,NOEXTR+1), if not FLGRD(IXSP,JXSP), only the surface
+!/MFIT      ! U_S and integral variables Kz,M will be written to UXSP(1:NSEA,1:5)
+!/MFIT      IF ( FLGRD(10,NOEXTR+1) .AND. .NOT. FLGRD(IXSP,JXSP) ) NZO = 1
 !
       FLGD(3) = .FALSE.
       FLG2(3) = .FALSE.
@@ -385,7 +385,7 @@
       USE W3GDATMD, ONLY: US3DF, USSPF
       USE W3ODATMD, ONLY: NOGRP, NGRPP, NOGE, IDOUT
       USE W3SERVMD, ONLY: NEXTLN, STRSPLIT, STR_TO_UPPER
-!/MFIT      USE W3ODATMD, ONLY: NOEXTR
+!/MFIT      USE W3ODATMD, ONLY: NOXSM
 !/S      USE W3SERVMD, ONLY: STRACE
 !
       IMPLICIT NONE
@@ -615,7 +615,7 @@
       USE W3ODATMD, ONLY: NOGRP, NGRPP, IDOUT
       USE W3SERVMD, ONLY: STRSPLIT, STR_TO_UPPER
       USE W3GDATMD, ONLY: US3DF, USSPF
-!/MFIT      USE W3ODATMD, ONLY: NOEXTR
+!/MFIT      USE W3ODATMD, ONLY: NOXSM
 !/S      USE W3SERVMD, ONLY: STRACE
 !
       IMPLICIT NONE
@@ -1007,7 +1007,7 @@
 !/XSTO      CASE('XSP')
 !/XSTO        I = IXSP
 !/XSTO        J = JXSP
-!/XSTO! w3ounfmetadata GROUP(6)%FIELD(J=J+1,J+2)%META also used by CASE('XSP')
+!/XSTO! Also w3ounfmeta GROUP(6)%FIELD(J)%SUBFIELD(1:3)%META used by CASE('XSP')
 !
 ! Group 7
 !
@@ -1068,15 +1068,13 @@
       CASE('U1')
         I = 10
         J = 1
-!/MFIT        J = 2
-!/MFIT! 'U1' and 'U2' are synonyms in /MFIT
       CASE('U2')
         I = 10
         J = 2
 !/MFIT!
 !/MFIT     CASE('MFIT')
 !/MFIT        I = 10
-!/MFIT        J = 1 ! w3ounfmetadata GROUP(10)%FIELD(2..6)%META also in CASE('MFIT')
+!/MFIT        J = 3 ! Also w3ounfmeta GROUP(10)%FIELD(3)%SUBFIELD(1:7)%META
 ! Not found:
 !/COU      CASE('DRY')
       CASE('UNSET')
@@ -1935,7 +1933,7 @@
 !/XSTO!  NZO is either 0 (no Stokes profile output), or
 !/MFIT!  NZO = 1 (for profile fit only), or
 !/XSTO!  NZO = XSND (for full profile).
-!/MFIT!  For profile fitting, also USERO(JSEA,1:7) are set by CALC_MFIT()
+!/MFIT!  For profile fitting, also XSMH(JSEA,1:7) are set by CALC_MFIT()
 !/XSTO!  CALC_XSTOKES(A) has its own loop over JSEA and thus called
 !/XSTO!  after the present loop
           END IF
@@ -2322,11 +2320,11 @@
 !/MFIT!  NZO = 1 (surface drift and integral values for MFIT), or
 !/XSTO!  NZO = XSND (for full profile).
 !/XSTO       IF ( FLOLOC(IXSP,JXSP)        &
-!/MFIT            .OR.  FLOLOC(10,1)  &
+!/MFIT            .OR.  FLOLOC(10,NOEXTR+1)  &
 !/MFIT                         ) THEN
 !/XSTO           CALL CALC_XSTOKES(A)
 !/MFIT         END IF
-!/MFIT       IF ( FLOLOC(10,1) ) CALL CALC_MFIT()
+!/MFIT       IF ( FLOLOC(10,NOEXTR+1) ) CALL CALC_MFIT()
 !/XSTO!        
       IF (FLOLOC( 6, 8)) THEN
         CALL CALC_U3STOKES(A,1)
@@ -2493,6 +2491,8 @@
                           USSP
 !/XSTO      USE W3ADATMD, ONLY: UXSP
 !/XSTO      USE W3ODATMD, ONLY: NZO
+!/MFIT      USE W3ADATMD, ONLY: XSMH
+!/MFIT      USE W3ODATMD, ONLY: NOXSM
 !/
       USE W3ODATMD, ONLY: NOGRP, NGRPP, IDOUT, UNDEF, NDST, NDSE,     &
                           FLOGRD, IPASS => IPASS1, WRITE => WRITE1,   &
@@ -3188,16 +3188,14 @@
 !     Section 10)
 !
                   ELSE IF ( IFI .EQ. 10 ) THEN
-!/MFIT              IF ( IFJ .EQ. 1 ) THEN
+!/MFIT              IF ( IFJ .EQ. NOEXTR+1 ) THEN
 !/MFIT !               write (ndst,*) '  Writing mfit params to file'      
-!/MFIT                WRITE ( NDSOG ) USERO(1:NSEA,1:NOEXTR-1)
+!/MFIT                WRITE ( NDSOG ) XSMH(1:NSEA,1:NOXSM)
 !/MFIT !               write (ndst,*) '  Done mfit params to file'      
 !/MFIT                IF ( .NOT. FLOGRD(IXSP,JXSP) ) WRITE ( NDSOG ) UXSP(1:NSEA,1:5)
 !/MFIT                ! Only the integral and surface variables
 !/MFIT                ! We presume that UXSP(:,3+2*NZO) point to XUXSP(:,5)
-!/MFIT            ELSE IF ( IFJ .EQ. 2 ) THEN
-!/MFIT              WRITE ( NDSOG ) USERO(1:NSEA,NOEXTR)
-!/MFIT            ELSE IF ( .FALSE. ) THEN
+!/MFIT              ELSE
                     WRITE ( NDSOG ) USERO(1:NSEA,IFJ)
 !/MFIT              END IF
 !
@@ -3520,19 +3518,16 @@
 !     Section 10)
 !
                   ELSE IF ( IFI .EQ. 10 ) THEN
-!/MFIT                    IF ( IFJ .EQ. 1 ) THEN
+!/MFIT                    IF ( IFJ .EQ. NOEXTR+1 ) THEN
 !/MFIT                      READ ( NDSOG,END=801,ERR=802,IOSTAT=IERR)      &
-!/MFIT                                                  USERO(1:NSEA,1:NOEXTR-1)
-!/MFIT                      IF ( .NOT. FLOGRD(IXSP,JXSP) )                      &
+!/MFIT                                                  XSMH(1:NSEA,1:NOXSM)
+!/MFIT                      IF ( .NOT. FLOGRD(IXSP,JXSP) )                 &
 !/MFIT                        READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)     &
 !/MFIT                                                  UXSP(1:NSEA,1:5)
-!/MFIT                    ELSE IF ( IFJ .EQ. 2 ) THEN
-!/MFIT                        READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)     &
-!/MFIT                                                  USERO(1:NSEA,NOEXTR)
-!/MFIT                    ELSE IF ( .FALSE. ) THEN
+!/MFIT                    ELSE
                     READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)         &
                                                       USERO(1:NSEA,IFJ)
-!/MFIT                      END IF
+!/MFIT                    END IF
                   END IF
 !
 ! End of test on WRITE/READ:
