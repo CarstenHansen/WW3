@@ -822,6 +822,7 @@
 !/XSTO! Extended tail Stokes drift profile
 !/XSTO      INTEGER                 :: NDP
 !/XSTO      REAL                    :: DSC
+!/XSTO      REAL                    :: BP
 !/XSTO      CHARACTER(LEN=4)        :: TYP
 !
 !/FLD1      NAMELIST /FLD1/ TAILTYPE, TAILLEV, TAILT1, TAILT2
@@ -941,7 +942,7 @@
 !/RTD! Poles of destination grids for boundary conditions output 
 !/RTD      NAMELIST /ROTB/ BPLAT, BPLON
 !/XSTO! Extended tail Stokes drift profile
-!/XSTO     NAMELIST /XSTO/ NDP, DSC, TYP
+!/XSTO     NAMELIST /XSTO/ NDP, DSC, BP, TYP
 !/
 !/ ------------------------------------------------------------------- /
 !/
@@ -2642,15 +2643,17 @@
 !/XSTO! XSND: Number of depths for Stokes profile
 !/XSTO! XSDS: Depth scale specifying the largest depth for the profile,
 !/XSTO!       XSDS = Kz * Z(XSND)
-!/XSTO! XSTY: Tail type (C*4);  'DoEw': Donelan-Ewans to f_tr=10 Hz, 
-!(XSTO!                        'DE[IF]: Donelan-Ewans to f_tr=I.F Hz,
-!(XSTO!                      or 'None': Spectrum truncated with no tail
-!/XSTO     NDP = 5
-!/XSTO     DSC = 1.0
-!/XSTO     TYP = 'DE20'
+!/XSTO! XSBP: Power of profile depth progression
+!/XSTO! XSTY: Tail type (C*4);  'DoEw': Donelan-Ewans to f_tr=2 Hz, 
+!/XSTO!                      or 'None': Spectrum truncated with no tail
+!/XSTO     NDP = 7
+!/XSTO     DSC = 2.0
+!/XSTO     BP  = 2.0
+!/XSTO     TYP = 'DoEw'
 !/XSTO     CALL READNL ( NDSS, 'XSTO', STATUS )
 !/XSTO     XSND = NDP
 !/XSTO     XSDS = DSC
+!/XSTO     XSBP = BP
 !/XSTO     XSTY = TYP
 !
 ! 6.x Read values for FLD stress calculation
@@ -2849,7 +2852,7 @@
 !/RTD         WRITE(NDSO,4991) PLAT, PLON, UNROT
 !/RTD         WRITE(NDSO,4992) BPLAT, BPLON
 !/XSTO!
-!/XSTO         WRITE(NDSO,2988) XSND, XSDS, XSTY
+!/XSTO         WRITE(NDSO,2988) XSND, XSDS, XSBP, XSTY
 !
         WRITE (NDSO,918)
         END IF
@@ -5978,7 +5981,7 @@
 !/RTD 4992 FORMAT ( '  &ROTB BPLAT =',9(F6.1,",")/                        &
 !/RTD               '        BPLON =',9(F6.1,","),' /')
 !/XSTO
-!/XSTO 2988 FORMAT ( '  &XSTO XSND =',I3,' XSDS =',F5.2,' XSTY ="',A,'" /')
+!/XSTO 2988 FORMAT ( '  &XSTO XSND =',I3,' XSDS =',F5.2,' XSBP =',F5.2,' XSTY ="',A,'" /')
       
  3000 FORMAT (/'  The spatial grid: '/                                &
                ' --------------------------------------------------'/ &

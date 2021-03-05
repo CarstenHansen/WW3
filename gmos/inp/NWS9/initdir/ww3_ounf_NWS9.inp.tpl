@@ -28,7 +28,7 @@ $        and variable type 4 [2 = SHORT, 3 = it depends , 4 = REAL]
 $ swell partitions [0 1 2 3 4 5]
 $ variables in same file [T] or not [F] 
 $
- 3 2
+ 3 3
  0 1 2
  T
 $
