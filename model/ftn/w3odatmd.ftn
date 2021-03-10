@@ -332,7 +332,6 @@
 !/ Set NOGE and IDOUT identifiers in W3NOUT
 !/XSTO!
 !/XSTO! Definition of I, J for parameter 'XSP' here.
-!/XSTO! TO FIX: group, field = 6, JXSP+1 and 6, JXSP+2 also set in w3ounfmetamd
 !/XSTO      INTEGER                         :: IXSP=6, JXSP=14
 !/
 !/ Data structures

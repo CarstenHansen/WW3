@@ -419,7 +419,7 @@
                                  XUSSY(:), XPRMS(:), XTPMS(:),        &
                                  XPHICE(:), XTAUICE(:,:)
         REAL, POINTER         :: XP2SMS(:,:), XUS3D(:,:), XUSSP(:,:)
-!/XSTO
+!/XSTO!
 !/XSTO! UXSP(1,1) will always exist
         REAL, POINTER         ::  UXSP(:,:)
 !/XSTO! XUXSP(1,1) will always exist
@@ -512,7 +512,7 @@
         INTEGER               :: ITIME, IPASS, IDLAST, NSEALM
         REAL, POINTER         :: ALPHA(:,:)
         LOGICAL               :: AINIT, AINIT2, FL_ALL, FLCOLD, FLIWND
-!
+!/XSTO!
 !/XSTO       REAL                  :: M_X, M_Y, K_S
 !/XSTO       REAL, POINTER         :: U_S(:), V_S(:), ZK_S(:)
 !
@@ -629,7 +629,7 @@
       INTEGER, POINTER        :: ITIME, IPASS, IDLAST, NSEALM
       REAL, POINTER           :: ALPHA(:,:)
       LOGICAL, POINTER        :: AINIT, AINIT2, FL_ALL, FLCOLD, FLIWND
-!
+!/XSTO!
 !/XSTO      REAL, POINTER           :: M_X, M_Y, K_S
 !/XSTO      REAL, POINTER           :: U_S(:), V_S(:), ZK_S(:)
 !/XSTO! UXSP(1,1) always exists
@@ -1165,7 +1165,7 @@
       IF (  P2MSF(1).GT.0 ) WADATS(IMOD)%P2SMS  = UNDEF
       IF (  US3DF(1).GT.0 ) WADATS(IMOD)%US3D   = UNDEF
       IF (  USSPF(1).GT.0 ) WADATS(IMOD)%USSP   = UNDEF
-!/XSTO
+!/XSTO!
 !/XSTO      IF ( NZO .GT. 0 ) THEN
 !/XSTO        WADATS(IMOD)%M_X  = UNDEF
 !/XSTO        WADATS(IMOD)%M_Y  = UNDEF
@@ -2260,7 +2260,7 @@
       WADATS(IMOD)%XCFLKMAX  = UNDEF
 !
       ISTAT=-1
-      DO I = NOEXTR, 1, -1
+      DO I = 1,NOEXTR
         IF ( OUTFLAGS(10, I) ) THEN
             ALLOCATE ( WADATS(IMOD)%XUSERO(NXXX,I), STAT=ISTAT )
             CHECK_ALLOC_STATUS ( ISTAT )
@@ -2785,6 +2785,16 @@
           WN     => WADATS(IMOD)%WN
 !/IC3     IC3WN_R=> WADATS(IMOD)%IC3WN_R
 !/IC3     IC3WN_I=> WADATS(IMOD)%IC3WN_I
+!/XSTO!
+!/XSTO          M_X => WADATS(IMOD)%M_X
+!/XSTO          M_Y => WADATS(IMOD)%M_Y
+!/XSTO          K_S => WADATS(IMOD)%K_S
+!/XSTO!
+!/XSTO          U_S => WADATS(IMOD)%U_S
+!/XSTO          V_S => WADATS(IMOD)%V_S
+!/XSTO          ZK_S => WADATS(IMOD)%ZK_S
+!/XSTO! For storage in out_grd.ww3: UXSP and XUXSP
+          UXSP => WADATS(IMOD)%UXSP
 !
           IF ( FL_ALL ) THEN
 !
@@ -2904,16 +2914,6 @@
 !
 !/MPI      GSTORE => WADATS(IMOD)%GSTORE
 !/MPI      SSTORE => WADATS(IMOD)%SSTORE
-!
-!/XSTO          M_X => WADATS(IMOD)%M_X
-!/XSTO          M_Y => WADATS(IMOD)%M_Y
-!/XSTO          K_S => WADATS(IMOD)%K_S
-!
-!/XSTO          U_S => WADATS(IMOD)%U_S
-!/XSTO          V_S => WADATS(IMOD)%V_S
-!/XSTO          ZK_S => WADATS(IMOD)%ZK_S
-!/XSTO! For storage in out_grd.ww3: UXSP and XUXSP
-          UXSP => WADATS(IMOD)%UXSP
 !
       RETURN
 !

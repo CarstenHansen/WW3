@@ -998,7 +998,7 @@
 !/XSTO      CASE('XSP')
 !/XSTO        I = IXSP
 !/XSTO        J = JXSP
-!/XSTO! w3ounfmetadata GROUP(6)%FIELD(J=J+1,J+2)%META also used by CASE('XSP')
+!/XSTO! Also w3ounfmeta GROUP(6)%FIELD(J)%SUBFIELD(1:3)%META used by CASE('XSP')
 !
 ! Group 7
 !
@@ -1061,7 +1061,7 @@
         J = 1
       CASE('U2')
         I = 10
-        J = 1
+        J = 2
 ! Not found:
 !/COU      CASE('DRY')
       CASE('UNSET')
@@ -1208,7 +1208,7 @@
 !
       USE W3PARALL, ONLY : INIT_GET_ISEA
 !/XSTO ! Stokes drift with extended tail
-!/XSTO ! It would be nice to be able to use double switch '!/XSTO!/MPI'
+!/XSTO ! TODO: Consider use double switch '!/XSTO!/FCLC'
 !/XSTO ! to avoid linking w3xstomd into ww3_ounf
 !/XSTO      USE W3XSTOMD, ONLY: CALC_XSTOKES
 !
@@ -2303,7 +2303,7 @@
 !/XSTO!  NZO is either 0 (no Stokes profile output), or
 !/XSTO!  NZO = XSND (for full profile).
 !/XSTO       IF ( FLOLOC(IXSP,JXSP)        &
-!/XSTO            ) CALL CALC_XSTOKES(A)
+!/XSTO          ) CALL CALC_XSTOKES(A)
 !/XSTO!        
       IF (FLOLOC( 6, 8)) THEN
         CALL CALC_U3STOKES(A,1)
@@ -2473,7 +2473,7 @@
 !/
       USE W3ODATMD, ONLY: NOGRP, NGRPP, IDOUT, UNDEF, NDST, NDSE,     &
                           FLOGRD, IPASS => IPASS1, WRITE => WRITE1,   &
-                          FNMPRE, NOSWLL, NOEXTR
+                          FNMPRE, NOSWLL
 !/
       USE W3SERVMD, ONLY: EXTCDE
       USE W3ODATMD, only : IAPROC
@@ -2798,7 +2798,6 @@
                 IF ( FLOGRD( 6, 11) ) PHICE(ISEA) = UNDEF
                 IF ( FLOGRD( 6, 12) ) USSP(ISEA,:) = UNDEF
 !/XSTO                IF ( FLOGRD( IXSP, JXSP) ) UXSP(ISEA,:) = UNDEF
-!
                 IF ( FLOGRD( 7, 1) ) THEN
                                      ABA   (ISEA) = UNDEF
                                      ABD   (ISEA) = UNDEF
@@ -2862,9 +2861,9 @@
             END DO
 !
         ELSE
-!/XSTO          ! NZO is required for use in W3MPIO and W3DIMA
-!/XSTO          IF ( FLOGRD(IXSP,JXSP) .AND. .NOT. NZO == XSND ) &
-!/XSTO             WRITE (NDSE,*) 'ERROR: NZO=',NZO,' should be equal to ',XSND
+!/XSTO     ! NZO is required for use in W3MPIO and W3DIMA
+!/XSTO     IF ( FLOGRD(IXSP,JXSP) .AND. .NOT. NZO == XSND ) &
+!/XSTO        WRITE (NDSE,*) 'ERROR: NZO=',NZO,' should be equal to ',XSND
           IF (.NOT.DINIT) CALL W3DIMW ( IGRD, NDSE, NDST, .TRUE. )
           IF (.NOT.AINIT) CALL W3DIMA ( IGRD, NDSE, NDST, .TRUE. )
         END IF

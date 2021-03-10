@@ -1969,7 +1969,6 @@
 !/MPI      USE W3ADATMD, ONLY: MPI_COMM_WAVE, WW3_FIELD_VEC
 !/MPI      USE W3ADATMD, ONLY: HS, WLM, T02
 
-
 !/MPI      USE W3ADATMD, ONLY: T0M1, THM, THS, FP0, THP0, FP1, THP1,   &
 !/MPI                          DTDYN, FCUT, SPPNT, ABA, ABD, UBA, UBD,&
 !/MPI                          SXX, SYY, SXY, USERO, PHS, PTP, PLP,   &
@@ -1985,8 +1984,8 @@
 !/MPI                          STMAXE, STMAXD, HMAXE, HCMAXE, HMAXD,  &
 !/MPI                          HCMAXD, QP, PTHP0, PQP, PPE, PGW, PSW, &
 !/MPI                          PTM1, PT1, PT2, PEP, WBT, CX, CY
-!/XSTO! UXSP(1,1) exists
-!/MPI      USE W3ADATMD, ONLY: UXSP
+!/XSTO: UXSP(1,1) exists
+!/XSTO!/MPI      USE W3ADATMD, ONLY: UXSP
 
 !/MPI      USE W3GDATMD, ONLY: NK
 !/MPI      USE W3ODATMD, ONLY: NDST, IAPROC, NAPROC, NTPROC, FLOUT,   &
@@ -2048,7 +2047,7 @@
 !
 !/XSTO      NZ2 = 0
 !/XSTO      IF ( NZO .GT. 0 ) NZ2=3+2*NZO
-!
+!/XSTO!
 !/MPI      IF ((FLOUT(1) .OR. FLOUT(7)).and.(.not. LPDLIB .or.       &
 !/MPI          (GTYPE .ne. UNGTYPE).or. .TRUE.)) THEN
 !
@@ -3504,7 +3503,7 @@
 !/MPI                      END DO
 !/MPI                  END IF  
 !
-!/XSTO!/MPI !                IF ( FLGRDALL( 6, 13) ) THEN ! <==> NZ2 > 0
+!/XSTO!/MPI !                IF ( FLGRDALL( IXSP, JXSP) ) THEN ! <==> NZ2 > 0
 !/XSTO!/MPI                    DO K=1, NZ2
 !/XSTO!/MPI                      IH     = IH + 1
 !/XSTO!/MPI                      IT     = IT + 1

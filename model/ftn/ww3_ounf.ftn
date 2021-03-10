@@ -234,6 +234,7 @@
                                  IOUT, S3, IRET, HASNC4,               &
                                  NBIPART, CNTIPART, NCVARTYPEI, IPART, &
                                  RTDNX, RTDNY
+!
       INTEGER                 :: TOUT(2), TDUM(2), STOPDATE(8)
 !
       INTEGER, ALLOCATABLE    :: TABIPART(:), NCIDS(:,:,:)
@@ -2269,7 +2270,7 @@
             END IF ! IFI AND IFJ
 
             ! CB Get netCDF metadata for IFI, IFJ combination (all components).
-            ! CarstenHansen: ISUB > 0 is an index for a sub-parameter meta
+            ! CarstenHansen: ISUB > 0 is a sub-parameter index
             DO I=1,NFIELD
               META(I) = GETMETA(IFI, IFJ, ICOMP=I, IPART=IPART, ISUB=ISUB)
             ENDDO

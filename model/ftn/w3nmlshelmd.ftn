@@ -273,18 +273,17 @@
 !/XSTO
 !/XSTO    WRITE (MSG,'(A)') 'OFCUT_COUNT % '
 !/XSTO    WRITE (NDSN,'(A)')
-!/XSTO    WRITE (NDSN,11) TRIM(MSG),'N_FIELD       = ', OFCUT_COUNT%N_FIELD
+!/XSTO    WRITE (NDSN,12) TRIM(MSG),'N_FIELD       = ', OFCUT_COUNT%N_FIELD
 !/XSTO    
 !/XSTO      DO I=1,OFCUT_COUNT%N_FIELD
 !/XSTO        WRITE (MSG,'(A,I5,A)') 'OFCUT(',I,') % '
-!/XSTO        WRITE (NDSN,'(A)')
 !/XSTO        WRITE (NDSN,10) TRIM(MSG),'FIELD     = ', TRIM(OFCUT(I)%FIELD)
 !/XSTO        WRITE (NDSN,11) TRIM(MSG),'FREQ      = ', OFCUT(I)%FREQ
-!/XSTO        WRITE (NDSN,'(A)')
 !/XSTO      END DO
 !/XSTO      
 !/XSTO 10  FORMAT (A,2X,A,A)
 !/XSTO 11  FORMAT (A,2X,A,F5.1)
+!/XSTO 12  FORMAT (A,2X,A,I3)
 !/XSTO
 !/XSTO  END SUBROUTINE REPORT_OFCUT_NML
 !/XSTO!/ ------------------------------------------------------------------- /

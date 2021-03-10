@@ -178,7 +178,7 @@
       INTEGER            :: NCVARTYPE   ! netCDF variable type
       CHARACTER(LEN=30)  :: DIRCOM      ! Direction convention comment
       CHARACTER(LEN=128) :: PARTCOM     ! Partitioning method comment
-
+      
       LOGICAL, PRIVATE   :: VECTOR      ! Vector or dir/mag for dir fields?
 
       CONTAINS 
@@ -216,17 +216,20 @@
       INTEGER :: I, J, K, S
 !/XSTO! Add 'XSP' to SPS
 !/XSTO! C Hansen: Before PR: Let extended-tail-tus a separate parameter 'xts'
-      ! These parameters have sub-parameters
-      CHARACTER (LEN=6), DIMENSION(3) :: SPS = (/ 'P2S   ', 'BED   ', 'XSP   ' /)
-      ! Number of sub-parameters for each element in SPS
-      INTEGER, DIMENSION(3)           :: NSPS = (/ 2,        2,        3 /)
+      CHARACTER (LEN=6), DIMENSION(3) :: SPS
+      INTEGER, DIMENSION(3)           :: NSPS
       ! Sub-parameter unique integer id.'s
       INTEGER, DIMENSION(3) :: SPIJ2
 
+      ! These parameters have sub-parameters
+      SPS  = (/ 'P2S   ', 'BED   ', 'XSP   ' /)
+      ! Number of sub-parameters for each element in SPS
+      NSPS = (/  2,        2,        3 /)
+      
       VECTOR = .TRUE.
       IF(PRESENT(VEC)) VECTOR = VEC
-         
-      ! Sub-parameter id.'s
+      SPIJ2(:) = 0
+      ! Id.'s for parameters that have sub-members
       DO K = 1,SIZE(SPS)
          CALL W3FLDTOIJ(SPS(K), I, J, 1, 1, 1)
          SPIJ2(K) = I*NGRPP+J
@@ -245,8 +248,10 @@
             IF ( SPIJ2(K) .EQ. S ) EXIT
           ENDDO
           IF ( SPIJ2(K) .NE. S ) THEN
+            ! No sub-parameter
             ALLOCATE(GROUP(I)%FIELD(J)%META(3)) ! Hardcode to 3 components for the moment
-          ELSE 
+          ELSE
+            ! One or more sub-parameters
             NSPMAX = MAX( NSPMAX, NSPS(K) )
             ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(NSPS(K)))
             DO S = 1,NSPS(K)
@@ -259,7 +264,6 @@
       ! Allocate storage for Global meta-data
       ALLOCATE(GLOBAL_META(MAX_GBLMETA))
       N_GBLMETA = 0
-
       ! 2. Set direction convention:
       DIRCOM = ""
 !/RTD      IF ( FLAGUNR ) THEN
@@ -1181,15 +1185,15 @@
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
-      INTEGER :: IFP, IFC, IFS
+      INTEGER :: IFP, IFC, ISP
       TYPE(META_T) :: META ! Not pointer as we might need to modify it
             
       IFC = 1
       IFP = 1
-      IFS = 0
+      ISP = 0
       IF(PRESENT(ICOMP)) IFC = ICOMP
       IF(PRESENT(IPART)) IFP = IPART
-      IF(PRESENT(ISUB))  IFS = ISUB
+      IF(PRESENT(ISUB))  ISP = ISUB
 
       ! Error checking on size of IFJ, ICOMP, IPART.
       IF(IFI .LT. 1 .OR. IFI .GT. NOGRP) THEN
@@ -1197,20 +1201,18 @@
         CALL EXTCDE(1)
       ENDIF
       IF(IFJ .LT. 1 .OR. IFJ .GT. NOGE(IFI)) THEN
-!/XSTO      IF ( IFI .NE. 6 .OR. IFJ .LT. 1 .OR. IFJ .GT. NOGE(IFI)+2 ) THEN
         WRITE(NDSE,1001) NOGE(IFI)
         CALL EXTCDE(1)
-!/XSTO      END IF
       ENDIF
       IF(IFC .LT. 1 .OR. IFC .GT. 3) THEN
         WRITE(NDSE,1002)
         CALL EXTCDE(1)
       ENDIF
       
-      IF ( IFS == 0 ) THEN
+      IF ( ISP == 0 ) THEN
         META = GROUP(IFI)%FIELD(IFJ)%META(IFC)
       ELSE
-        META = GROUP(IFI)%FIELD(IFJ)%SUBFIELD(IFS)%META(IFC)
+        META = GROUP(IFI)%FIELD(IFJ)%SUBFIELD(ISP)%META(IFC)
       ENDIF
       
       ! For partitioned data, expand in the partition number:
@@ -2751,7 +2753,7 @@
 !/XSTO      META(1)%VARNM='uxsm'
 !/XSTO      META(1)%VARNL='eastward wave pseudo momentum'
 !/XSTO      META(1)%VARNS='eastward_wave_pseudo_momentum'
-!/XSTO      META(1)%VARNC='K = ksc'
+!/XSTO      META(1)%VARNC=''
 !/XSTO      META(2)=META(1)
 !/XSTO      META(2)%VARNM='vxsm'
 !/XSTO      META(2)%VARNL='northward wave pseudo momentum'
@@ -3022,17 +3024,19 @@
 !
 ! ------ Group 10 (User defined) -------
 !
-! IFI=10, IFJ=1
-      META => GROUP(10)%FIELD(1)%META
-      META(1)%FSC    = 0.1
-      META(1)%UNITS  = 'm'
-      META(1)%VMIN = 0
-      META(1)%VMAX = 0
-      WRITE (META(1)%ENAME,'(A2,I2.2)') '.u'
-      WRITE (META(1)%VARNM,'(A1,I2.2)') 'u'
-      WRITE (META(1)%VARNL,'(A12,I2.2)') 'User_defined'
-      WRITE (META(1)%VARNS,'(A12,I2.2)') 'User_defined'
-      WRITE (META(1)%VARNG,'(A12,I2.2)') 'user_defined'
+! IFI=10, IFJ=1..NOEXTR
+      DO IFJ = 1,NOEXTR
+        META => GROUP(10)%FIELD(IFJ)%META
+        META(1)%FSC    = 0.1
+        META(1)%UNITS  = 'm'
+        META(1)%VMIN = 0
+        META(1)%VMAX = 0
+        WRITE (META(1)%ENAME,'(A2,I2.2)') '.u',IFJ
+        WRITE (META(1)%VARNM,'(A1,I2.2)') 'u',IFJ
+        WRITE (META(1)%VARNL,'(A12,I2.2)') 'User_defined',IFJ
+        WRITE (META(1)%VARNS,'(A12,I2.2)') 'User_defined',IFJ
+        WRITE (META(1)%VARNG,'(A12,I2.2)') 'user_defined',IFJ
+      ENDDO
 !
       END SUBROUTINE DEFAULT_META
 !/ ------------------------------------------------------------------- /
