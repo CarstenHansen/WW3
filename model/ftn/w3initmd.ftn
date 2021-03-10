@@ -1969,7 +1969,6 @@
 !/MPI      USE W3ADATMD, ONLY: MPI_COMM_WAVE, WW3_FIELD_VEC
 !/MPI      USE W3ADATMD, ONLY: HS, WLM, T02
 
-
 !/MPI      USE W3ADATMD, ONLY: T0M1, THM, THS, FP0, THP0, FP1, THP1,   &
 !/MPI                          DTDYN, FCUT, SPPNT, ABA, ABD, UBA, UBD,&
 !/MPI                          SXX, SYY, SXY, USERO, PHS, PTP, PLP,   &
@@ -1985,8 +1984,9 @@
 !/MPI                          STMAXE, STMAXD, HMAXE, HCMAXE, HMAXD,  &
 !/MPI                          HCMAXD, QP, PTHP0, PQP, PPE, PGW, PSW, &
 !/MPI                          PTM1, PT1, PT2, PEP, WBT, CX, CY
-!/XSTO! UXSP(1,1) exists
-!/MPI      USE W3ADATMD, ONLY: UXSP
+!/XSTO: UXSP(1,1) exists
+!/XSTO!/MPI      USE W3ADATMD, ONLY: UXSP
+!/MFIT!/MPI      USE W3ADATMD, ONLY: XSMH
 
 !/MPI      USE W3GDATMD, ONLY: NK
 !/MPI      USE W3ODATMD, ONLY: NDST, IAPROC, NAPROC, NTPROC, FLOUT,   &
@@ -2000,6 +2000,7 @@
 !/MPI                          ABPOS, NRQTR, IRQTR, IT0PNT, IT0TRK,   &
 !/MPI                          IT0PRT, NOSWLL, NOEXTR, NDSE, IOSTYP,  &
 !/MPI                          FLOGR2
+!/MFIT!/MPI      USE W3ODATMD, ONLY: NOXSM
 !/MPI      USE W3PARALL, ONLY : INIT_GET_JSEA_ISPROC
       USE W3GDATMD, ONLY: GTYPE, UNGTYPE
       USE CONSTANTS, ONLY: LPDLIB
@@ -2072,6 +2073,7 @@
 !/MPI          IF ( FLGRDALL( 6, 8) ) NRQMAX = NRQMAX + 2*NK
 !/MPI          IF ( FLGRDALL( 6,12) ) NRQMAX = NRQMAX + 2*NK
 !
+!/MFIT!/MPI          NRQMAX = NRQMAX + NOXSM
 !/XSTO!/MPI          IF ( NZ2 .GT. 0 ) NRQMAX = NRQMAX + NZ2 ! FLGRDALL( 6, 1[N])
 !/XSTO!
 !/MPI          IF ( NRQMAX .GT. 0 ) THEN 
@@ -2871,6 +2873,17 @@
 !/MPIT      WRITE (NDST,9011) IH, STRING, IROOT, IT, IRQGO(IH), IERR
 !/MPI                  END IF
 !/MPI                END DO
+!/MFIT
+!/MFIT!/MPI              DO I=1, NOXSM
+!/MFIT!/MPI                IF ( FLGRDALL(10, NOEXTR+I) ) THEN
+!/MFIT!/MPI                    IH     = IH + 1
+!/MFIT!/MPI                    IT     = IT + 1
+!/MFIT!/MPI      CALL MPI_SEND_INIT (XSMH(1,I),NSEALM , MPI_REAL, IROOT,  &
+!/MFIT!/MPI                                IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+!/MFIT!/MPIT                   WRITE (STRING,'(A3,I2.2)') '10/', I
+!/MFIT!/MPIT      WRITE (NDST,9011) IH, STRING, IROOT, IT, IRQGO(IH), IERR
+!/MFIT!/MPI                  END IF
+!/MFIT!/MPI                END DO
 !
 !/MPI               NRQGO  = IH
 !/MPIT              WRITE (NDST,9012)
@@ -3685,6 +3698,17 @@
 !/MPIT      WRITE (NDST,9011) IH, STRING, IFROM, IT, IRQGO2(IH), IERR
 !/MPI                    END IF
 !/MPI                  END DO
+!/MFIT!
+!/MFIT!/MPI                DO I=1, NOXSM
+!/MFIT!/MPI                  IF ( FLGRDALL(10, I+NOEXTR) ) THEN
+!/MFIT!/MPI                      IH     = IH + 1
+!/MFIT!/MPI                      IT     = IT + 1
+!/MFIT!/MPI      CALL MPI_RECV_INIT (XSMH(I0,I),1,WW3_FIELD_VEC, IFROM, IT, &
+!/MFIT!/MPI                               MPI_COMM_WAVE, IRQGO2(IH), IERR )
+!/MFIT!/MPIT                     WRITE (STRING,'(A3,I2.2)') '10/', I
+!/MFIT!/MPIT      WRITE (NDST,9011) IH, STRING, IFROM, IT, IRQGO2(IH), IERR
+!/MFIT!/MPI                    END IF
+!/MFIT!/MPI                  END DO
 !
 !/MPI                END DO
 !

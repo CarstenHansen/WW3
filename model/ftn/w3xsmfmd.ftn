@@ -9,11 +9,6 @@
 !/                  |                          FORTRAN 90         |
 !/                  | Last update :           09-OCT-2019         |
 !/                  +---------------------------------------------+
-!      TODO:
-!       X) USERO should be exchanged with an array completely similar to US3D
-!       X) Consider a look-up table and function calls IPd=IPds(KsD,K_S)
-!          and IPp=IPps(KsD,K_S)
-!
 !/
 !/    02-May-2011 : Origination. Development program w3stokes.ftn converted
 !/                  from tested Python code
@@ -94,11 +89,8 @@
 !  the convergence of the iteration procedure.
 !
 !  All calculations are performed in parallel and the results are gathered
-!  to the process that writes the output using the user-slot variable 'USERO'.
+!  to the process that writes the output  variable XSMH.
 ! 
-!  For this purpose, the length NOEXTR of the array USERO(JSEA,1:NOEXTR) is
-!  extended to the required number of fitting parameters (7) plus one.
-!
 !  From the array UXSP (see w3xstomd.ftn) at least the following 5 values are
 !  stored to out_grd.ww3 to be used in conversion to NetCDF (ww3_ounf) .
 !
@@ -110,22 +102,20 @@
 !    UXSP(JSEA,4)      = U0_X   ! Surface Stokes drift [ m/s ]
 !    UXSP(JSEA,4+XSND) = U0_Y 
 !
-!  Via the array USERO we store other seven fitting parameters
+!  Via the array USEROXSMH we store other seven fitting parameters
 !
-!    USERO(JSEA,1)     = Ud_X   ! Surface drift of 'deep' partition
-!    USERO(JSEA,2)     = Ud_Y   ! Primary partition drift is Up = U0 - Ud
-!    USERO(JSEA,3)     = AM     ! Fit parameter, primary partition
-!    USERO(JSEA,4)     = PM     ! Fit parameter, primary partition
-!    USERO(JSEA,5)     = AMd    ! Fit parameter, deep partition
-!    USERO(JSEA,6)     = PMd    ! Fit parameter, deep part. May be a constant
+!    XSMH(JSEA,1)     = Ud_X   ! Surface drift of 'deep' partition
+!    XSMH(JSEA,2)     = Ud_Y   ! Primary partition drift is Up = U0 - Ud
+!    XSMH(JSEA,3)     = AM     ! Fit parameter, primary partition
+!    XSMH(JSEA,4)     = PM     ! Fit parameter, primary partition
+!    XSMH(JSEA,5)     = AMd    ! Fit parameter, deep partition
+!    XSMH(JSEA,6)     = PMd    ! Fit parameter, deep part. May be a constant
 !
-!    USERO(JSEA,7)     = SIC  ! Quality count, see Stokes_MHfit()
+!    XSMH(JSEA,7)     = SIC  ! Quality count, see Stokes_MHfit()
 !    !    IT  : Number of iterations in MH_fit
 !    !    SI  : Scatter index  std(|U_S - U_mod| * dz)/|M|
 !    !    C   : Convergence of iteration
 !        
-!    ! USERO(JSEA,8) is free to use for other purpose        
-!
 !  2. Usage
 !
 !  a) In ww3_grid.inp/namelists.nml, you may modify four namelist variables:
@@ -236,81 +226,53 @@
 !
 !  a) w3odatmd.ftn
 !
-!     Real arrays UXSP(JSEA,1:4), UXSP(JSEA,4+XSND) and USERO(JSEA,1:6) (a
-!     "user_slot") contain the 11 Stokes fitting parameters for the sea point
-!     JSEA. UXSP and USERO are structures for later communication to the job
+!     Real arrays UXSP(JSEA,1:4), UXSP(JSEA,4+XSND) and XSMH(JSEA,1:6) 
+!     contain the 11 Stokes fitting parameters for the sea point
+!     JSEA. UXSP and XSMH are structures for later communication to the job
 !     that performs field output and belong to the module w3adatmd.ftn.
 !
-!     In w3odatmd.ftn, set the integer NOEXTR to 1 + the number of parameters
-!     (7) used in USERO. Remove the 'parameter' type from it's
-!     module declaration
-!     ! change this line      INTEGER, PARAMETER      :: NOEXTR=  2
-!            INTEGER                 :: NOEXTR=  2
-!     In subroutine W3NOUT(), set NOEXTR = NOEXSTK and specify the MHfit
-!     parameter names
-!     !/MFIT      INTEGER, PRIVATE        :: NOEXSTK = 8
-!     (...)
-!     !/MFIT      NOEXTR = 0
-!           DO I=1, MIN ( 20 , NOEXTR )
-!             WRITE (STRING,'(A14,I2.2,A4)') 'User defined #', I, '    '
-!             IDOUT(10, I) = STRING
-!             END DO
-!     !/MFIT      NOEXTR = NOEXSTK
-!           NOGE(10) = NOEXTR
+!     In subroutine W3NOUT(), specify the MHfit parameter names
+!           NOGE(10) = NOEXTR+7
 !     !/MFIT
-!     !/MFIT      IDOUT(10, 1)  = 'Deep Stokes drift E.'
-!     !/MFIT      IDOUT(10, 2)  = 'Deep Stokes drift N.'
-!     !/MFIT      IDOUT(10, 3)  = 'MHfit parameter AM  '
-!     !/MFIT      IDOUT(10, 4)  = 'MHfit parameter PM  '
-!     !/MFIT      IDOUT(10, 5)  = 'MHfit parameter AMd '
-!     !/MFIT      IDOUT(10, 6)  = 'MHfit parameter PMd '
-!     !/MFIT      IDOUT(10, 7)  = 'Quality count SIC '
-!     !/MFIT      IDOUT(10, 8)  = 'User defined #1     '
+!     !/MFIT      IDOUT(10, NOEXTR+1)  = 'Deep Stokes drift E.'
+!     !/MFIT      IDOUT(10, NOEXTR+2)  = 'Deep Stokes drift N.'
+!     !/MFIT      IDOUT(10, NOEXTR+3)  = 'MHfit parameter AM  '
+!     !/MFIT      IDOUT(10, NOEXTR+4)  = 'MHfit parameter PM  '
+!     !/MFIT      IDOUT(10, NOEXTR+5)  = 'MHfit parameter AMd '
+!     !/MFIT      IDOUT(10, NOEXTR+6)  = 'MHfit parameter PMd '
+!     !/MFIT      IDOUT(10, NOEXTR+7)  = 'Quality count SIC '
 !     (...)
 !
 !  b) w3iogomd.ftn
 !
-!     b1) SUBROUTINE W3READFLGRD, and also in W3FLGRDFLAG:
-!     !/MFIT      USE W3ODATMD, ONLY: NOEXTR
-!        (...)
-!     ! Group 10
-!     !
-!                CASE('U1')
-!                  FLG2D(10,1)=.TRUE.
-!     !/MFIT            FLG2D(10,min(7,NOEXTR))=.TRUE.
-!                CASE('U2')
-!                  FLG2D(10,2)=.TRUE.
-!     !/MFIT           CASE('MFIT')
-!     !/MFIT             FLG2D(10,1:NOEXTR-1)=.TRUE.
+!     b1) SUBROUTINE W3READFLGRD, and W3FLGRDFLAG
 !        
 !     b2) In subroutine W3FLGRDUPDT
 !     !/XSTO      ! Set NZO for use in W3DIMA, W3DIMX
 !     !/XSTO      NZO = 0
 !     !/XSTO      IF ( FLGRD(IXSP,JXSP) ) NZO = XSND
-!     !/MFIT      ! For FLGRD(10,1), if FLGRD( IXSP, JXSP) is False, only the
-!     !/MFIT      ! surface and integral variables are in UXSP(1:NSEA,1:5)
-!     !/MFIT      IF ( FLGRD(10,1) .AND. .NOT. FLGRD(IXSP, JXSP) ) NZO = 1
+!     !/MFIT      ! For FLGRD(10,NOEXTR+1), if FLGRD( IXSP, JXSP) is False, only
+!     !/MFIT      ! the surface and integral variables are in UXSP(1:NSEA,1:5)
+!     !/MFIT      IF ( FLGRD(10,NOEXTR+1) .AND. .NOT. FLGRD(IXSP, JXSP) ) NZO = 1
 !        
 !     b3) In subroutine W3OUTG:
 !     Declare use of CALC_MFIT()
 !     !/MFIT      USE W3XSMFMD, ONLY: CALC_MFIT
 !     (...)
-!       (...)
-!       !  Add here USERO(JSEA,1) ...
 !       !
 !       !/XSTO! UXSP(JSEA,1:3+2*XSND) is set by CALC_XSTOKES(A). Thereafter,
-!       !/MFIT! USERO(JSEA,1:7) is determined by CALC_MFIT(A)
+!       !/MFIT! XSMH(JSEA,1:7) is determined by CALC_MFIT(A)
 !       !/MFIT! The combined CALC_XSTOKES(A); CALC_MFIT() are called
 !       !/MFIT! outside and after the present loop
 !
 !     b4) Later in  W3OUTG() just following CALL CALC_XSTOKES():
 !     !/XSTO ! Stokes drift with extended tail
 !     !/XSTO       IF ( FLOLOC(IXSP,JXSP)        &
-!     !/MFIT            .OR.  FLOLOC(10,1)  &
+!     !/MFIT            .OR.  FLOLOC(10,NOEXTR+1)  &
 !     !/XSTO                         ) THEN
 !     !/XSTO           CALL CALC_XSTOKES(A)
 !     !/XSTO         END IF
-!     !/MFIT       IF ( FLOLOC(10,1) ) CALL CALC_MFIT()
+!     !/MFIT       IF ( FLOLOC(10,NOEXTR+1) ) CALL CALC_MFIT()
 !     !/XSTO!
 !        
 !  c) In ww3_ounf.ftn:
@@ -409,7 +371,7 @@
 !  10. Source code :
 !
       USE W3SERVMD, ONLY: EXTCDE
-      USE W3ADATMD, ONLY: USERO
+      USE W3ADATMD, ONLY: XSMH
       USE W3ODATMD, ONLY: NDSO, NDSE, NDST, IAPROC, NAPROC, NAPOUT
       USE W3GDATMD, ONLY: XSND, XSDS, NSEAL, NK, NTH, SIG, DMIN
       ! Stokes drift profile data      
@@ -557,19 +519,19 @@
       
       call MH_fit(JSEA, AM, PM, AMd, PMd, UsD, VsD, SIC)
 
-      UXSP(JSEA,2)   = M_X
-      UXSP(JSEA,3)   = M_Y
+      UXSP(JSEA,2)  = M_X
+      UXSP(JSEA,3)  = M_Y
 
-      USERO(JSEA,1)  = UsD     ! Surface drift of 'deep' part.
-      USERO(JSEA,2)  = VsD     ! Primary part drift is UsP=U_S-UsD.
+      XSMH(JSEA,1)  = UsD     ! Surface drift of 'deep' part.
+      XSMH(JSEA,2)  = VsD     ! Primary part drift is UsP=U_S-UsD.
 
-      USERO(JSEA,3)  = AM      ! MHfit parameter, primary part
-      USERO(JSEA,4)  = PM      ! MHfit parameter, primary part
+      XSMH(JSEA,3)  = AM      ! MHfit parameter, primary part
+      XSMH(JSEA,4)  = PM      ! MHfit parameter, primary part
 
-      USERO(JSEA,5)  = AMd     ! Deep part MHfit parameter.
-      USERO(JSEA,6) = PMd      ! Deep part MHfit parameter. May be constant PMds
+      XSMH(JSEA,5)  = AMd     ! Deep part MHfit parameter.
+      XSMH(JSEA,6)  = PMd     ! Deep part MHfit parameter. May be constant PMds
 
-      USERO(JSEA,7) = SIC    ! Quality integer
+      XSMH(JSEA,7)  = SIC     ! Quality integer
       ! SIC = si*100 + min(int(qiUd+3*niter),9)*10 + min(int(limAP+3*uopp),9)
       ! si : Scatter index % std(|U_S - U_mod| * dz)/std(|U_mod|)
       !

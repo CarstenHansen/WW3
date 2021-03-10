@@ -324,8 +324,7 @@
       INTEGER, PARAMETER      :: DIMP = 15
       INTEGER                 :: NOGE(NOGRP)
       INTEGER                 :: NOTYPE
-! For the switch XSMF: No PARAMETER attribute in this declaration:
-      INTEGER                 :: NOEXTR=  2
+      INTEGER, PARAMETER      :: NOEXTR=  2
       CHARACTER(LEN=20)       :: IDOUT(NOGRP,NGRPP)
       CHARACTER(LEN=80)       :: FNMPRE = './'
       !Moved UNDEF to constants and included above
@@ -335,7 +334,6 @@
 !/ Set NOGE and IDOUT identifiers in W3NOUT
 !/XSTO!
 !/XSTO! Definition of I, J for parameter 'XSP' here.
-!/XSTO! TO FIX: group, field = 6, JXSP+1 and 6, JXSP+2 also set in w3ounfmetamd
 !/XSTO      INTEGER                         :: IXSP=6, JXSP=14
 !/
 !/ Data structures
@@ -598,7 +596,6 @@
       INTEGER                 :: I, NLOW, J
 !/S      INTEGER, SAVE           :: IENT = 0
       CHARACTER(LEN=20)       :: STRING
-!/MFIT      INTEGER                 :: NOEXSTK = 8
 !/
 !/S      CALL STRACE (IENT, 'W3NOUT')
 !
@@ -851,18 +848,15 @@
 ! 10) User defined
 !
       NOGE(10) = NOEXTR
+!/MFIT      NOGE(10) = NOEXTR+1
 !
-!/MFIT      IDOUT(10, 1)  = 'Stokes profile fit  '
-!/MFIT!     'Deep Stokes drift E., N., Mfit parameters AM, PM, AMd, QC
+!/MFIT      IDOUT(10, NOEXTR+1)  = 'Stokes profile fit  '
+!/MFIT!     'Deep Stokes drift E., N., Mfit parameters AM, PM, AMd, PMd, QC
 !/MFIT!      parameter ITSIC'
       DO I=1, MIN ( 20 , NOEXTR )
-!/MFIT        EXIT
-!/MFIT        END DO
-!/MFIT      DO I=2, MIN ( 20 , NOEXTR )
         WRITE (STRING,'(A14,I2.2,A4)') 'User defined #', I, '    '
         IDOUT(10, I) = STRING
         END DO
-!/MFIT      NOEXTR = NOEXSTK
 !
 !/T      WRITE (NDSTST,9000) NGRIDS
 !
