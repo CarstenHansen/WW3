@@ -210,6 +210,7 @@
       USE W3GDATMD, ONLY: E3DF, P2MSF, US3DF, USSPF
 !/XSTO      USE W3GDATMD, ONLY: XSND
 !/XSTO      USE W3ODATMD, ONLY: NZO
+!/MFIT      USE W3ODATMD, ONLY: NOEXTR
       USE W3ODATMD, ONLY: NOGRP, NGRPP
 !/S      USE W3SERVMD, ONLY: STRACE
 !
@@ -385,7 +386,6 @@
       USE W3GDATMD, ONLY: US3DF, USSPF
       USE W3ODATMD, ONLY: NOGRP, NGRPP, NOGE, IDOUT
       USE W3SERVMD, ONLY: NEXTLN, STRSPLIT, STR_TO_UPPER
-!/MFIT      USE W3ODATMD, ONLY: NOXSM
 !/S      USE W3SERVMD, ONLY: STRACE
 !
       IMPLICIT NONE
@@ -615,7 +615,6 @@
       USE W3ODATMD, ONLY: NOGRP, NGRPP, IDOUT
       USE W3SERVMD, ONLY: STRSPLIT, STR_TO_UPPER
       USE W3GDATMD, ONLY: US3DF, USSPF
-!/MFIT      USE W3ODATMD, ONLY: NOXSM
 !/S      USE W3SERVMD, ONLY: STRACE
 !
       IMPLICIT NONE
@@ -732,6 +731,7 @@
 !
 !/ ------------------------------------------------------------------- /
       USE W3GDATMD, ONLY: US3DF, USSPF
+!/MFIT      USE W3ODATMD, ONLY: NOEXTR
       IMPLICIT NONE
 !/
 !/ ------------------------------------------------------------------- /
@@ -1074,7 +1074,7 @@
 !/MFIT!
 !/MFIT     CASE('MFIT')
 !/MFIT        I = 10
-!/MFIT        J = 3 ! Also w3ounfmeta GROUP(10)%FIELD(3)%SUBFIELD(1:7)%META
+!/MFIT        J = NOEXTR+1 ! Also w3ounfmeta GROUP(10)%FIELD(3)%SUBFIELD(1:7)
 ! Not found:
 !/COU      CASE('DRY')
       CASE('UNSET')
@@ -1221,10 +1221,11 @@
 !
       USE W3PARALL, ONLY : INIT_GET_ISEA
 !/XSTO ! Stokes drift with extended tail
-!/XSTO ! It would be nice to be able to use double switch '!/XSTO!/MPI'
+!/XSTO ! TODO: Consider use double switch '!/XSTO!/FCLC'
 !/XSTO ! to avoid linking w3xstomd into ww3_ounf
 !/XSTO      USE W3XSTOMD, ONLY: CALC_XSTOKES
 !/MFIT      USE W3XSMFMD, ONLY: CALC_MFIT
+!/MFIT      USE W3ODATMD, ONLY: NOEXTR
 !
       IMPLICIT NONE
 !/
@@ -2492,11 +2493,11 @@
 !/XSTO      USE W3ADATMD, ONLY: UXSP
 !/XSTO      USE W3ODATMD, ONLY: NZO
 !/MFIT      USE W3ADATMD, ONLY: XSMH
-!/MFIT      USE W3ODATMD, ONLY: NOXSM
+!/MFIT      USE W3ODATMD, ONLY: NOXSM, NOEXTR
 !/
       USE W3ODATMD, ONLY: NOGRP, NGRPP, IDOUT, UNDEF, NDST, NDSE,     &
                           FLOGRD, IPASS => IPASS1, WRITE => WRITE1,   &
-                          FNMPRE, NOSWLL, NOEXTR
+                          FNMPRE, NOSWLL
 !/
       USE W3SERVMD, ONLY: EXTCDE
       USE W3ODATMD, only : IAPROC
@@ -2821,7 +2822,7 @@
                 IF ( FLOGRD( 6, 11) ) PHICE(ISEA) = UNDEF
                 IF ( FLOGRD( 6, 12) ) USSP(ISEA,:) = UNDEF
 !/XSTO                IF ( FLOGRD( IXSP, JXSP) ) UXSP(ISEA,:) = UNDEF
-!/MFIT                IF ( FLOGRD( 10, 1) .AND. .NOT. FLOGRD( IXSP, JXSP) )  &
+!/MFIT                IF ( FLOGRD( 10, NOEXTR+1) .AND. .NOT. FLOGRD( IXSP, JXSP) )  &
 !/MFIT                                      UXSP(ISEA,:) = UNDEF
                 IF ( FLOGRD( 7, 1) ) THEN
                                      ABA   (ISEA) = UNDEF
@@ -2886,11 +2887,11 @@
             END DO
 !
         ELSE
-!/XSTO          ! NZO is required for use in W3MPIO and W3DIMA
-!/XSTO          IF ( FLOGRD(IXSP,JXSP) .AND. .NOT. NZO == XSND ) &
-!/XSTO             WRITE (NDSE,*) 'ERROR: NZO=',NZO,' should be equal to ',XSND
-!/MFIT          IF ( FLOGRD(10,1) .AND. .NOT.FLOGRD(IXSP,JXSP) .AND. .NOT.NZO==1 ) &
-!/MFIT             WRITE (NDSE,*) 'ERROR: NZO=',NZO,' should be equal to 1'
+!/XSTO     ! NZO is required for use in W3MPIO and W3DIMA
+!/XSTO     IF ( FLOGRD(IXSP,JXSP) .AND. .NOT. NZO == XSND ) &
+!/XSTO        WRITE (NDSE,*) 'ERROR: NZO=',NZO,' should be equal to ',XSND
+!/MFIT     IF ( FLOGRD(10,NOEXTR+1) .AND. .NOT.FLOGRD(IXSP,JXSP) .AND. .NOT.NZO==1 ) &
+!/MFIT        WRITE (NDSE,*) 'ERROR: NZO=',NZO,' should be equal to 1'
           IF (.NOT.DINIT) CALL W3DIMW ( IGRD, NDSE, NDST, .TRUE. )
           IF (.NOT.AINIT) CALL W3DIMA ( IGRD, NDSE, NDST, .TRUE. )
         END IF
@@ -3189,15 +3190,13 @@
 !
                   ELSE IF ( IFI .EQ. 10 ) THEN
 !/MFIT              IF ( IFJ .EQ. NOEXTR+1 ) THEN
-!/MFIT !               write (ndst,*) '  Writing mfit params to file'      
 !/MFIT                WRITE ( NDSOG ) XSMH(1:NSEA,1:NOXSM)
-!/MFIT !               write (ndst,*) '  Done mfit params to file'      
 !/MFIT                IF ( .NOT. FLOGRD(IXSP,JXSP) ) WRITE ( NDSOG ) UXSP(1:NSEA,1:5)
 !/MFIT                ! Only the integral and surface variables
 !/MFIT                ! We presume that UXSP(:,3+2*NZO) point to XUXSP(:,5)
 !/MFIT              ELSE
                     WRITE ( NDSOG ) USERO(1:NSEA,IFJ)
-!/MFIT              END IF
+!/MFIT        END IF
 !
                   END IF
 !

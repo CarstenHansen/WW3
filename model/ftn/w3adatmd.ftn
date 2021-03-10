@@ -2273,7 +2273,7 @@
       WADATS(IMOD)%XCFLTHMAX = UNDEF
       WADATS(IMOD)%XCFLKMAX  = UNDEF
 !/MFIT!
-!/MFIT      IF (  OUTFLAGS(10, 1) ) THEN
+!/MFIT      IF (  OUTFLAGS(10, NOEXTR+1) ) THEN
 !/MFIT          ALLOCATE ( WADATS(IMOD)%XXSMH(NXXX,NOXSM), STAT=ISTAT )
 !/MFIT          CHECK_ALLOC_STATUS ( ISTAT )
 !/MFIT        ELSE
@@ -2285,9 +2285,8 @@
       WADATS(IMOD)%XXSMH   = UNDEF
 !
       ISTAT=-1
-      DO I = NOEXTR, 1, -1
-        ! OUTFLAGS(10,1) is for MFIT output
-        IF ( OUTFLAGS(10, I+1) ) THEN
+      DO I = 1,NOEXTR
+        IF ( OUTFLAGS(10, I) ) THEN
             ALLOCATE ( WADATS(IMOD)%XUSERO(NXXX,I), STAT=ISTAT )
             CHECK_ALLOC_STATUS ( ISTAT )
             EXIT
@@ -2811,6 +2810,18 @@
           WN     => WADATS(IMOD)%WN
 !/IC3     IC3WN_R=> WADATS(IMOD)%IC3WN_R
 !/IC3     IC3WN_I=> WADATS(IMOD)%IC3WN_I
+!/XSTO!
+!/XSTO          M_X => WADATS(IMOD)%M_X
+!/XSTO          M_Y => WADATS(IMOD)%M_Y
+!/XSTO          K_S => WADATS(IMOD)%K_S
+!/XSTO
+!/XSTO          U_S => WADATS(IMOD)%U_S
+!/XSTO          V_S => WADATS(IMOD)%V_S
+!/XSTO          ZK_S => WADATS(IMOD)%ZK_S
+!/XSTO! For storage in out_grd.ww3: UXSP and XUXSP
+          UXSP => WADATS(IMOD)%UXSP
+!/MFIT!
+          XSMH => WADATS(IMOD)%XSMH
 !
           IF ( FL_ALL ) THEN
 !
@@ -2930,18 +2941,6 @@
 !
 !/MPI      GSTORE => WADATS(IMOD)%GSTORE
 !/MPI      SSTORE => WADATS(IMOD)%SSTORE
-!/XSTO
-!/XSTO          M_X => WADATS(IMOD)%M_X
-!/XSTO          M_Y => WADATS(IMOD)%M_Y
-!/XSTO          K_S => WADATS(IMOD)%K_S
-!/XSTO
-!/XSTO          U_S => WADATS(IMOD)%U_S
-!/XSTO          V_S => WADATS(IMOD)%V_S
-!/XSTO          ZK_S => WADATS(IMOD)%ZK_S
-!/XSTO! For storage in out_grd.ww3: UXSP and XUXSP
-          UXSP => WADATS(IMOD)%UXSP
-!/MFIT!
-          XSMH => WADATS(IMOD)%XSMH
 !
       RETURN
 !

@@ -1,4 +1,4 @@
- !/ ------------------------------------------------------------------- /
+!/ ------------------------------------------------------------------- /
       MODULE W3OUNFMETAMD
 !/
 !/                  +-----------------------------------+
@@ -178,8 +178,6 @@
       INTEGER            :: NCVARTYPE   ! netCDF variable type
       CHARACTER(LEN=30)  :: DIRCOM      ! Direction convention comment
       CHARACTER(LEN=128) :: PARTCOM     ! Partitioning method comment
-!/MFIT!
-!/MFIT      LOGICAL, PRIVATE   :: DO_MFIT = .FALSE.
       
       LOGICAL, PRIVATE   :: VECTOR      ! Vector or dir/mag for dir fields?
 
@@ -235,10 +233,11 @@
       
       VECTOR = .TRUE.
       IF(PRESENT(VEC)) VECTOR = VEC
-      
+      SPIJ2(:) = 0
       ! Id.'s for parameters that have sub-members
       DO K = 1,SIZE(SPS)
          CALL W3FLDTOIJ(SPS(K), I, J, 1, 1, 1)
+!/MFIT ! IF ( FLG2D(I, J) ) &
          SPIJ2(K) = I*NGRPP+J
       ENDDO   
 
@@ -300,7 +299,7 @@
       ENDIF
 
       ! 3. Set the default values for the OUNF netCDF meta data.
-      CALL DEFAULT_META()
+      CALL DEFAULT_META(FLG2D)
 
       ! If the ounfmeta.inp exists, read this in to override defaults:
       INQUIRE(FILE=TRIM(FNMPRE)//"ounfmeta.inp", EXIST=FLGNML)
@@ -1208,12 +1207,8 @@
         CALL EXTCDE(1)
       ENDIF
       IF(IFJ .LT. 1 .OR. IFJ .GT. NOGE(IFI)) THEN
-!/XSTO      IF ( IFI .NE. 6 .OR. IFJ .LT. 1 .OR. IFJ .GT. NOGE(IFI)+2 ) THEN
-!/MFIT        IF ( IFI .NE. 10 .OR. IFJ .LT. 1 .OR. IFJ .GT. 7 ) THEN
         WRITE(NDSE,1001) NOGE(IFI)
         CALL EXTCDE(1)
-!/MFIT        END IF
-!/XSTO      END IF
       ENDIF
       IF(IFC .LT. 1 .OR. IFC .GT. 3) THEN
         WRITE(NDSE,1002)
@@ -1593,7 +1588,7 @@
       END SUBROUTINE PRINT_META
 
 !/ ------------------------------------------------------------------- /
-      SUBROUTINE DEFAULT_META()
+      SUBROUTINE DEFAULT_META(FLG2D)
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -1622,8 +1617,12 @@
 !
 !/ ------------------------------------------------------------------- /
 !/XSTO      USE W3IOGOMD, ONLY: W3FLDTOIJ
+!/MFIT      USE W3ODATMD, ONLY: NOEXTR
       IMPLICIT NONE
+!/MFIT! C Hansen note: FLG2D is for the fb_xsmf branch only
+      LOGICAL, INTENT(IN) :: FLG2D(NOGRP,NGRPP)
       TYPE(META_T), POINTER :: META(:)
+!/MFIT      INTEGER :: IXMF=10, JXMF = NOEXTR+1
 !/XSTO      INTEGER :: IFI, IFJ
 !
 !----------GROUP 1 ----------------
@@ -2757,7 +2756,8 @@
 !/XSTO      META(1)%ENAME  = '.xsm'
 !/XSTO      META(1)%VARND = DIRCOM
 !/XSTO      META(1)%VARNG=''
-!/XSTO!/MFIT        IF ( .NOT. DO_MFIT ) THEN
+!/MFIT! IXMF=10; JXMF=3
+!/XSTO!/MFIT        IF ( .NOT. FLG2D(IXMF,JXMF) ) THEN
 !/XSTO      META(1)%FSC    = 1.
 !/XSTO      META(1)%VMIN = -1000
 !/XSTO      META(1)%VMAX =  1000
@@ -2765,7 +2765,7 @@
 !/XSTO      META(1)%VARNM='uxsm'
 !/XSTO      META(1)%VARNL='eastward wave pseudo momentum'
 !/XSTO      META(1)%VARNS='eastward_wave_pseudo_momentum'
-!/XSTO      META(1)%VARNC='K = ksc'
+!/XSTO      META(1)%VARNC=''
 !/XSTO!/MFIT      ELSE
 !/XSTO!/MFIT        ! abs(xsm * 2 * ksc) is less than O(1)
 !/XSTO!/MFIT        META(1)%FSC    = 1./30000.
@@ -2775,16 +2775,17 @@
 !/XSTO!/MFIT        META(1)%VARNS=''
 !/XSTO!/MFIT        META(1)%VARNM='MKX'
 !/XSTO!/MFIT        META(1)%VARNL='Eastward wave pseudo-momentum * 2 * Kz'
-!/XSTO!/MFIT      END IF ! ( .NOT. DO_MFIT )
+!/XSTO!/MFIT        META(1)%VARNC='Kz = ksc'
+!/XSTO!/MFIT      END IF ! ( .NOT. FLG2D(IXMF,JXMF) )
 !/XSTO      META(2)=META(1)
-!/XSTO!/MFIT        IF ( .NOT. DO_MFIT ) THEN
+!/XSTO!/MFIT        IF ( .NOT. FLG2D(IXMF,JXMF) ) THEN
 !/XSTO      META(2)%VARNM='vxsm'
 !/XSTO      META(2)%VARNL='northward wave pseudo momentum'
 !/XSTO      META(2)%VARNS='northward_wave_pseudo_momentum'
 !/XSTO!/MFIT      ELSE
 !/XSTO!/MFIT        META(2)%VARNM='MKY'
 !/XSTO!/MFIT        META(2)%VARNL='Northward wave pseudo-momentum * 2 * Kz'
-!/XSTO!/MFIT      END IF ! ( .NOT. DO_MFIT )
+!/XSTO!/MFIT      END IF ! ( .NOT. FLG2D(IXMF,JXMF) )
 !
 !---------- GROUP 7 ----------------
 !   
@@ -3051,9 +3052,10 @@
 !
 ! ------ Group 10 (User defined) -------
 !
-! IFI=10, IFJ=1
-      META => GROUP(10)%FIELD(NOEXTR+1)%META
-!/MFIT      IF ( DO_MFIT ) THEN
+!/MFIT! IFI=10, IFJ=3 (IXMF=10,JXMF=NOEXTR+1=3)
+!/MFIT! ISP=1
+!/MFIT      META => GROUP(IXMF)%FIELD(JXMF)%SUBFIELD(1)%META
+!/MFIT!      IF ( FLG2D(IXMF,JXMF) ) THEN
 !/MFIT      ! The seven subfields (ISP=1..7) are joined in the netCDF file
 !/MFIT      META(1)%FSC    = 0.001
 !/MFIT      META(1)%UNITS  = '1'
@@ -3072,9 +3074,9 @@
 !/MFIT      META(2)%varnm = 'S0Y'
 !/MFIT      META(2)%varnl = 'Northward surface Stokes-drift / abs(MK)'
 !/MFIT      META(2)%varnc='Up(Z) = Up(0) exp( -AM (Z Kz)^PM )'
-! IFI=10, IFJ=1, ISP=2
-!/MFIT      META => GROUP(10)%FIELD(NOEXTR+2)%META
-!/MFIT      META(1) = GROUP(10)%FIELD(NOEXTR+1)%META(1)
+!/MFIT! IFI=IXMF, IFJ=JXMF, ISP=2
+!/MFIT      META => GROUP(IXMF)%FIELD(JXMF)%SUBFIELD(2)%META
+!/MFIT      META(1) = GROUP(IXMF)%FIELD(JXMF)%SUBFIELD(1)%META(1)
 !/MFIT      META(1)%varnm = 'SdX'
 !/MFIT      META(1)%varnl = 'Eastward deep part Stokes-drift / abs(MK)'
 !/MFIT      META(1)%ENAME = '.sd'
@@ -3084,51 +3086,51 @@
 !/MFIT      META(2)%varnm = 'SdY'
 !/MFIT      META(2)%varnl = 'Northward deep part Stokes-drift / abs(MK)'
 !/MFIT      META(2)%varnc = 'Ud(0) = Sd * abs(MK)'
-! IFI=10, IFJ=1, ISP=3..7
-!/MFIT      META => GROUP(10)%FIELD(NOEXTR+3)%META
-!/MFIT      META(1) = GROUP(10)%FIELD(NOEXTR+1)%META(1)
+!/MFIT! IFI=IXMF, IFJ=JXMF, ISP=3..7
+!/MFIT      META => GROUP(IXMF)%FIELD(JXMF)%SUBFIELD(3)%META
+!/MFIT      META(1) = GROUP(IXMF)%FIELD(JXMF)%SUBFIELD(1)%META(1)
 !/MFIT      META(1)%VARND = ''
 !/MFIT      META(1)%varnc = ''
 !/MFIT      META(1)%vmin = 0
 !/MFIT      META(1)%varnm = 'AM'
 !/MFIT      META(1)%varnl = 'MFIT parameter AM'
 !/MFIT      META(1)%ENAME = '.am'
-!/MFIT      META => GROUP(10)%FIELD(NOEXTR+4)%META
-!/MFIT      META(1) = GROUP(10)%FIELD(NOEXTR+3)%META(1)
+!/MFIT      META => GROUP(IXMF)%FIELD(JXMF)%SUBFIELD(4)%META
+!/MFIT      META(1) = GROUP(IXMF)%FIELD(JXMF)%SUBFIELD(3)%META(1)
 !/MFIT      META(1)%varnm = 'PM'
 !/MFIT      META(1)%varnl = 'MFIT parameter PM'
 !/MFIT      META(1)%ENAME = '.pm'
-!/MFIT      META => GROUP(10)%FIELD(NOEXTR+5)%META
-!/MFIT      META(1) = GROUP(10)%FIELD(NOEXTR+3)%META(1)
+!/MFIT      META => GROUP(IXMF)%FIELD(JXMF)%SUBFIELD(5)%META
+!/MFIT      META(1) = GROUP(IXMF)%FIELD(JXMF)%SUBFIELD(3)%META(1)
 !/MFIT      META(1)%varnm = 'AMd'
 !/MFIT      META(1)%varnl = 'MFIT parameter AMd'
 !/MFIT      META(1)%ENAME = '.amd'
-!/MFIT      META => GROUP(10)%FIELD(NOEXTR+6)%META
-!/MFIT      META(1) = GROUP(10)%FIELD(NOEXTR+3)%META(1)
+!/MFIT      META => GROUP(IXMF)%FIELD(JXMF)%SUBFIELD(6)%META
+!/MFIT      META(1) = GROUP(IXMF)%FIELD(JXMF)%SUBFIELD(3)%META(1)
 !/MFIT      META(1)%varnm = 'PMd'
 !/MFIT      META(1)%varnl = 'MFIT parameter PMd'
 !/MFIT      META(1)%ENAME = '.pmd'
-!/MFIT      META => GROUP(10)%FIELD(NOEXTR+7)%META
-!/MFIT      META(1) = GROUP(10)%FIELD(NOEXTR+3)%META(1)
+!/MFIT      META => GROUP(IXMF)%FIELD(JXMF)%SUBFIELD(7)%META
+!/MFIT      META(1) = GROUP(IXMF)%FIELD(JXMF)%SUBFIELD(3)%META(1)
 !/MFIT      META(1)%varnm = 'SIC'
 !/MFIT      META(1)%varnl = 'MFIT quality integer'
 !/MFIT      META(1)%ENAME = '.sic'
 !/MFIT      META(1)%FSC  = 1
 !/MFIT      META(1)%vmin = -32766
 !/MFIT      META(1)%vmax = 32766
-!/MFIT      END IF ! ( DO_MFIT )
+!/MFIT!      END IF ! ( FLG2D(IXMF,JXMF) )
 ! IFI=10, IFJ=1..NOEXTR
-      DO J = 1,NOEXTR
-      META => GROUP(10)%FIELD(J)%META
-      META(1)%FSC    = 0.1
-      META(1)%UNITS  = 'm'
-      META(1)%VMIN = 0
-      META(1)%VMAX = 0
-      WRITE (META(1)%ENAME,'(A2,I2.2)') '.u',J
-      WRITE (META(1)%VARNM,'(A1,I2.2)') 'u',J
-      WRITE (META(1)%VARNL,'(A12,I2.2)') 'User_defined',J
-      WRITE (META(1)%VARNS,'(A12,I2.2)') 'User_defined',J
-      WRITE (META(1)%VARNG,'(A12,I2.2)') 'user_defined',J
+      DO IFJ = 1,NOEXTR
+        META => GROUP(10)%FIELD(IFJ)%META
+        META(1)%FSC    = 0.1
+        META(1)%UNITS  = 'm'
+        META(1)%VMIN = 0
+        META(1)%VMAX = 0
+        WRITE (META(1)%ENAME,'(A2,I2.2)') '.u',IFJ
+        WRITE (META(1)%VARNM,'(A1,I2.2)') 'u',IFJ
+        WRITE (META(1)%VARNL,'(A12,I2.2)') 'User_defined',IFJ
+        WRITE (META(1)%VARNS,'(A12,I2.2)') 'User_defined',IFJ
+        WRITE (META(1)%VARNG,'(A12,I2.2)') 'user_defined',IFJ
       ENDDO
 !
       END SUBROUTINE DEFAULT_META
