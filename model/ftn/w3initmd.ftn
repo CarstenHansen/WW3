@@ -2049,13 +2049,7 @@
 !
 !/XSTO      NZ2 = 0
 !/XSTO      IF ( NZO .GT. 0 ) NZ2=3+2*NZO
-              IF ( .FALSE. ) THEN
-!/MFIT              ELSE
-             ! Code here if output of USERO(1:6)
-!/MPI             IF ( FLGRDALL(10, 2) ) FLGRDALL(10, 7) = .TRUE.
-!/MPI             IF ( FLGRDALL(10, 1) ) FLGRDALL(10, 1:6) = .TRUE.
-                END IF
-!
+!/XSTO!
 !/MPI      IF ((FLOUT(1) .OR. FLOUT(7)).and.(.not. LPDLIB .or.       &
 !/MPI          (GTYPE .ne. UNGTYPE).or. .TRUE.)) THEN
 !
@@ -2073,7 +2067,7 @@
 !/MPI          IF ( FLGRDALL( 6, 8) ) NRQMAX = NRQMAX + 2*NK
 !/MPI          IF ( FLGRDALL( 6,12) ) NRQMAX = NRQMAX + 2*NK
 !
-!/MFIT!/MPI          NRQMAX = NRQMAX + NOXSM
+!/MFIT!/MPI    IF ( FLGRDALL(10, NOEXTR+1) ) NRQMAX = NRQMAX + NOXSM
 !/XSTO!/MPI          IF ( NZ2 .GT. 0 ) NRQMAX = NRQMAX + NZ2 ! FLGRDALL( 6, 1[N])
 !/XSTO!
 !/MPI          IF ( NRQMAX .GT. 0 ) THEN 
@@ -2874,16 +2868,16 @@
 !/MPI                  END IF
 !/MPI                END DO
 !/MFIT
-!/MFIT!/MPI              DO I=1, NOXSM
-!/MFIT!/MPI                IF ( FLGRDALL(10, NOEXTR+I) ) THEN
-!/MFIT!/MPI                    IH     = IH + 1
-!/MFIT!/MPI                    IT     = IT + 1
+!/MFIT!/MPI          IF ( FLGRDALL(10, NOEXTR+1) ) THEN
+!/MFIT!/MPI            DO I=1, NOXSM
+!/MFIT!/MPI              IH     = IH + 1
+!/MFIT!/MPI              IT     = IT + 1
 !/MFIT!/MPI      CALL MPI_SEND_INIT (XSMH(1,I),NSEALM , MPI_REAL, IROOT,  &
 !/MFIT!/MPI                                IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
-!/MFIT!/MPIT                   WRITE (STRING,'(A3,I2.2)') '10/', I
+!/MFIT!/MPIT             WRITE (STRING,'(A3,I2.2)') '10/', I
 !/MFIT!/MPIT      WRITE (NDST,9011) IH, STRING, IROOT, IT, IRQGO(IH), IERR
-!/MFIT!/MPI                  END IF
-!/MFIT!/MPI                END DO
+!/MFIT!/MPI              END DO
+!/MFIT!/MPI            END IF
 !
 !/MPI               NRQGO  = IH
 !/MPIT              WRITE (NDST,9012)
@@ -3699,16 +3693,16 @@
 !/MPI                    END IF
 !/MPI                  END DO
 !/MFIT!
-!/MFIT!/MPI                DO I=1, NOXSM
-!/MFIT!/MPI                  IF ( FLGRDALL(10, I+NOEXTR) ) THEN
-!/MFIT!/MPI                      IH     = IH + 1
-!/MFIT!/MPI                      IT     = IT + 1
+!/MFIT!/MPI          IF ( FLGRDALL(10, NOEXTR+1) ) THEN
+!/MFIT!/MPI            DO I=1, NOXSM
+!/MFIT!/MPI              IH     = IH + 1
+!/MFIT!/MPI              IT     = IT + 1
 !/MFIT!/MPI      CALL MPI_RECV_INIT (XSMH(I0,I),1,WW3_FIELD_VEC, IFROM, IT, &
 !/MFIT!/MPI                               MPI_COMM_WAVE, IRQGO2(IH), IERR )
-!/MFIT!/MPIT                     WRITE (STRING,'(A3,I2.2)') '10/', I
+!/MFIT!/MPIT             WRITE (STRING,'(A3,I2.2)') '10/', I
 !/MFIT!/MPIT      WRITE (NDST,9011) IH, STRING, IFROM, IT, IRQGO2(IH), IERR
-!/MFIT!/MPI                    END IF
-!/MFIT!/MPI                  END DO
+!/MFIT!/MPI              END DO
+!/MFIT!/MPI            END IF
 !
 !/MPI                END DO
 !

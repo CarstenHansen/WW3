@@ -232,16 +232,8 @@
 !     that performs field output and belong to the module w3adatmd.ftn.
 !
 !     In subroutine W3NOUT(), specify the MHfit parameter names
-!           NOGE(10) = NOEXTR+7
-!     !/MFIT
-!     !/MFIT      IDOUT(10, NOEXTR+1)  = 'Deep Stokes drift E.'
-!     !/MFIT      IDOUT(10, NOEXTR+2)  = 'Deep Stokes drift N.'
-!     !/MFIT      IDOUT(10, NOEXTR+3)  = 'MHfit parameter AM  '
-!     !/MFIT      IDOUT(10, NOEXTR+4)  = 'MHfit parameter PM  '
-!     !/MFIT      IDOUT(10, NOEXTR+5)  = 'MHfit parameter AMd '
-!     !/MFIT      IDOUT(10, NOEXTR+6)  = 'MHfit parameter PMd '
-!     !/MFIT      IDOUT(10, NOEXTR+7)  = 'Quality count SIC '
-!     (...)
+!           NOGE(10) = NOEXTR+1
+!     !/MFIT      IDOUT(10, NOEXTR+1)  = 'Stokes profile fit  '
 !
 !  b) w3iogomd.ftn
 !

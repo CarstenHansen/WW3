@@ -325,6 +325,7 @@
       INTEGER                 :: NOGE(NOGRP)
       INTEGER                 :: NOTYPE
       INTEGER, PARAMETER      :: NOEXTR=  2
+!/MFIT      INTEGER, PARAMETER      :: NOXSM=  7
       CHARACTER(LEN=20)       :: IDOUT(NOGRP,NGRPP)
       CHARACTER(LEN=80)       :: FNMPRE = './'
       !Moved UNDEF to constants and included above

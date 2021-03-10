@@ -217,7 +217,7 @@
       USE W3OUNFMETAMD, ONLY: INIT_META, TEARDOWN_META, GETMETA,       &
                               WRITE_META, WRITE_GLOBAL_META,           &
                               META_T, NCVARTYPE, NSPMAX
-!/MFIT      USE W3ODATMD, ONLY : IXSP,JXSP,NOXSM 
+!/MFIT      USE W3ODATMD, ONLY : IXSP, JXSP, NOEXTR, NOXSM 
 !/MFIT      ! (Will also call W3IOGOMD: W3FLDTOIJ('XSP   ', IXSP, JXSP, 1, 1, 1))
 !
       USE NETCDF
@@ -452,8 +452,8 @@
         END DO
       END DO
 
-!/MFIT      ! Write UXSP(1:3) to netCDF if not the full profile is to be written
-!/MFIT      IF ( FLG2D(10,1) .AND. .NOT. FLG2D(IXSP,JXSP) ) THEN
+!/MFIT      ! Write UXSP(1:3) to netCDF if not the Stokes profile is selected
+!/MFIT      IF ( FLG2D(10,NOEXTR+1) .AND. .NOT. FLG2D(IXSP,JXSP) ) THEN
 !/MFIT        SVP=.FALSE.
 !/MFIT        FLG2D(IXSP,JXSP) = .TRUE.
 !/MFIT      END IF
@@ -2089,7 +2089,7 @@
 !/XSTO          ENDIF ! SMCGRD
 !/XSTO!
 !/XSTO        ELSE IF ( ISP .EQ. 2 ) THEN
-!/XSTO!/MFIT    IF (SVP) THEN
+!/XSTO!/MFIT    IF (.NOT. SVP) CYCLE
 !/XSTO          ! Vertical profile of Stokes drift
 !/XSTO          ! For an XSTO spectral tail
 !/XSTO          DIM3NAME='zk'
@@ -2109,7 +2109,6 @@
 !/XSTO            XXK(:,:,IK-3)=XX
 !/XSTO            XYK(:,:,IK-3)=XY
 !/XSTO          END DO
-!/XSTO!/MFIT    END IF ! (SVP)
 !/XSTO!
 !/XSTO        ELSE IF ( ISP .EQ. 3 ) THEN
 !/XSTO          ! Vertically integrated Stokes drift == wave pseudo momentum
@@ -2118,7 +2117,7 @@
 !/XSTO          ! 'Stokes transport', but with the XSTO extended tail
 !/XSTO          NFIELD=2
 !/XSTO!/MFIT!
-!/XSTO!/MFIT    IF ( FLG2D(10,1) ) THEN
+!/XSTO!/MFIT    IF ( FLG2D(10,NOEXTR+1) ) THEN
 !/XSTO!/MFIT    ! Multiply by 2*ksc
 !/XSTO!/MFIT    UXSP(1:NSEA,2) = UXSP(1:NSEA,2)*UXSP(1:NSEA,1)*2.
 !/XSTO!/MFIT    UXSP(1:NSEA,3) = UXSP(1:NSEA,3)*UXSP(1:NSEA,1)*2.
@@ -2172,7 +2171,7 @@
 !/XSTO!       Thus it cannot be scaled to a 16-bit integer
 !/XSTO!       We might alternatively consider to store xsm * ksc
 !/XSTO          IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
-!/XSTO!/MFIT    END IF ! FLG2D(10,1)
+!/XSTO!/MFIT    END IF ! FLG2D(10,NOEXTR+1)
 !/XSTO!/MFIT!
 !/XSTO!
 !/XSTO!/RTD          ! Rotate x,y vector back to standard pole
@@ -2373,7 +2372,7 @@
             END IF ! IFI AND IFJ
 
             ! CB Get netCDF metadata for IFI, IFJ combination (all components).
-            ! CarstenHansen: ISUB > 0 is an index for a sub-parameter meta
+            ! CarstenHansen: ISUB > 0 is a sub-parameter index
             DO I=1,NFIELD
               META(I) = GETMETA(IFI, IFJ, ICOMP=I, IPART=IPART, ISUB=ISUB)
             ENDDO
