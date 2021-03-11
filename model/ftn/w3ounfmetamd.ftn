@@ -106,7 +106,7 @@
       USE W3GDATMD, ONLY: SIG, NK
 !/RTD      USE W3GDATMD, ONLY : FLAGUNR
       USE W3ODATMD, ONLY: PTMETH, PTFCUT, NOGRP, NOGE, NGRPP,           &
-                          NDSE, FNMPRE
+                          NDSE, FNMPRE, NOEXTR
       USE W3SERVMD, ONLY: EXTCDE, STR_TO_UPPER
 
       IMPLICIT NONE
@@ -1605,7 +1605,7 @@
 !/ ------------------------------------------------------------------- /
       IMPLICIT NONE
       TYPE(META_T), POINTER :: META(:)
-!
+      INTEGER :: IFJ
 !----------GROUP 1 ----------------
 !
 ! IFI=1, IFJ=1
@@ -2962,17 +2962,19 @@
 !
 ! ------ Group 10 (User defined) -------
 !
-! IFI=10, IFJ=1
-      META => GROUP(10)%FIELD(1)%META
-      META(1)%FSC    = 0.1
-      META(1)%UNITS  = 'm'
-      META(1)%VMIN = 0
-      META(1)%VMAX = 0
-      WRITE (META(1)%ENAME,'(A2,I2.2)') '.u'
-      WRITE (META(1)%VARNM,'(A1,I2.2)') 'u'
-      WRITE (META(1)%VARNL,'(A12,I2.2)') 'User_defined'
-      WRITE (META(1)%VARNS,'(A12,I2.2)') 'User_defined'
-      WRITE (META(1)%VARNG,'(A12,I2.2)') 'user_defined'
+! IFI=10
+      DO IFJ = 1,NOGE(10)
+        META => GROUP(10)%FIELD(IFJ)%META
+        META(1)%FSC    = 0.1
+        META(1)%UNITS  = 'm'
+        META(1)%VMIN = 0
+        META(1)%VMAX = 0
+        WRITE (META(1)%ENAME,'(A2,I2.2)') '.u',IFJ
+        WRITE (META(1)%VARNM,'(A1,I2.2)') 'u',IFJ
+        WRITE (META(1)%VARNL,'(A12,I2.2)') 'User_defined',IFJ
+        WRITE (META(1)%VARNS,'(A12,I2.2)') 'User_defined',IFJ
+        WRITE (META(1)%VARNG,'(A12,I2.2)') 'user_defined',IFJ
+      ENDDO
 !
       END SUBROUTINE DEFAULT_META
 !/ ------------------------------------------------------------------- /
