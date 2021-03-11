@@ -108,7 +108,7 @@
       USE W3GDATMD, ONLY: SIG, NK
 !/RTD      USE W3GDATMD, ONLY : FLAGUNR
       USE W3ODATMD, ONLY: PTMETH, PTFCUT, NOGRP, NOGE, NGRPP,           &
-                          NDSE, FNMPRE
+                          NDSE, FNMPRE, NOEXTR
       USE W3SERVMD, ONLY: EXTCDE, STR_TO_UPPER
 
       IMPLICIT NONE
@@ -1613,7 +1613,8 @@
 !/XSTO      USE W3IOGOMD, ONLY: W3FLDTOIJ
       IMPLICIT NONE
       TYPE(META_T), POINTER :: META(:)
-!/XSTO      INTEGER :: IFI, IFJ
+!/XSTO      INTEGER :: IFI
+      INTEGER :: IFJ
 !
 !----------GROUP 1 ----------------
 !
@@ -3024,8 +3025,8 @@
 !
 ! ------ Group 10 (User defined) -------
 !
-! IFI=10, IFJ=1..NOEXTR
-      DO IFJ = 1,NOEXTR
+! IFI=10
+      DO IFJ = 1,NOGE(10)
         META => GROUP(10)%FIELD(IFJ)%META
         META(1)%FSC    = 0.1
         META(1)%UNITS  = 'm'
