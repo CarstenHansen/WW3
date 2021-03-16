@@ -16,10 +16,10 @@ $
 $ DPT CUR WND AST WLV ICE IBG D50 IC1 IC5 HS LM T02 T0M1 T01 FP DIR SPR
 $ DP HIG EF TH1M STH1M TH2M STH2M WN PHS PTP PLP PDIR PSPR PWS TWS PNR
 $ UST CHA CGE FAW TAW TWA WCC WCF WCH WCM SXY TWO BHD FOC TUS USS P2S 
-$ USF P2L TWI FIC ABR UBR BED FBB TBB MSS MSC DTD FC CFX CFD CFK U1/DSTOK U2 
+$ USF P2L TWI FIC ABR UBR BED FBB TBB MSS MSC DTD FC CFX CFD CFK U1 U2 
 $
  N
- DPT HS FP T02 T0M1 DIR TUS USS DTD MFIT ICE
+ DPT HS FP T02 T0M1 DIR TUS USS DTD XSP ICE MFIT
 $
 $--------------------------------------------------------------------- $
 $ netCDF version [3,4]
@@ -27,7 +27,7 @@ $        and variable type 4 [2 = SHORT, 3 = it depends , 4 = REAL]
 $ swell partitions [0 1 2 3 4 5]
 $ variables in same file [T] or not [F] 
 $
- 3 2
+ 3 3
  0 1 2
  T
 $

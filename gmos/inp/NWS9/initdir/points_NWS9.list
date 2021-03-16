@@ -23,9 +23,6 @@ $ In CMEMS 202004:
      2.269   61.204  'GullfaksC ' $ Gullfaks-C
      1.909   58.371  'Sleipner-A' $ Sleipner-A
 $ Older, may be in inner domains:
-     1.708   61.000  '63113     ' $ 63113
-    -2.295   46.833  '62067     ' $ 62067
-    -8.500   47.500  '62163     ' $ 62163
 $     2.000   51.240  '62170     ' $ 62170
 $     2.703   51.350  'Kwintebank' $ Kwintebank
 $     2.439   51.389  'Westhinder' $ Westhinder
@@ -42,6 +39,9 @@ $     3.276   51.999  'Europlatf2' $ Europlatform2, Europlatform3
 $     3.737   52.010  'EurogeuE13' $ EurogeulE13
 $     4.268   52.493  'IJgeul5   ' $ IJgeul5
 $     4.058   52.550  'IJmuidMuni' $ IJmuidenMunitiestort, IJmuidenMunitiestort2
+     1.708   61.000  '63113     ' $ 63113
+    -2.295   46.833  '62067     ' $ 62067
+    -8.500   47.500  '62163     ' $ 62163
      4.151   52.926  'Q1        ' $ Q1, Q11
      1.700   53.000  '62130     ' $ 62130
      2.800   53.103  '62145     ' $ 62145

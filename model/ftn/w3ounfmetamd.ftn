@@ -108,7 +108,7 @@
       USE W3GDATMD, ONLY: SIG, NK
 !/RTD      USE W3GDATMD, ONLY : FLAGUNR
       USE W3ODATMD, ONLY: PTMETH, PTFCUT, NOGRP, NOGE, NGRPP,           &
-                          NDSE, FNMPRE
+                          NDSE, FNMPRE, NOEXTR
       USE W3SERVMD, ONLY: EXTCDE, STR_TO_UPPER
 
       IMPLICIT NONE
@@ -1623,7 +1623,8 @@
       LOGICAL, INTENT(IN) :: FLG2D(NOGRP,NGRPP)
       TYPE(META_T), POINTER :: META(:)
 !/MFIT      INTEGER :: IXMF=10, JXMF = NOEXTR+1
-!/XSTO      INTEGER :: IFI, IFJ
+!/XSTO      INTEGER :: IFI
+      INTEGER :: IFJ
 !
 !----------GROUP 1 ----------------
 !
@@ -3119,7 +3120,7 @@
 !/MFIT      META(1)%vmin = -32766
 !/MFIT      META(1)%vmax = 32766
 !/MFIT!      END IF ! ( FLG2D(IXMF,JXMF) )
-! IFI=10, IFJ=1..NOEXTR
+! IFI=10
       DO IFJ = 1,NOEXTR
         META => GROUP(10)%FIELD(IFJ)%META
         META(1)%FSC    = 0.1

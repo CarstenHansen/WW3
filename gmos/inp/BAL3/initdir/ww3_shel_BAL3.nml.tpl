@@ -253,7 +253,7 @@
 !
 ! -------------------------------------------------------------------- !
 &OUTPUT_TYPE_NML
-  TYPE%FIELD%LIST     = 'DPT WND ICE HS T02 T0M1 FP DIR SPR DP TUS USS DTD FC CFX CFD CFK MFIT'
+  TYPE%FIELD%LIST     = 'DPT WND ICE HS T02 T0M1 FP DIR SPR DP TUS USS XSP MFIT DTD FC CFX CFD CFK'
 /
 
 ! -------------------------------------------------------------------- !

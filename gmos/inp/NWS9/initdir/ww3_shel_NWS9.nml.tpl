@@ -253,7 +253,7 @@
 !
 ! -------------------------------------------------------------------- !
 &OUTPUT_TYPE_NML
-  TYPE%FIELD%LIST     = 'DPT WND HS T02 T0M1 FP DIR SPR DP TUS USS XSP DTD FC CFX CFD CFK MFIT'
+  TYPE%FIELD%LIST     = 'DPT WND HS T02 T0M1 FP DIR SPR DP TUS USS XSP MFIT DTD FC CFX CFD CFK'
 /
 
 ! -------------------------------------------------------------------- !
@@ -261,13 +261,14 @@
 ! OFCUT_COUNT and OFCUT
 ! 
 ! &OFCUT_COUNT_NML
-! OFCUT_COUNT%N_FIELD = 1     [ Number of fields where OFCUT%FREQ is not infinite ]
+! OFCUT_COUNT%N_FIELD = 1   [ Number of fields where OFCUT%FREQ is not infinite ]
 ! /
 ! &OFCUT_NML
 ! OFCUT(1)%FIELD      = 'XSP' [ Name of field no. 1 ]
 ! OFCUT(1)%FREQ       = 2.0   [ Cut-off frequency for field no. 1.
 ! /                            May be higher than FREQ(NK) ]
 ! -------------------------------------------------------------------- !
+
 &OFCUT_COUNT_NML
   OFCUT_COUNT%N_FIELD = 1
 /
