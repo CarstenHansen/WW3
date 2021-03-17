@@ -2096,9 +2096,8 @@
 !/XSTO          ! This variable is nearly the same as TUS, the
 !/XSTO          ! 'Stokes transport', but with the XSTO extended tail
 !/XSTO          NFIELD=2
-!/XSTO! NOTE: The magnitude of wave pseudo momentum spans from O(1e-3) to O(1e+3)
-!/XSTO!       Thus it cannot be scaled to a 16-bit integer
-!/XSTO!       We might alternatively consider to store xsm * ksc
+!/XSTO! NOTE: The magnitude of wave pseudo momentum may span from O(1e-3)
+!/XSTO!       to O(1e+2). Thus it should not be scaled to a 16-bit integer
 !/XSTO          IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
 !/XSTO!
 !/XSTO!/RTD          ! Rotate x,y vector back to standard pole

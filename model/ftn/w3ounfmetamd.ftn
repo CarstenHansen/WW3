@@ -2747,9 +2747,9 @@
 !/XSTO      META(1)%ENAME  = '.xsm'
 !/XSTO      META(1)%VARND = DIRCOM
 !/XSTO      META(1)%VARNG=''
-!/XSTO      META(1)%FSC    = 1.
-!/XSTO      META(1)%VMIN = -1000
-!/XSTO      META(1)%VMAX =  1000
+!/XSTO      META(1)%FSC    = 0.01
+!/XSTO      META(1)%VMIN = -20.
+!/XSTO      META(1)%VMAX =  20.
 !/XSTO      META(1)%UNITS  = 'm2 s-1'
 !/XSTO      META(1)%VARNM='uxsm'
 !/XSTO      META(1)%VARNL='eastward wave pseudo momentum'
