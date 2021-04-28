@@ -526,12 +526,30 @@
 
         end do ! JSEA = 1,NSEAL
 
-!/ ------------------------------------------------------------- /
-! Initializations for calculations related to the diagnostic, tail range
+      ! If the tail is truncated at a specific frequency ftr,
+      DO IK=1,OFCUT_COUNT%N_FIELD+1
+        IF (IK == OFCUT_COUNT%N_FIELD+1) exit
+        IF (OFCUT(IK)%FIELD == 'XSP') exit
+        END DO
+      IF (IK <= OFCUT_COUNT%N_FIELD) ftr = OFCUT(IK)%FREQ
+      if ( xsto_verbose .gt. 0 ) &
+          WRITE (NDSV, *), ' XSTOKES_INIT: CUT-OFF AT',ftr,'Hz'
 
 ! cha 20110627: IKT:  Upper edge of prognostic range.
 !                     NK is the highest possible such limit
 !
+      ! Default is a truncated spectrum with no tail extension
+      IKT = NK-1
+      IKTT = NK
+      if ( ftr < SIG(NK)/TPI) then
+          if ( xsto_verbose .gt. 0 ) &
+              WRITE (NDSV, *), ' CUT-OFF below NK - No tail extension'
+          return
+      end if
+      
+!/ ------------------------------------------------------------- /
+! Initializations for calculations related to the diagnostic, tail range
+
 ! cha 20121123: Shift fitting interval limits away from NK, from NK-5 to NK-2
       if ( XSTY == 'DoEw' ) then
           ! Donelan-Ewans
@@ -539,15 +557,11 @@
 ! cha 20110627: IKTT: Lower edge of tail fitting to the prognostic spectrum
           IKTT = NK - MAX( 5, NINT( 0.5/log(XFR) ) )
       else if ( XSTY == 'None' ) then
-          ! 'None': Truncated spectrum
-          IKT = NK-1
-          IKTT = NK
+         return
       else
         WRITE (NDSV, 916), 'XSTOKES_INIT: Unknown spectral tail type: ', XSTY
         CALL EXTCDE ( 73 )
         end if
-
-      if ( XSTY == 'None' ) return
 
       allocate ( fOfp(NSEAL), stat=IERR )
       ! A zero value will cause fd/fp to be initialized at the first timestep
@@ -559,6 +573,13 @@
       XKH = DFH**2
       NP = IKT
 
+      ! The truncation frequency ftr corresponds to a bin number ntr, where
+      ! ftr/fp=DFH**ntr, or ntr = log( ftr/fp ) / log(DFH).
+      ! Relative to the transition frequency fd = SIG(IKT) / TPI we have
+      ! ftr/fd = (ftr/fp) / (fd/fp). The tail truncation bin exceeds the
+      ! transition bin at fd by ntre bins, where ftr/fd = DFH**ntre, or:
+      ntre = log( ftr * TPI / SIG(IKT) ) / log(DFH)
+      
       ! SBDiaZ(z,bin): A 'normalized, look-up' vertical Stokes Drift profile
       ! shape for spectral bins of the diagnostic tail.
       ! Factorized as DStkOsn(bin) * exp( -tRk(bin) * ZK_S(z) )
@@ -594,22 +615,6 @@
       ! Extend with a zero to be used for linear interpolation
       Im(Np+1) = 0.
 
-      ! If the tail is truncated at a specific frequency ftr,
-      DO IK=1,OFCUT_COUNT%N_FIELD+1
-        IF (IK == OFCUT_COUNT%N_FIELD+1) exit
-        IF (OFCUT(IK)%FIELD == 'XSP') exit
-        END DO
-      IF (IK <= OFCUT_COUNT%N_FIELD) ftr = OFCUT(IK)%FREQ
-      if ( xsto_verbose .gt. 0 ) &
-          WRITE (NDSV, *), ' XSTOKES_INIT: CUT-OFF AT',ftr,'Hz'
-
-      ! The truncation frequency ftr corresponds to a bin number ntr, where
-      ! ftr/fp=DFH**ntr, or ntr = log( ftr/fp ) / log(DFH).
-      ! Relative to the transition frequency fd = SIG(IKT) / TPI we have
-      ! ftr/fd = (ftr/fp) / (fd/fp). The tail truncation bin exceeds the
-      ! transition bin at fd by ntre bins, where ftr/fd = DFH**ntre, or:
-      ntre = log( ftr * TPI / SIG(IKT) ) / log(DFH)
-      
       tRk = 2.
       do ntt=1,NP
         tRk = tRk*XKH ! = 2 * XKH**ntt
@@ -799,7 +804,7 @@
       StkDiag = 0.
 
 
-      if ( xsto_verbose .gt. 1 .and. JSEA .eq. 1 ) &
+      if ( xsto_verbose .gt. 0 .and. JSEA .eq. 1 ) &
           WRITE (NDSV, 907), '  Transition range IKTT =', IKTT, 'to IKT =', IKT
 
       DEPTH  = MAX ( DMIN, DW(ISEA) )
@@ -873,7 +878,7 @@
                call equivalent_tail(m1t, fOfp(JSEA), stat=II)
             end if
             if ( II > 0 ) then
-               fOfp(JSEA) = fOfp_ini + 0.125 * ( 10.0 - fOfp_ini )
+               fOfp(JSEA) = fOfp_ini + 0.0625 * ( 20.0 - fOfp_ini )
                if ( xsto_verbose .gt. 0 ) then
                   WRITE (NDSV, 900),  &
                        'Issue in w3xstomd, equivalent_tail() for Ts = ', Ts
@@ -1545,12 +1550,13 @@
       integer, intent(inout), optional  :: stat
       real, intent(in), optional :: fOfp0, fOfp1, xacc
 
-      real                       ::  fOfp0_, fOfp1_, xacc_
+      real                       ::  fOfp0_, fOfp1_, xacc_, fOfpE_
       integer                    ::  status_
 
       ! Default values
       fOfp0_=1.0
-      fOfp1_=10.5751
+      ! fOfp1_=10.5751
+      fOfp1_= 30.
       xacc_=0.01
       ! Substitute with optionals
       if ( present(fOfp0)) fOfp0_=fOfp0
@@ -1566,9 +1572,10 @@
       else
         m1E = m1
         end if
-
+        
+      fOfpE_=fOfpE
       ! Determine the root fOfpE
-      fOfpE = rtnewt(m1Ed_Ew98, fOfpE, 0.0, fOfp1_, xacc_, status_)
+      fOfpE = rtnewt(m1Ed_Ew98, fOfpE_, 0.0, fOfp1_, xacc_, status_)
 
       ! Validate the result
       if ( (fOfp0_-fOfpE)*(fOfpE-fOfp1_).lt.0.) then
@@ -1576,6 +1583,7 @@
           WRITE (NDSV, 908), 'WARNING: fOfpE = rtnewt() =', fOfpE, &
             '. Result beyond valid range [',fOfp0_,',',fOfp1_,'] . m1=', m1
         status_ = 3
+        fOfpE = fOfpE_
         end if
 
       if (present(stat)) stat = status_
@@ -1617,6 +1625,10 @@
         dx=f/df
         rtnewt=rtnewt-dx
 
+        ! Remedy initial over-/undershoot
+        if (rtnewt < x1 .and. j < 3) rtnewt = x1 + 0.1*(x2-x1) * j
+        if (rtnewt > x2 .and. j < 3) rtnewt = x2 - 0.1*(x2-x1) * j
+        
         if((x1-rtnewt)*(rtnewt-x2).lt.0.) then
           if (xsto_verbose .gt. 1) &
             WRITE (NDSV, 914), '  WARNING in w3dstkmd.ftn: rtnewt =', rtnewt, &
@@ -1626,7 +1638,6 @@
             WRITE (NDSV, 906), '  j=', j, 'rtnewtv=', rtnewtv, 'm1E=', m1E
             end if
           status=2
-          rtnewt = rtnewtv
           return
           end if
 
