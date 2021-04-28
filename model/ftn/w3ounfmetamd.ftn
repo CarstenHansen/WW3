@@ -1613,8 +1613,7 @@
 !/XSTO      USE W3IOGOMD, ONLY: W3FLDTOIJ
       IMPLICIT NONE
       TYPE(META_T), POINTER :: META(:)
-!/XSTO      INTEGER :: IFI
-      INTEGER :: IFJ
+!/XSTO      INTEGER :: IFI, IFJ
 !
 !----------GROUP 1 ----------------
 !
@@ -2747,9 +2746,9 @@
 !/XSTO      META(1)%ENAME  = '.xsm'
 !/XSTO      META(1)%VARND = DIRCOM
 !/XSTO      META(1)%VARNG=''
-!/XSTO      META(1)%FSC    = 0.01
-!/XSTO      META(1)%VMIN = -20.
-!/XSTO      META(1)%VMAX =  20.
+!/XSTO      META(1)%FSC    = 0.002
+!/XSTO      META(1)%VMIN = -50.
+!/XSTO      META(1)%VMAX =  50.
 !/XSTO      META(1)%UNITS  = 'm2 s-1'
 !/XSTO      META(1)%VARNM='uxsm'
 !/XSTO      META(1)%VARNL='eastward wave pseudo momentum'
@@ -3025,8 +3024,8 @@
 !
 ! ------ Group 10 (User defined) -------
 !
-! IFI=10
-      DO IFJ = 1,NOGE(10)
+! IFI=10, IFJ=1..NOEXTR
+      DO IFJ = 1,NOEXTR
         META => GROUP(10)%FIELD(IFJ)%META
         META(1)%FSC    = 0.1
         META(1)%UNITS  = 'm'
