@@ -1623,8 +1623,7 @@
       LOGICAL, INTENT(IN) :: FLG2D(NOGRP,NGRPP)
       TYPE(META_T), POINTER :: META(:)
 !/MFIT      INTEGER :: IXMF=10, JXMF = NOEXTR+1
-!/XSTO      INTEGER :: IFI
-      INTEGER :: IFJ
+!/XSTO      INTEGER :: IFI, IFJ
 !
 !----------GROUP 1 ----------------
 !
@@ -2759,9 +2758,9 @@
 !/XSTO      META(1)%VARNG=''
 !/MFIT! IXMF=10; JXMF=3
 !/XSTO!/MFIT        IF ( .NOT. FLG2D(IXMF,JXMF) ) THEN
-!/XSTO      META(1)%FSC    = 1.
-!/XSTO      META(1)%VMIN = -1000
-!/XSTO      META(1)%VMAX =  1000
+!/XSTO      META(1)%FSC    = 0.002
+!/XSTO      META(1)%VMIN = -50.
+!/XSTO      META(1)%VMAX =  50.
 !/XSTO      META(1)%UNITS  = 'm2 s-1'
 !/XSTO      META(1)%VARNM='uxsm'
 !/XSTO      META(1)%VARNL='eastward wave pseudo momentum'
@@ -3120,7 +3119,7 @@
 !/MFIT      META(1)%vmin = -32766
 !/MFIT      META(1)%vmax = 32766
 !/MFIT!      END IF ! ( FLG2D(IXMF,JXMF) )
-! IFI=10
+! IFI=10, IFJ=1..NOEXTR
       DO IFJ = 1,NOEXTR
         META => GROUP(10)%FIELD(IFJ)%META
         META(1)%FSC    = 0.1

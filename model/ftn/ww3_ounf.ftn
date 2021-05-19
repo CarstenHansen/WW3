@@ -2167,9 +2167,8 @@
 !/XSTO!/MFIT    deallocate ( MKfac )
 !/XSTO!/MFIT    deallocate ( M2K )
 !/XSTO!/MFIT    ELSE
-!/XSTO! NOTE: The magnitude of wave pseudo momentum spans from O(1e-3) to O(1e+3)
-!/XSTO!       Thus it cannot be scaled to a 16-bit integer
-!/XSTO!       We might alternatively consider to store xsm * ksc
+!/XSTO! NOTE: The magnitude of wave pseudo momentum may span from O(1e-3)
+!/XSTO!       to O(1e+2). Thus it should not be scaled to a 16-bit integer
 !/XSTO          IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
 !/XSTO!/MFIT    END IF ! FLG2D(10,NOEXTR+1)
 !/XSTO!/MFIT!
