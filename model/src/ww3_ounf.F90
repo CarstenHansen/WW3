@@ -1884,7 +1884,6 @@
 !
             ! Power spectral density of equivalent surface pressure
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 7 ) THEN
-<<<<<<< HEAD:model/ftn/ww3_ounf.ftn
               ! This is an example of placing more than one parameter in the
               ! same file even if TOGETHER is set as .FALSE. This is managed
               ! by joining sub-parameters into into a common netCDF Id:
