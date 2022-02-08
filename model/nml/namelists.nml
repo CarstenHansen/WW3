@@ -401,7 +401,7 @@ $                                 a climate model.
 $
 $ Output of Stokes mean drift profile array--------------------------- $
 $
-$   Compile switch /XSTO required.
+$   Compile switch XSTO required.
 $
 $ NDP: Number of depths (->NDEPTH)
 $ DSC: Depth scale specifying the largest depth Z(NDP)=DSC/(2pi/Tz)^2*GRAV
