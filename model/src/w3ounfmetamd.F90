@@ -249,7 +249,7 @@
 
       TYPE(PART_TMPL_T), POINTER :: PART_TMPL
 
-      INTEGER            :: NSPMAX ! Max number of sub-parameters
+      INTEGER            :: NFSMAX      ! Max number of sub-parameters
 
       INTEGER            :: NCVARTYPE   ! netCDF variable type
       CHARACTER(LEN=30)  :: DIRCOM      ! Direction convention comment
@@ -296,7 +296,7 @@
       ! These parameters have sub-parameters I,J = (6,7)  , (7,3)
       CHARACTER (LEN=6), DIMENSION(2) :: SPS = (/ 'P2S   ', 'BED   ' /)
       ! Number of sub-parameters for each element in SPS
-      INTEGER, DIMENSION(2)           :: NSPS = (/ 2,        2 /)
+      INTEGER, DIMENSION(2)           :: NSP = (/ 2,        2 /)
       ! Sub-parameter unique integer id.'s
       INTEGER, DIMENSION(2) :: SPIJ2
 
@@ -324,7 +324,7 @@
          
       ! 1. Allocate nested GROUP, FIELD structure:
       ALLOCATE(GROUP(NOGRP))
-      NSPMAX=0
+      NFSMAX=0
       
       DO I = 1,NOGRP
         ALLOCATE(GROUP(I)%FIELD(NOGE(I)))
@@ -337,9 +337,9 @@
           IF ( SPIJ2(K) .NE. S ) THEN
             ALLOCATE(GROUP(I)%FIELD(J)%META(3)) ! Hardcode to 3 components for the moment
           ELSE 
-            NSPMAX = MAX( NSPMAX, NSPS(K) )
-            ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(NSPS(K)))
-            DO S = 1,NSPS(K)
+            NFSMAX = MAX( NFSMAX, NSP(K) )
+            ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(NSP(K)))
+            DO S = 1,NSP(K)
               ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(S)%META(2)) ! Hardcode to 2 components
             ENDDO
           ENDIF
@@ -1494,6 +1494,7 @@
 !       IFJ     Int.  I  Output field number
 !       ICOMP   Int.  I  Component number (defaults to 1)
 !       IPART   Int.  I  Partition number (defaults to 1)
+!       ISUB    Int.  I  Subfield number (defaults to 0 meaning no subfields)
 !     ----------------------------------------------------------------
 !
 !/ ------------------------------------------------------------------- /
