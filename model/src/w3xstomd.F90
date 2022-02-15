@@ -73,14 +73,13 @@
 !
 !  2. Usage
 !
-!  a) In ww3_grid.inp/ww3_grid.nml, you may modify three namelist variables:
+!  a) In ww3_grid.inp/ww3_grid.nml, you may modify four namelist variables:
 !     $ NDP: Number of depths (->NDEPTH)
 !     $ DSC: Depth scale specifying the largest depth Z(NDP)=DSC/(2pi/Tz)^2*GRAV
+!     $ BP: Power of profile depth progression
 !     $ TYP: Tail type (C*4); 'DoEw': Donelan-Ewans,
-!     $                       'DE20': Donelan-Ewans truncated at 2.0 Hz,
-!     $                       'DE'IF: Donelan-Ewans truncated at I.F Hz
 !     $                       'None': Prognostic spectrum frequencies, only
-!     &XSTO NDP = 11, DSC = 1.0, TYP = 'DE20' /
+!     &XSTO NDP = 11, DSC = 2.0, BP = 2.0, TYP = 'DoEw' /
 !
 !  ( TODO: In ww3_shel.nml, you may in the future set namelist variable
 !     XSVB: Verboseness level [0..4] of output. Default XSVB=1 )
@@ -287,27 +286,16 @@
       USE W3ODATMD, ONLY: NDST, NDSO, NDSE, IAPROC, NAPROC, NAPOUT, XSVB
       USE W3DISPMD, ONLY: DSIE, N1MAX, ECG1, EWN1
 
-      PRIVATE
-
-! Used with w3nmlshelmd to read in namelist parameters for ww3_shel
-! Declared here in order not to require w3nmlshelmd for the program ww3_ounf
-      TYPE NML_OFCUT_COUNT_T
-        INTEGER                     :: N_FIELD  
-      END TYPE NML_OFCUT_COUNT_T
-  
-      TYPE NML_OFCUT_T
-        CHARACTER(LEN=6)            :: FIELD
-        REAL                        :: FREQ
-      END TYPE NML_OFCUT_T
-!
-      TYPE(NML_OFCUT_T), PUBLIC, ALLOCATABLE    :: OFCUT(:)
-      TYPE(NML_OFCUT_COUNT_T), PUBLIC           :: OFCUT_COUNT
-      
-!      USE W3NMLSHELMD, ONLY: OFCUT, OFCUT_COUNT
+! Lowpass cutoff frequencies for specific output fields. These are namelist
+! parameters for ww3_shel and declared in W3ODATMD in order not to link
+! w3nmlshelmd with the program ww3_ounf
+      USE W3ODATMD, ONLY: OFCUT, OFCUT_COUNT
 
 ! TODO, like OFCUT:
 !   XSND, XSDS,XSBP and XSTY may be set at run init from WW3_shel.nml, and also:
 !   XSVB: Verboseness level [0..4] of XSTO output to NDSV
+
+      PRIVATE
 
 !/
 !/ ------------------------------------------------------------------- /

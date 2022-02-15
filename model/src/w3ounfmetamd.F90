@@ -251,7 +251,7 @@
 
       TYPE(PART_TMPL_T), POINTER :: PART_TMPL
 
-      INTEGER            :: NSPMAX ! Max number of sub-parameters
+      INTEGER            :: NFSMAX      ! Max number of sub-parameters
 
       INTEGER            :: NCVARTYPE   ! netCDF variable type
       CHARACTER(LEN=30)  :: DIRCOM      ! Direction convention comment
@@ -294,23 +294,20 @@
 !/
       LOGICAL :: FLGNML
       INTEGER :: I, J, K, S
+
 #ifdef W3_XSTO
 ! Add 'XSP' to SPS
 ! C Hansen: TODO before PR: Let extended-tail-tus a separate parameter 'xts'
 #endif
-      CHARACTER (LEN=6), DIMENSION(3) :: SPS
-      INTEGER, DIMENSION(3)           :: NSPS
+      ! These parameters have sub-parameters
+      CHARACTER (LEN=6), DIMENSION(3) :: SPS = (/ 'P2S   ', 'BED   ', 'XSP   ' /)
+      ! Number of sub-parameters for each element in SPS
+      INTEGER, DIMENSION(3)           :: NSP = (/  2,        2,        3 /)
       ! Sub-parameter unique integer id.'s
       INTEGER, DIMENSION(3) :: SPIJ2
-
-      ! These parameters have sub-parameters
-      SPS  = (/ 'P2S   ', 'BED   ', 'XSP   ' /)
-      ! Number of sub-parameters for each element in SPS
-      NSPS = (/  2,        2,        3 /)
       
       VECTOR = .TRUE.
       IF(PRESENT(VEC)) VECTOR = VEC
-      SPIJ2(:) = 0
 #ifdef W3_RTD
  ! Is the grid really rotated?
       IF ( POLAT < 90. ) FLRTD = .True.
@@ -332,8 +329,8 @@
 
       ! 1. Allocate nested GROUP, FIELD structure:
       ALLOCATE(GROUP(NOGRP))
-      NSPMAX=0
-
+      NFSMAX=0
+      
       DO I = 1,NOGRP
         ALLOCATE(GROUP(I)%FIELD(NOGE(I)))
         DO J = 1,NOGE(I)
@@ -345,11 +342,10 @@
           IF ( SPIJ2(K) .NE. S ) THEN
             ! No sub-parameter
             ALLOCATE(GROUP(I)%FIELD(J)%META(3)) ! Hardcode to 3 components for the moment
-          ELSE
-            ! One or more sub-parameters
-            NSPMAX = MAX( NSPMAX, NSPS(K) )
-            ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(NSPS(K)))
-            DO S = 1,NSPS(K)
+          ELSE 
+            NFSMAX = MAX( NFSMAX, NSP(K) )
+            ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(NSP(K)))
+            DO S = 1,NSP(K)
               ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(S)%META(2)) ! Hardcode to 2 components
             ENDDO
           ENDIF
@@ -1504,6 +1500,7 @@
 !       IFJ     Int.  I  Output field number
 !       ICOMP   Int.  I  Component number (defaults to 1)
 !       IPART   Int.  I  Partition number (defaults to 1)
+!       ISUB    Int.  I  Subfield number (defaults to 0 meaning no subfields)
 !     ----------------------------------------------------------------
 !
 !/ ------------------------------------------------------------------- /

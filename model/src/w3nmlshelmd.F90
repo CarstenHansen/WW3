@@ -19,8 +19,8 @@
 !/ ------------------------------------------------------------------- /
 
 #ifdef W3_XSTO
-  USE W3XSTOMD, ONLY: OFCUT, OFCUT_COUNT
-  ! Declared in w3xstomd to avoid linking w3nmlshelmd with ww3_ounf
+  USE W3ODATMD, ONLY: OFCUT, OFCUT_COUNT
+  ! Declared in w3odatmd to avoid linking w3nmlshelmd with ww3_ounf
   ! They have types similar to TYPE NML_DOMAIN_T etc., and are read from
   ! the namelist by calling the subroutines READ_OFCUT_NML and REPORT_OFCUT_NML
   ! Character OFCUT%FIELD, real OFCUT%FREQ, integer OFCUT_COUNT%N_FIELD

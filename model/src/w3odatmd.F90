@@ -140,6 +140,7 @@
 #ifdef W3_XSTO
 !      XSVB      Int.  Public   Verboseness of CALC_XSTOKES()
 !      NZO       Int.  Public   Number of output profile depths
+!      OFCUT     TYPE  Public   Physical low-pass frequency for a field
 #endif
 !     ----------------------------------------------------------------
 !
@@ -459,6 +460,24 @@
         TYPE(OTYPE5)          :: OUT5
         TYPE(OTYPE6)          :: OUT6
       END TYPE OUTPUT
+#ifdef W3_XSTO
+!/
+! Lowpass cutoff frequencies for specific output fields. These are Namelist
+! parameters for ww3_shel and declared here in order not to link w3nmlshelmd
+! with the program ww3_ounf
+      TYPE NML_OFCUT_COUNT_T
+        INTEGER                     :: N_FIELD  
+      END TYPE NML_OFCUT_COUNT_T
+  
+      TYPE NML_OFCUT_T
+        CHARACTER(LEN=6)            :: FIELD
+        REAL                        :: FREQ
+      END TYPE NML_OFCUT_T
+!
+      TYPE(NML_OFCUT_T), PUBLIC, ALLOCATABLE    :: OFCUT(:)
+      TYPE(NML_OFCUT_COUNT_T), PUBLIC           :: OFCUT_COUNT      
+#endif
+      
 !/
 !/ Data storage
 !/
