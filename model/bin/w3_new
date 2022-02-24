@@ -78,6 +78,7 @@
                                    touch ww3_grib.F90 ;; 
      'grib'   ) cd $main_dir/src ; touch ww3_grib.F90 ;; 
      'netcdf' ) cd $main_dir/src ; touch ww3_ounf.F90
+                                   touch ww3_ounf3.F90
                                    touch ww3_ounp.F90
                                    touch ww3_bounc.F90
                                    touch ww3_systrk.F90
@@ -179,6 +180,7 @@
                                    touch ww3_outp.F90
                                    touch ww3_ounp.F90
                                    touch ww3_ounf.F90
+                                   touch ww3_ounf3.F90
                                    touch gx_outp.F90 ;;
      'stab'   ) cd $main_dir/src ; touch w3updtmd.F90
                                    touch w3src3md.F90
@@ -220,6 +222,7 @@
                                    touch ww3_outf.F90
                                    touch ww3_ounp.F90
                                    touch ww3_ounf.F90
+                                   touch ww3_ounf3.F90
                                    touch ww3_shel.F90
                                    touch gx_outp.F90 ;;
      's_db'   ) cd $main_dir/src ; touch w3gdatmd.F90
@@ -271,6 +274,7 @@
                                    touch ww3_gint.F90
                                    touch w3gridmd.F90
                                    touch ww3_ounf.F90
+                                   touch ww3_ounf3.F90
                                    touch ww3_outf.F90
                                    touch ww3_shel.F90
                                    touch ww3_outp.F90
@@ -357,6 +361,7 @@
                                    touch w3updtmd.F90
                                    touch ww3_grib.F90
                                    touch ww3_ounf.F90
+                                   touch ww3_ounf3.F90
                                    touch ww3_ounp.F90
                                    touch ww3_outf.F90
                                    touch w3gridmd.F90 ;;
@@ -403,6 +408,7 @@
                                    touch w3wavemd.F90
                                    touch w3wdatmd.F90
                                    touch ww3_ounf.F90
+                                   touch ww3_ounf3.F90
                                    touch ww3_ounp.F90;;
       'pdlib' ) cd $main_dir/src ; touch w3adatmd.F90
                                    touch w3gdatmd.F90
