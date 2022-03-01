@@ -27,7 +27,7 @@
 !     Test the "Example ounfmeta.inp file" with the BED example:
 !     This has sub-fields IFS=1 and IFS=2. (IFS defaults to 0 if no sub-fields)
 !     META [ IFI [ IFJ ]  |  FLDID ] [ IFC ] [ IFS ]
-!     When accepted, implement as a new name 'ounf3meta.inp' (with 'c')
+!     When accepted, implement as a new name 'ounfmeta.inp'
 !
 !  1. Purpose :
 !
@@ -41,11 +41,11 @@
 !     grouped by component (max 3), field (IFI) and group (IFJ).
 !
 !     The user can override this meta data via an input text file
-!     with the filename `ounf3meta.inp`.
+!     with the filename `ounfmeta.inp`.
 !
 !     Entries in the file are formatted as follows:
 !
-!       META [ IFI [ IFJ ]  |  FLDID ]  [ IFC ]
+!       META [ IFI [ IFJ ]  |  FLDID ]  [ IFC ] [ IFS ]
 !         attr_name = attr_value
 !         attr_name = attr_value
 !         extra_attr = extra_value [type]
@@ -54,7 +54,9 @@
 !     An output field is selected using the META keyword followed by
 !     either an [IFI, IFJ] integer pair or a FieldID string. Optionally,
 !     either form may be followed by an integer value to select the
-!     component in multi-component fields (such as wind).
+!     component in multi-component fields (such as wind). A further optional
+!     integer IFS may be given, identifying a sub-field (requires setting IFC,
+!     see the example "BED output, with sub-fields" below)
 !
 !     Blank lines and comments lines (starting with $) are ignored.
 !
@@ -109,7 +111,7 @@
 !     using the template name surrounded by < .. >, e.g. <SPART>
 !
 !     It is also possible to supply user defined partitioned parameter
-!     template strings in the ounf3meta.inp file using the TEMPLATE
+!     template strings in the ounfmeta.inp file using the TEMPLATE
 !     keyword, as below:
 !
 !       TEMPLATE <template-name>
@@ -171,7 +173,7 @@
 !          comment "space seperated strings should be quoted" c
 !          version = 1.0 r
 !
-!        $ BED output parameter, with sub-fields:
+!        $ BED output, with sub-fields:
 !        $ Sub-field 1 (a scalar)
 !        META BED 1 1
 !          standard_name = "sea_bottom_roughness_length"
@@ -212,7 +214,7 @@
 
       LOGICAL, PRIVATE :: DEBUG = .FALSE.
 
-      CHARACTER(LEN=*), PARAMETER :: FN_META = "ounf3meta.inp"
+      CHARACTER(LEN=*), PARAMETER :: FN_META = "ounfmeta.inp"
 
       ! String token used to merge in partition number:
       CHARACTER(LEN=*), PARAMETER :: IPART_TOKEN  = "<IPART>"
@@ -430,8 +432,8 @@
       ! Set the default coordiante reference system (if applicable)
       CALL DEFAULT_CRS_META()
 
-      ! If the ounf3meta.inp exists, read this in to override defaults:
-      INQUIRE(FILE=TRIM(FNMPRE)//"ounf3meta.inp", EXIST=FLGNML)
+      ! If the ounfmeta.inp exists, read this in to override defaults:
+      INQUIRE(FILE=TRIM(FNMPRE)//"ounfmeta.inp", EXIST=FLGNML)
       IF(FLGNML) THEN
          CALL READ_META()
       ENDIF
@@ -913,7 +915,7 @@
 !       IFI     Int.  O  Output group number
 !       IFJ     Int.  O  Output field number
 !       IFC     Int.  O  Component number (defaults to 1)
-!       IFS     Int.  O  Sub-parameter number (defaults to 0)
+!       IFS     Int.  O  Sub-field number (defaults to 0)
 !     ----------------------------------------------------------------
 !
 !/ ------------------------------------------------------------------- /
@@ -939,7 +941,7 @@
       ! Is first value an int?
       READ(BUF, *, IOSTAT=IERR) IFI
       IF(IERR .EQ. 0) THEN
-        ! Try reading four values:
+        ! Try reading four values (group, field, vector-comp., sub-field):
         READ(BUF, *, iostat=IERR) IFI, IFJ, IFC, IFS
         IF(IERR .NE. 0) THEN        
           ! Try reading three values:
@@ -950,7 +952,7 @@
           ENDIF
         ENDIF
       ELSE
-        ! Try reading field ID plus component plus sub-parameter
+        ! Try reading field ID plus component plus sub-field
         READ(BUF, *, IOSTAT=IERR) FLD, IFC, IFS
         IF(ierr .NE. 0) THEN
           ! Try reading field ID plus component
@@ -1527,7 +1529,7 @@
 !  2. Method :
 !
 !     A copy of the meta-data is returned, rather than a pointer. This
-!     is because in the case of paritioned fields, the metadata
+!     is because in the case of partitioned fields, the metadata
 !     will be updated with the partition number.
 !
 !  3. Parameters :
@@ -1538,7 +1540,7 @@
 !       IFJ     Int.  I  Output field number
 !       ICOMP   Int.  I  Component number (defaults to 1)
 !       IPART   Int.  I  Partition number (defaults to 1)
-!       ISUB    Int.  I  Subfield number (defaults to 0 meaning no subfields)
+!       ISUB    Int.  I  Sub-field number (defaults to 0 meaning no sub-fields)
 !     ----------------------------------------------------------------
 !
 !/ ------------------------------------------------------------------- /
@@ -1853,7 +1855,7 @@
 !     The placeholder <IPART> is automatically replaced with the
 !     partition number (0, 1, 2, etc).
 !
-!     Other template placeholders can be defined in the ounf3meta.inp
+!     Other template placeholders can be defined in the ounfmeta.inp
 !     file by the user.
 !
 !  2. Parameters :
@@ -1947,7 +1949,7 @@
                '     NUM ENTRIES     : ',I2                           / &
                '     REQESTED IPART* : ',I2                           / &
                '     (*Note: IPART is zero-refernced)'                / &
-               '     Please update your ounf3meta.inp file.'           /)
+               '     Please update your ounfmeta.inp file.'           /)
 
       END SUBROUTINE PARTNO_STRING_SUB
 
@@ -3382,10 +3384,11 @@
       META(2)%VARNG='northward_surface_stokes_drift'
       WRITE(META(2)%VARNC,'(A,F8.4,A,F8.4,A)') 'Frequency range ',SIG(1)*TPIINV,' to ',SIG(NK)*TPIINV,' Hz'
 ! IFI=6, IFJ=7, P2S
+      ! First sub-field
       META => GROUP(6)%FIELD(7)%SUBFIELD(1)%META
       IF ( NCVARTYPE .EQ. 2 ) THEN
-        ! C Hansen: In ww3_ounf3.ftn: IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
-        ! For short data type, you get only high seas results
+        ! In ww3_ounf3.F90: IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
+        ! Warning: For short data type, you get only high seas results
         META(1)%FSC    = 0.01
         META(1)%VMIN = -150
         META(1)%VMAX = 320
@@ -3835,16 +3838,16 @@
 !
 ! IFI=10
       DO IFJ = 1,NOGE(10)
-        META => GROUP(10)%FIELD(1)%META
+        META => GROUP(10)%FIELD(IFJ)%META
         META(1)%FSC    = 0.1
         META(1)%UNITS  = 'm'
         META(1)%VMIN = 0
         META(1)%VMAX = 0
-        WRITE (META(1)%ENAME,'(A2,I2.2)') '.u'
-        WRITE (META(1)%VARNM,'(A1,I2.2)') 'u'
-        WRITE (META(1)%VARNL,'(A12,I2.2)') 'User_defined'
-        WRITE (META(1)%VARNS,'(A12,I2.2)') 'User_defined'
-        WRITE (META(1)%VARNG,'(A12,I2.2)') 'user_defined'
+        WRITE (META(1)%ENAME,'(A2,I2.2)') '.u',IFJ
+        WRITE (META(1)%VARNM,'(A1,I2.2)') 'u',IFJ
+        WRITE (META(1)%VARNL,'(A12,I2.2)') 'User_defined',IFJ
+        WRITE (META(1)%VARNS,'(A12,I2.2)') 'User_defined',IFJ
+        WRITE (META(1)%VARNG,'(A12,I2.2)') 'user_defined',IFJ
       ENDDO
 !
       END SUBROUTINE DEFAULT_META
