@@ -5,20 +5,22 @@ then
   echo "need four arguments:"
   echo '$1 : path_i'
   echo '$2 : path_w'
-  echo '$3 : complr'
-  echo '$4 : switch'
+  echo '$3 : switch'
+  echo '$4 : ww3_dir'
   exit 1
 fi
 
 path_i=$1
 path_w=$2
-cmplr=$3
-swtstr=$4
+swtstr=$3
+ww3_dir=$4
 
 echo ''
 echo '   setup coupling environment'
-export WWATCH3_DIR=`grep WWATCH3_DIR $WWATCH3_ENV | awk -F' ' '{print $2}' `
-export WWATCH3_CC=`grep WWATCH3_CC $WWATCH3_ENV | awk -F' ' '{print $2}' `
+
+export WWATCH3_DIR=${ww3_dir}/model
+export OASIS_INPUT_PATH=$path_w/oasis3-mct
+export OASIS_WORK_PATH=$path_w/work_oasis3-mct
 
 
 echo '   copy oasis and toy in $path_w'
@@ -28,42 +30,17 @@ cp -r $path_i/../input/oasis3-mct $path_w/
 
 echo '   Setup oasis cmplr file'
 cd $path_w/oasis3-mct/util/make_dir
-source $WWATCH3_DIR/bin/cmplr.env
-# shortlist optl
-alloptl=( $optl )
-for ioptl in $(seq 2 ${#alloptl[@]}); do
-  optls="${optls}${alloptl[$ioptl]} "
-done
-# shortlist optc
-alloptc=( $optc )
-for ioptc in $(seq 3 ${#alloptc[@]}); do
-  optcs="${optcs}${alloptc[$ioptc]} "
-done
-# shorten comp_mpi
-comp_mpi_exe="$(echo $comp_mpi | awk -F' ' '{print $1}')"
-# sed cmplr.tmpl
-sed -e "s:<oasis_input_path>:$path_w/oasis3-mct:" \
-    -e "s:<oasis_work_path>:$path_w/work_oasis3-mct:" \
-    -e "s/<optc_short>/$optcs/" -e "s/<optl_short>/$optls/" \
-    -e "s/<comp_mpi>/$comp_mpi/" -e "s/<comp_mpi_exe>/$comp_mpi_exe/" \
-    -e "s/<wwatch3_cc>/$WWATCH3_CC/"  cmplr.tmpl > cmplr
-echo "      sed cmplr.tmpl => cmplr"
-chmod 775 cmplr
-
 
 echo '   setup oasis make.inc file'
-sed -e "s:<oasis_input_path>:$path_w/oasis3-mct:" make.inc.tmpl > make.inc
-
 
 echo '   compile oasis coupler'
-make realclean -f TopMakefileOasis3 > $path_w/oasis_clean.out
-make -f TopMakefileOasis3 > $path_w/oasis_make.out
-
+# Build OASIS with CMake wrapper
+rm -rf Makefile CMakeCache.txt  CMakeFiles  cmake_install.cmake cmplr src tmp
+cmake . ${CMAKE_OPTIONS:-}
+make
 
 echo '   setup toy Makefile'
 cd $path_w/toy
-sed -e "s:<oasis_input_path>:$path_w/oasis3-mct:" Makefile.tmpl > Makefile
-
 
 echo '   compile toy model'
 make clean > $path_w/toy_clean.out
