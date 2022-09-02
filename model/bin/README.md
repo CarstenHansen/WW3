@@ -3,7 +3,24 @@
 This is the WW3 bin directory which mostly serves to create the make file
 and set up the environment.  Below we have three sections, build environment
 varibles, quick start instructions and information from various centers that
-use WW3.  
+use WW3.
+
+## CMake Build
+
+Requires CMake 3.19 or greated.
+
+To do an out-of-source build:
+
+Create a build directory in the top-level directory:
+
+```
+mkdir build && cd build
+cmake .. -DSWITCH=<switch_file> -DCMAKE_INSTALL_PREFIX=<dir>
+make <-jn>
+make install
+```
+
+The CMake build builds all available executables with the given switches.
 
 # Build Enivronment Variables 
 
@@ -34,7 +51,7 @@ METIS_PATH = < path before lib/libparmetis.a and lib/libmetis.a >
 
 The following paths/libraries are expected to be set: 
 
-G2_LIB4, W3NCO_LIB4, BACIO_LIB4, JASPER_LIB, PNG_LIB, and Z_LIB
+G2_LIB4, W3EMC_LIB4, BACIO_LIB4, JASPER_LIB, PNG_LIB, and Z_LIB
 
 If using NCEP hpc-stack, you just need to set the following: 
 

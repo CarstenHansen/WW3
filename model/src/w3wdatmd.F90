@@ -1,5 +1,20 @@
+!> @file
+!> @brief Contains module W3WDATMD.
+!> 
+!> @author H. L. Tolman @date 22-Mar-2021
+!>
+
 #include "w3macros.h"
 !/ ------------------------------------------------------------------- /
+!>
+!> @brief Define data structures to set up wave model dynamic data for
+!>  several models simultaneously.
+!> 
+!> @details The number of grids is taken from W3GDATMD, and needs to be
+!>  set first with W3DIMG.
+!>
+!> @author H. L. Tolman  @date 22-Mar-2021
+!>
       MODULE W3WDATMD
 !/
 !/                  +-----------------------------------+
@@ -183,6 +198,16 @@
 !/
       CONTAINS
 !/ ------------------------------------------------------------------- /
+!>
+!> @brief Set up the number of grids to be used.
+!>
+!> @details Use data stored in NGRIDS in W3GDATMD.
+!>
+!> @param[in] NDSE Error output unit number.
+!> @param[in] NDST Test output unit number.
+!> 
+!> @author H. L. Tolman  @date 10-Dec-2014
+!>        
       SUBROUTINE W3NDAT ( NDSE, NDST )
 !/
 !/                  +-----------------------------------+
@@ -303,6 +328,19 @@
 !/
       END SUBROUTINE W3NDAT
 !/ ------------------------------------------------------------------- /
+!>
+!> @brief  Initialize an individual data grid at the proper dimensions.
+!>
+!> @details Allocate directly into the structure array. Note that
+!>  this cannot be done through the pointer alias!
+!>
+!> @param[in] IMOD Model number to point to.
+!> @param[in] NDSE Error output unit number.
+!> @param[in] NDST Test output unit number.
+!> @param[in] F_ONLY FLag for initializing field arrays only.
+!>
+!> @author H. L. Tolman  @date 22-Mar-2021
+!>      
       SUBROUTINE W3DIMW  ( IMOD, NDSE, NDST, F_ONLY )
 !/
 !/                  +-----------------------------------+
@@ -380,7 +418,7 @@
       USE W3ODATMD, ONLY: NAPROC, IAPROC
       USE W3SERVMD, ONLY: EXTCDE
       USE CONSTANTS, ONLY : LPDLIB, DAIR
-      USE W3PARALL, ONLY: SET_UP_NSEAL_NSEALM
+      USE W3PARALL, ONLY: SET_UP_NSEAL_NSEALM, LSLOC 
 #ifdef W3_NL5
       USE W3GDATMD, ONLY: QI5NNZ
 #endif
@@ -516,6 +554,7 @@
     FLUSH(740+IAPROC)
 #endif
 #ifdef W3_PDLIB
+        IF (.not. LSLOC) THEN
           ALLOCATE ( WDATAS(IMOD)%VSTOT(NSPEC,NSEAL), stat=istat )
 #endif
 #ifdef W3_DEBUGINIT
@@ -530,6 +569,7 @@
     FLUSH(740+IAPROC)
 #endif
 #ifdef W3_PDLIB
+        ENDIF ! LSLOC 
           ALLOCATE ( WDATAS(IMOD)%VAOLD(NSPEC,NSEAL), stat=istat )
 #endif
 #ifdef W3_DEBUGINIT
@@ -537,15 +577,8 @@
     FLUSH(740+IAPROC)
 #endif
 #ifdef W3_PDLIB
-          DO ISEA=1,NSEAL
-#endif
-#ifdef W3_DEBUGINIT
-        WRITE(740+IAPROC,*) 'Setting to ZERO at ISEA=', ISEA
-        FLUSH(740+IAPROC)
-#endif
-#ifdef W3_PDLIB
-            WDATAS(IMOD)%VSTOT(:,ISEA)=0
-          END DO
+        IF (.not. LSLOC) THEN
+         WDATAS(IMOD)%VSTOT=0
 #endif
 #ifdef W3_DEBUGINIT
     WRITE(740+IAPROC,*) 'W3DIMW, step 8.8'
@@ -559,6 +592,7 @@
     FLUSH(740+IAPROC)
 #endif
 #ifdef W3_PDLIB
+        ENDIF ! LSLOC 
           WDATAS(IMOD)%SHAVETOT=.FALSE.
 #endif
 #ifdef W3_DEBUGINIT
@@ -719,6 +753,18 @@
 !/
       END SUBROUTINE W3DIMW
 !/ ------------------------------------------------------------------- /
+!>
+!> @brief Select one of the WAVEWATCH III grids / models.
+!>
+!> @details Point pointers to the proper variables in the proper element of
+!>  the GRIDS array.
+!>
+!> @param[in] IMOD Model number to point to.
+!> @param[in] NDSE Error output unit number.
+!> @param[in] NDST Test output unit number.
+!>
+!> @author H. L. Tolman  @date 22-Mar-2021
+!>      
       SUBROUTINE W3SETW ( IMOD, NDSE, NDST )
 !/
 !/                  +-----------------------------------+
