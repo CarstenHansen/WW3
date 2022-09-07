@@ -1,23 +1,6 @@
-!> @file
-!> @brief Contains program for NetCDF grid output.
-!> @author F. Ardhuin
-!> @author M. Accensi
-!> @date 02-Sep-2021
-
 #include "w3macros.h"
 #define CHECK_ERR(I) CHECK_ERROR(I, __LINE__)
 !/ ------------------------------------------------------------------- /
-
-!> @brief Post-processing of grid output to NetCDF files.
-!>
-!> @details Data is read from the grid output file out_grd.ww3
-!>  (raw data)  and from the file ww3_ounf.nml or ww3_ounf.inp (NDSI)
-!>  Model definition and raw data files are read using WAVEWATCH III
-!>  subroutines. Extra global NetCDF attributes may be read from
-!>  ASCII file NC_globatt.inp.
-!> @author F. Ardhuin
-!> @author M. Accensi
-!> @date 02-Sep-2021
       PROGRAM W3OUNF
 !/
 !/                  +-----------------------------------+
@@ -62,9 +45,14 @@
 !/                  time variables.
 !/    26-Jan-2021 : Added TP output (derived from fp)   ( version 7.12 )
 !/                  and alternative dir/mag output.
+!/    15-Jan-2021 : Extend handling of 3'rd dimension   ( version 7.XX )
 !/    02-Feb-2021 : Make default global meta optional   ( version 7.12 )
 !/    22-Mar-2021 : New coupling fields output          ( version 7.12 )
 !/    02-Sep-2021 : Added coordinates attribute         ( version 7.12 )
+!/    25-Jan-2022 : Extend handling of 3'rd dimension,  ( version 7.XX )
+!/                  (C. Hansen)
+!/    15-Jan-2021 : XSTO option: Stokes drift profile   ( version 7.XX )
+!/                  for extended spectral tail
 !/
 !/    Copyright 2009-2013 National Weather Service (NWS),
 !/       National Oceanic and Atmospheric Administration.  All rights
@@ -119,7 +107,7 @@
 !     Checks on input, checks in W3IOxx.
 !
 !  7. Remarks :
-!
+!      
 !     The VARID array stores netCDF variable IDs for all variables in
 !     file. The first 20 elements are reserved for dimension/auxiliary
 !     variables as defined below:
@@ -141,7 +129,40 @@
 !        13-19    [Reserved for future use]
 !        20       MAPSTA
 !
-!    Indices 21 - 300 are for storage of field output variable IDs.
+!     Indices 21 - 300 are for storage of field output variable IDs.
+!
+!     A note on the logical flag FLJOIN and loop over a number of sub-parameters:
+!
+!     Currently the maximum number of sub-parameters in the code is NFSMAX=2.
+!          
+!     FLJOIN is a flag indicating if a sub-parameter should be put together in
+!     a joint netCDF file. It is set to False in the case of a spectral field
+!     over three dimensions, x, y, and frequency ('f'), for which is a
+!     configuration flag FLFRQ is True.
+!
+!     A field parameter may contain more than one sub-parameter. Two examples of
+!     this are the parameter 'P2S' (IFI,IFJ=6,7), which contains two scalar
+!     sub-parameters 'p2s' and 'pp2s', and the parameter 'BED' (IFI,IFJ=7,3),
+!     which  contains two sub-parameters, a scalar 'bed' and a vector
+!     ('ripplex', 'rippley').
+!
+!     A flag FLJOIN may be set to True for individual sub-parameters in the
+!     hardcoded configuration, and in case the overall input (namelist) parameter
+!     NML_FIELD%SAMEFILE is False the sub-parameter will be put together with the
+!     first sub-parameter under the common parameter index pair (IFI,IFJ).
+!    
+!     To manage this, a counter IFS=1,NFS is applied in a loop over these
+!     sub-parameters. In addition IFS also acts as a counter over swell
+!     partitions. Any sub-parameter with IFS >= 2, which has a configured True
+!     value of FLJOIN, is put in the same file as the parameter with IFS == 1,
+!     even if TOGETHER is .FALSE. A message 'Writing the new record ...' is
+!     written to standard output for each sub-parameter.
+!
+!     Note that FLJOIN is NOT set to True for swell partitions
+!     
+!     A parameter with IFS == 1 can be forced to a separate file by setting
+!     FLJOIN to False. You cannot do the reverse: If you try to set FLJOIN to
+!     True for IFS == 1, it will be changed to the logical value of TOGETHER.
 !
 !  8. Structure :
 !
@@ -150,6 +171,7 @@
 !  9. Switches :
 !
 !     !/S     Enable subroutine tracing.
+!     !/XSTO  Stokes drift profile for spectrum with extended tail
 !
 ! 10. Source code :
 !
@@ -174,6 +196,7 @@
 #endif
 !/
       USE W3GDATMD
+!/! With XSTO switch: USE W3GDATMD, ONLY: XSND, XSDS, XSBP, NK, NX, NY, NSEA, MAPSF, ...
       USE W3WDATMD, ONLY: TIME, WLV, ICE, ICEH, ICEF, BERG,            &
                           UST, USTDIR, RHOAIR
 #ifdef W3_SETUP
@@ -195,6 +218,9 @@
                           STMAXE, STMAXD, HMAXE, HCMAXE, HMAXD, HCMAXD,&
                           P2SMS, EF, US3D, TH1M, STH1M, TH2M, STH2M,   &
                           WN, USSP, WBT, WNMEAN
+#ifdef W3_XSTO
+      USE W3ADATMD, ONLY: UXSP
+#endif
       USE W3ODATMD, ONLY: NDSO, NDSE, SCREEN, NOGRP, NGRPP, IDOUT,     &
                           UNDEF, FLOGRD, FNMPRE, NOSWLL, NOGE
 !
@@ -204,7 +230,8 @@
                               WRITE_META, WRITE_GLOBAL_META,           &
                               WRITE_FREEFORM_META_LIST,                &
                               META_T, NCVARTYPE, CRS_META, CRS_NAME,   &
-                              FL_DEFAULT_GBL_META, COORDS_ATTR
+                              FL_DEFAULT_GBL_META, COORDS_ATTR,        &
+                              NFSMAX
 !
       USE NETCDF
 
@@ -528,22 +555,6 @@
 
 
 ! 4.3 Output type
-      ALLOCATE(TABIPART(NOSWLL + 1))
-      ALLOCATE(NCIDS(NOGRP,NGRPP,NOSWLL + 1))
-      NBIPART=0
-      DO I=1,30
-        IF(STRINGIPART(I:I) .EQ. ' ') CYCLE
-        READ(STRINGIPART(I:I),'(I1)') IPART
-        IF(IPART .GT. NOSWLL) THEN
-           WRITE(NDSO, 1500) IPART, NOSWLL
-           CYCLE
-        ENDIF
-        NBIPART = NBIPART + 1
-        IF(NBIPART .GT. NOSWLL + 1) THEN
-           GOTO 803
-        ENDIF
-        TABIPART(NBIPART) = IPART
-      ENDDO
 !
       IF ( NCTYPE.LT.3 .OR. NCTYPE.GT.4 ) THEN
         WRITE (NDSE,1010) NCTYPE
@@ -603,6 +614,51 @@
 !
 ! 4.4 Initialise meta-data
       CALL INIT_META(VECTOR)
+
+! 4.5 Partitions, sub-parameters and netCDF-variable ID setup
+      
+!      NBIPART=0
+!!      DO I=1,29
+!!        IF ((STRINGIPART(I:I+1).EQ.'0').OR.(STRINGIPART(I:I+1).EQ.'1')      &
+!!            .OR.(STRINGIPART(I:I+1).EQ.'2').OR.(STRINGIPART(I:I+1).EQ.'3')  &
+!!            .OR.(STRINGIPART(I:I+1).EQ.'4').OR.(STRINGIPART(I:I+1).EQ.'5')) THEN
+!!          NBIPART=NBIPART+1
+!!        END IF
+!!      END DO
+!!      ALLOCATE(TABIPART(NBIPART))
+!!      CNTIPART=0
+!!      DO I=1,29
+!!        IF ((STRINGIPART(I:I+1).EQ.'0').OR.(STRINGIPART(I:I+1).EQ.'1')      &
+!!            .OR.(STRINGIPART(I:I+1).EQ.'2').OR.(STRINGIPART(I:I+1).EQ.'3')  &
+!!            .OR.(STRINGIPART(I:I+1).EQ.'4').OR.(STRINGIPART(I:I+1).EQ.'5')) THEN
+!!          CNTIPART=CNTIPART+1
+!!          READ(STRINGIPART(I:I+1),'(I1)') TABIPART(CNTIPART)
+!!        END IF
+!!      END DO
+
+      ! Alternative processing of TABIPART to capture requests 
+      ! greater than NOSWLL (C.Bunney):
+      ALLOCATE(TABIPART(NOSWLL + 1))
+      NBIPART=0
+      DO I=1,30
+        IF(STRINGIPART(I:I) .EQ. ' ') CYCLE
+        READ(STRINGIPART(I:I),'(I1)') IPART
+        IF(IPART .GT. NOSWLL) THEN
+           WRITE(NDSO, 1500) IPART, NOSWLL
+           CYCLE
+        ENDIF
+        NBIPART = NBIPART + 1
+        IF(NBIPART .GT. NOSWLL + 1) THEN
+           GOTO 803
+        ENDIF
+        TABIPART(NBIPART) = IPART
+      ENDDO
+
+      ! Max of requested partitions or configured sub-parameters
+      ! NFSMAX from w3ounfmetamd
+      NFSMAX = MAX(NBIPART,NFSMAX)
+      ALLOCATE(NCIDS(NOGRP,NGRPP,NFSMAX))
+      
 !
 !--- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ! 5.  Time management.
@@ -651,70 +707,44 @@
       CALL TEARDOWN_META()
 
 
-! 5.2 Closes the netCDF file
-      IF (TOGETHER .AND. NCIDS(1,1,1).NE.0) THEN
-        IRET = NF90_REDEF(NCIDS(1,1,1))
-        CALL CHECK_ERR(IRET)
-        IF(FL_DEFAULT_GBL_META) THEN
-          IRET=NF90_PUT_ATT(NCIDS(1,1,1),NF90_GLOBAL,'stop_date',STRSTOPDATE)
-          CALL CHECK_ERR(IRET)
-        ENDIF
-        IRET=NF90_CLOSE(NCIDS(1,1,1))
-        CALL CHECK_ERR(IRET)
-      END IF
-!
+! 5.2 Closes the netCDF files
       DO IFI=1, NOGRP
+        IF ( ALL(NCIDS(IFI,:,1).EQ.0) ) CYCLE
         DO IFJ=1, NGRPP
-          IF ( FLG2D(IFI,IFJ) ) THEN
-            IF ( FLOGRD(IFI,IFJ) ) THEN
-              IF (.NOT. TOGETHER) THEN
-                IF (NCIDS(IFI,IFJ,1).NE.0) THEN
-                  IRET = NF90_REDEF(NCIDS(IFI,IFJ,1))
-                  CALL CHECK_ERR(IRET)
-                  IF(FL_DEFAULT_GBL_META) THEN
-                    IRET=NF90_PUT_ATT(NCIDS(IFI,IFJ,1),NF90_GLOBAL,'stop_date',STRSTOPDATE)
-                    CALL CHECK_ERR(IRET)
-                  ENDIF
-                  IRET=NF90_CLOSE(NCIDS(IFI,IFJ,1))
-                  CALL CHECK_ERR(IRET)
-                END IF ! NCIDS
-                ! close partition files (except part 0 which is already closed by (IFI,IFJ,1)
-                IF ((IFI.EQ.4).AND.(IFJ.LE.NOGE(IFI))) THEN
-                  DO IPART=1,NOSWLL
-                    IF (NCIDS(IFI,IFJ,IPART+1).NE.0) THEN
-                      IRET = NF90_REDEF(NCIDS(IFI,IFJ,IPART+1))
-                      CALL CHECK_ERR(IRET)
-                      IF(FL_DEFAULT_GBL_META) THEN
-                        IRET=NF90_PUT_ATT(NCIDS(IFI,IFJ,IPART+1),NF90_GLOBAL,'stop_date',STRSTOPDATE)
-                        CALL CHECK_ERR(IRET)
-                      ENDIF
-                      IRET=NF90_CLOSE(NCIDS(IFI,IFJ,IPART+1))
-                      CALL CHECK_ERR(IRET)
-                    END IF ! NCIDS
-                  END DO ! IPART
-                END IF ! partition
-              ! else if together
-              ELSE
-                ! close frequency file
-                IF ( ((IFI.EQ.6).AND.(IFJ.EQ.8)) .OR.                 &
-                     ((IFI.EQ.6).AND.(IFJ.EQ.9)) .OR.                 &
-                     (IFI.EQ.3) ) THEN
-                  IF (NCIDS(IFI,IFJ,1).NE.0) THEN
-                    IRET = NF90_REDEF(NCIDS(IFI,IFJ,1))
-                    CALL CHECK_ERR(IRET)
-                    IF(FL_DEFAULT_GBL_META) THEN
-                      IRET=NF90_PUT_ATT(NCIDS(IFI,IFJ,1),NF90_GLOBAL,'stop_date',STRSTOPDATE)
-                      CALL CHECK_ERR(IRET)
-                    ENDIF
-                    IRET=NF90_CLOSE(NCIDS(IFI,IFJ,1))
-                    CALL CHECK_ERR(IRET)
-                  END IF ! NCIDS
-                END IF ! IFI
-              END IF ! TOGETHER
-            END IF ! FLOGRD
-          END IF ! FLG2D
+          IF (NCIDS(IFI,IFJ,1).NE.0) THEN
+            IRET = NF90_REDEF(NCIDS(IFI,IFJ,1))
+            CALL CHECK_ERR(IRET)
+            IF(FL_DEFAULT_GBL_META) THEN
+              IRET=NF90_PUT_ATT(NCIDS(IFI,IFJ,1),NF90_GLOBAL,'stop_date',STRSTOPDATE)
+              CALL CHECK_ERR(IRET)
+            ENDIF
+            IRET=NF90_CLOSE(NCIDS(IFI,IFJ,1))
+            CALL CHECK_ERR(IRET)
+          END IF ! NCIDS
+          IF ( ALL(NCIDS(IFI,IFJ+1:NGRPP,1).EQ.0) ) EXIT
         END DO ! IFJ
+        
       END DO ! IFI
+!
+      ! close partition files (except part 0 which is already closed by (IFI,IFJ,1)
+      IF (NOGE(4).GE.1 .AND. .NOT.TOGETHER) THEN
+        IFI = 4
+        DO IFJ=1, NOGE(IFI)
+          IF ( ALL(NCIDS(IFI,IFJ,2:NFSMAX).EQ.0 ) ) CYCLE
+          DO IPART=2,NFSMAX
+            IF (NCIDS(IFI,IFJ,IPART).NE.0) THEN
+              IRET = NF90_REDEF(NCIDS(IFI,IFJ,IPART))
+              CALL CHECK_ERR(IRET)
+              IF(FL_DEFAULT_GBL_META) THEN
+                IRET=NF90_PUT_ATT(NCIDS(IFI,IFJ,IPART),NF90_GLOBAL,'stop_date',STRSTOPDATE)
+                CALL CHECK_ERR(IRET)
+              ENDIF
+              IRET=NF90_CLOSE(NCIDS(IFI,IFJ,IPART))
+              CALL CHECK_ERR(IRET)
+            END IF ! NCIDS
+          END DO ! IPART
+        END DO ! IFJ
+      END IF ! NOGE(4).GE.1 .AND. .NOT.TOGETHER
 
 !
       GOTO 888
@@ -839,31 +869,6 @@
 !/
       CONTAINS
 !/ ------------------------------------------------------------------- /
-!> @brief Perform actual grid output in NetCDF file.
-!>
-!> @param[in] NX Grid dimension X
-!> @param[in] NY Grid dimension Y
-!> @param[in] IX1 Grid index along X
-!> @param[in] IXN Grid index along X
-!> @param[in] IY1 Grid index along Y
-!> @param[in] IYN Grid index along Y
-!> @param[in] NSEA Number of sea points
-!> @param[inout] FILEPREFIX 
-!> @param[in] E3DF
-!> @param[in] P2MSF
-!> @param[in] US3DF
-!> @param[in] USSPF
-!> @param[in] NCTYPE
-!> @param[in] TOGETHER
-!> @param[in] NCVARTYPEI
-!> @param[in] FLG2D
-!> @param[inout] NCIDS
-!> @param[inout] S3
-!> @param[in] STRSTOPDATE     
-!> @author F. Ardhuin
-!> @author M. Accensi
-!> @date 22-Mar-2021
-!>        
       SUBROUTINE W3EXNC ( NX, NY, IX1, IXN, IY1, IYN, NSEA,             &
                           FILEPREFIX, E3DF, P2MSF, US3DF, USSPF,NCTYPE, &
                           TOGETHER, NCVARTYPEI, FLG2D, NCIDS, S3, STRSTOPDATE )
@@ -906,10 +911,10 @@
 !
 !     Internal parameters
 !     ----------------------------------------------------------------
-!       FLTWO   Log.  Flags for two-dimensional field X Y.
-!       FLDIR   Log.  Flags for two-dimensional, directional field.
+!       NTIM    Int.  Output time counter, saved. Initial value == 1
+!       ! C Hansen: Removed obsolete flag FLTWO
 !       FLFRQ   Log.  Flags for frequency array (3D field)
-!       X1, X2, XX, XY
+!       X1, X2, XX, XY, XK, XXK, YYK
 !               R.A.  Output fields
 !     ----------------------------------------------------------------
 !
@@ -964,6 +969,10 @@
 #ifdef W3_T
       USE W3ODATMD, ONLY : NDST
 #endif
+#ifdef W3_XSTO
+      USE W3ODATMD, ONLY : NZO ! May alternatively get IXSP, JXSP from here
+      USE W3IOGOMD, ONLY: W3FLDTOIJ
+#endif
       USE NETCDF
       IMPLICIT NONE
 
@@ -974,51 +983,60 @@
       INTEGER, INTENT(IN)     :: NX, NY, IX1, IXN, IY1, IYN, NSEA,     &
                                  E3DF(3,5), P2MSF(3), US3DF(3),        &
                                  USSPF(2), NCTYPE, NCVARTYPEI
-      CHARACTER(30)           :: FILEPREFIX
+      CHARACTER*30,INTENT(IN) :: FILEPREFIX
       LOGICAL, INTENT(IN)     :: TOGETHER
       LOGICAL, INTENT(IN)     :: FLG2D(NOGRP,NGRPP)
-      INTEGER, INTENT(INOUT)  :: NCIDS(NOGRP,NGRPP,NOSWLL + 1), S3
+      INTEGER, INTENT(INOUT)  :: NCIDS(NOGRP,NGRPP,NFSMAX), S3
       CHARACTER*30,INTENT(IN) :: STRSTOPDATE
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
+#ifdef W3_XSTO
+       INTEGER                ::  IXSP, JXSP
+#endif
       INTEGER                 :: IFI, IFJ, MFILL, I, J, ISEA, IX, IY,  &
-                                 I1, J1, IPART, INDEXIPART, COORDTYPE
-      INTEGER                 :: S1, S2, S4, S5, NCID, OLDNCID, NDSDAT,&
-                                 NFIELD, N, IRET, IK, EXTRADIM, IVAR,  &
+                                 I1, J1, IPART, INDEXIPART
+      INTEGER, SAVE           :: NTIM = 1
+      INTEGER                 :: S1, S2, S4, S5, NCID, OLDNCID, NDSDAT,& 
+                                 NFIELD, IRET, IK, EXTRADIM, IVAR,     &
                                  IVAR1
+      INTEGER                 :: IFS, NFS, ISUB
+      INTEGER                 :: N3, TDIM, EDIM, DIMID3
       INTEGER                 :: DIMID(6), VARID(300), START(4),       &
-                                 COUNT(4), DIMLN(6),START1D(2),        &
-                                 COUNT1D(2), DIMFIELD(3),              &
+                                 COUNT(4), DIMLN(6), DIMFIELD(4),      &
                                  STARTDATE(8), CURDATE(8),             &
-                                 EPOCHDATE(8),                         &
-                                 MAP(NX+1,NY), MP2(NX+1,NY)
+                                 EPOCHDATE(8)
+      ! C Hansen: Commented out MAP and MP2 not used anywhere.
+      !                           MAP(NX+1,NY), MP2(NX+1,NY)
 !
       INTEGER                  :: DEFLATE=1
 #ifdef W3_S
       INTEGER, SAVE           :: IENT   =   0
 #endif
 !
+      INTEGER, ALLOCATABLE    :: TRIGP2(:,:)
       ! Make the below allocatable to avoid stack overflow on some machines 
-      INTEGER(KIND=2), ALLOCATABLE    :: MX1(:,:), MXX(:,:), MYY(:,:), &
+      INTEGER(KIND=2), ALLOCATABLE    :: MX1(:,:), MXX(:,:), &
                                          MXY(:,:), MAPOUT(:,:)
 !
       REAL                    :: CABS, UABS, MFILLR
+#ifdef W3_XSTO
+      INTEGER                 :: IZ
+      REAL                    :: XZK
+#endif
 #ifdef W3_BT4
    REAL, PARAMETER            :: LOG2=LOG(2.)
 #endif
 !
-      REAL,DIMENSION(:),  ALLOCATABLE    :: LON, LAT, FREQ
+      REAL,DIMENSION(:),  ALLOCATABLE    :: LON, LAT, DIM3VAR
       REAL,DIMENSION(:,:),  ALLOCATABLE  :: LON2D, LAT2D, ANGLD2D
 #ifdef W3_RTD
       REAL,DIMENSION(:,:),  ALLOCATABLE  :: LON2DEQ, LAT2DEQ
 #endif
       ! Make the below allocatable to avoid stack overflow on some machines
       REAL, ALLOCATABLE       :: X1(:,:), X2(:,:), XX(:,:), XY(:,:),   &
-                                 XK(:,:,:), XXK(:,:,:), XYK(:,:,:),    &
-                                 MX1R(:,:), MXXR(:,:), MYYR(:,:),      &
-                                 MXYR(:,:), AUX1(:)
+                                 XK(:,:,:), XXK(:,:,:), XYK(:,:,:), AUX1(:)
 !
       DOUBLE PRECISION        :: OUTJULDAY
       INTEGER(KIND=8)         :: OUTSECS
@@ -1029,12 +1047,16 @@
       !CHARACTER*30            :: UNITVAR(3),FORMAT1
       CHARACTER*30            :: FORMAT1
       CHARACTER*30            :: STRSTARTDATE
-      CHARACTER               :: FNAMENC*128,                           &
-                                 FORMF*11
+      CHARACTER               :: FNAMENC*128
+      ! C. Hansen, removed obsolete CHARACTER FORMF*11
+      CHARACTER               :: WRITETO*50
       CHARACTER, SAVE         :: OLDTIMEID*16 = '0000000000000000'
       CHARACTER, SAVE         :: TIMEID*16 = '0000000000000000'
 !
-      LOGICAL                 :: FLFRQ, FLDIR, FEXIST, FREMOVE
+      CHARACTER*9             :: DIM3NAME = '         '
+!
+      LOGICAL                 :: FLFRQ, FEXIST
+      LOGICAL                 :: FLJOIN, NEW3D, FIRST_TOGETHER
       LOGICAL                 :: CUSTOMFRQ=.FALSE.
 #ifdef W3_T
       LOGICAL                 :: LTEMP(NGRPP)
@@ -1061,6 +1083,26 @@
 !--- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ! 1.  Preparations
 !
+
+      ! Length of 3'rd dimension in the file. The default is none:
+      N3 = 0
+      ! If spectral output is requested, then
+      ! let N3 = NK: the largest possible number of frequencies
+      IF ( FLG2D(6,8) .OR. FLG2D(6,9) .OR. FLG2D(6,12) ) THEN
+        N3 = NK
+      ELSE
+        ! All fields in group 3 are spectral
+        DO IFJ=1, NGRPP
+          IF ( N3 .EQ. NK ) EXIT
+          IF ( FLG2D(3,IFJ)  ) N3 = NK
+        END DO
+      END IF
+#ifdef W3_XSTO
+      CALL W3FLDTOIJ('XSP   ', IXSP, JXSP, 1, 1, 1)
+      ! If a vertical Stokes profile dimension 'zk' is requested,
+      IF ( FLG2D(IXSP, JXSP) ) N3 = max(N3,NZO) ! size(UXSP,2) == 3 + 2*NZO
+#endif
+
       ! Allocate output storage. This is required with the introduction
       ! of the SMC grid output as the regridded output grid dimensions could
       ! conceivably be larger than the NX and NY values. Making these (large)
@@ -1069,17 +1111,17 @@
       IF(SMCGRD) THEN
 #ifdef W3_SMC
         ALLOCATE(X1(NXO,NYO), X2(NXO,NYO), XX(NXO,NYO), XY(NXO,NYO))
-        ALLOCATE(XK(NXO,NYO,NK), XXK(NXO,NYO,NK), XYK(NXO,NYO,NK))
-
-        ALLOCATE(MX1(NXO,NYO), MXX(NXO,NYO), MYY(NXO,NYO),               &
+        IF ( N3 .GT. 0 ) &
+          ALLOCATE(XK(NXO,NYO,N3), XXK(NXO,NYO,N3), XYK(NXO,NYO,N3))
+     
+        ALLOCATE(MX1(NXO,NYO), MXX(NXO,NYO),                       &
                  MXY(NXO,NYO), MAPOUT(NXO,NYO))
-        ALLOCATE(MX1R(NXO,NYO), MXXR(NXO,NYO), MYYR(NXO,NYO), MXYR(NXO,NYO))
 #endif
       ELSE
         ALLOCATE(X1(NX+1,NY),X2(NX+1,NY),XX(NX+1,NY),XY(NX+1,NY))
-        ALLOCATE(XK(NX+1,NY,NK), XXK(NX+1,NY,NK), XYK(NX+1,NY,NK))
-        ALLOCATE(MX1(NX,NY), MXX(NX,NY), MYY(NX,NY), MXY(NX,NY), MAPOUT(NX,NY))
-        ALLOCATE(MX1R(NX,NY), MXXR(NX,NY), MYYR(NX,NY), MXYR(NX,NY))
+        IF ( N3 .GT. 0 ) &
+          ALLOCATE(XK(NX+1,NY,N3), XXK(NX+1,NY,N3), XYK(NX+1,NY,N3))
+        ALLOCATE(MX1(NX,NY), MXX(NX,NY), MXY(NX,NY), MAPOUT(NX,NY))
       ENDIF ! SMCGRD
       ALLOCATE(AUX1(NSEA))
 
@@ -1114,11 +1156,6 @@
 ! 1.1 Set-up transfer files
       MFILL  = NF90_FILL_SHORT
       MFILLR  = NF90_FILL_FLOAT
-      IF (GTYPE.NE.UNGTYPE) THEN
-        COORDTYPE=1
-      ELSE
-        COORDTYPE=2
-      ENDIF
 
 ! 1.2 Sets the date as ISO8601 convention
       ! S3 defines the number of characters in the date for the filename
@@ -1157,50 +1194,99 @@
       FNAMENC(1:S1)=FILEPREFIX(1:S1)
       FNAMENC(S1+1:S1+S4) = TIMEID(1:S4)
 
-      !
+! 1.3 Increment the time step or set a flag when an new time stamp in files
+
+      IF ( INDEX(TIMEID,OLDTIMEID) .EQ. 0 ) THEN
+         ! time splitted condition
+         NTIM = 1
+         ! The first field in a file TOGETHER. Will be set FALSE for
+         ! following fields in the file
+         FIRST_TOGETHER = .TRUE.
+      ELSE
+         NTIM = NTIM + 1
+         FIRST_TOGETHER = .FALSE.
+      END IF
+
 #ifdef W3_SMC
 !
 !---  Update MAPSMC for SMC type 2 output. This needs to be
 !     done at each timestep as MAPSTA could change if there
-!     are water level or ice input chagnes.
+!     are water level or ice input changes.
 !
       IF( SMCGRD .AND. (SMCOTYPE .EQ. 2) ) CALL MAPSTA_SMC()
 #endif
 !
+      
 !--- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-! 2.  Loop over output fields.
+! 2.  Loop over output parameters.
 !
 
-      ! Instanciates the field and group indexes
+      ! Instanciates the parameter and group indexes
       I1=0
       J1=0
 !
       DO IFI=1, NOGRP
         DO IFJ=1, NGRPP
-          ! If the flag for the variable IFI of the group IFJ is .TRUE.
-          IF ( FLG2D(IFI,IFJ) ) THEN
-            ! Instanciates the partition array
-            INDEXIPART=1
-            IPART=TABIPART(INDEXIPART)
+
+          IF ( .NOT. FLG2D(IFI,IFJ) ) CYCLE
+          ! Here, the flag for the field IFI of the group IFJ is .TRUE.
+          
+          ! Instanciates the partition array
+          INDEXIPART=1
+
+          ! NFS: Number of swell partitions or sub-parameters under (IFI,IFJ).
+          ! NFS will be incremented by one for each partition or sub-parameter
+          NFS = 1
+          ! Sub-parameter index, to be incremented:
+          IFS = 0
+          ! Sub-parameter attribute meta index:
+          ISUB = 0
+          DO WHILE ( IFS .LT. NFS )
+            IFS = IFS + 1
+
             NFIELD=1 ! Default is one field
 
+            ! Increment NFS by one if a following partition is requested
+            ! (Loops over IPART for partition variables)
+            ! ChrisBunney: Don't loop IPART for last two entries in section 4
+            ! (16: total wind sea fraction, 17: number of parts) as these fields
+            ! do not have partitions.
+            IF (IFI .EQ. 4 .AND. IFJ .LE. NOGE(IFI) - 2) THEN
+              IPART=TABIPART(INDEXIPART)
+              DO WHILE (INDEXIPART.LT.NBIPART)
+                INDEXIPART=INDEXIPART+1
+                IF (TABIPART(INDEXIPART).EQ.-1) CYCLE
+                NFS = NFS + 1
+                EXIT
+              END DO
+             END IF
 
-!  Loop over IPART for partition variables
-555         CONTINUE
-
-            ! Initializes the index of field and group at the first flag FLG2D at .TRUE.
-            IF (I1.EQ.0) I1=IFI
-            IF (J1.EQ.0) J1=IFJ
-            FORMF  = '(1X,32I5)'
 #ifdef W3_T
-            WRITE (NDST,9020) IDOUT(IFI,IFJ)
+            IF ( INDEXIPART .GT. 0 ) THEN
+                 WRITE (NDST,9021) IDOUT(IFI,IFJ), IPART
+               ELSE IF ( IFS .GT. 1 ) THEN
+                 WRITE (NDST,9021) IDOUT(IFI,IFJ), IFS
+               ELSE
+                 WRITE (NDST,9020) IDOUT(IFI,IFJ)
+               END IF
 #endif
 !
 ! 2.1 Set output arrays and parameters
 !
-            ! Initializes the flags for freq and direction dimensions
+            ! Initializes the flag for freq dimension
             FLFRQ = .FALSE.
-            FLDIR = .FALSE.
+            DIM3NAME = ''
+            ! Initializes a flag that the parameters should go together in the
+            ! same file if the user input parameter NML_FIELD%SAMEFILE is True
+            FLJOIN = TOGETHER
+            ! A parameter may be forced to a separate file by setting
+            ! FLJOIN = .FALSE. in the settings below for each IFI,IFJ.
+            ! For example, this is set presently for all parameters with a
+            ! frequency dimension. You cannot do the reverse: If you try to set
+            ! FLJOIN to True for IFS == 1, it will be changed to the logical
+            ! value of TOGETHER.
+
+            ! With a few exceptions a netCDF variable of type short is permitted
             IF (NCVARTYPEI.EQ.3) NCVARTYPE=2
 !
             ! Depth
@@ -1434,6 +1520,8 @@
             ! Wave elevation spectrum
             ELSE IF ( IFI .EQ. 3 .AND. IFJ .EQ. 1 ) THEN
               ! Information for spectral
+              FLJOIN = .FALSE.
+              ! FLJOIN = .TRUE. ! Set this to include ef in file TOGETHER
               FLFRQ  = .TRUE.
               I1F=E3DF(2,1)
               I2F=E3DF(3,1)
@@ -1446,6 +1534,7 @@
             ! Mean wave direction frequency spectrum
             ELSE IF ( IFI .EQ. 3 .AND. IFJ .EQ. 2 ) THEN
               ! Information for spectral
+              FLJOIN = .FALSE.
               FLFRQ  = .TRUE.
               I1F=E3DF(2,2)
               I2F=E3DF(3,2)
@@ -1461,6 +1550,7 @@
             ! Spreading frequency spectrum
             ELSE IF ( IFI .EQ. 3 .AND. IFJ .EQ. 3 ) THEN
               ! Information for spectral
+              FLJOIN = .FALSE.
               FLFRQ  = .TRUE.
               I1F=E3DF(2,3)
               I2F=E3DF(3,3)
@@ -1472,6 +1562,7 @@
             ! Second mean wave direction frequency spectrum
             ELSE IF ( IFI .EQ. 3 .AND. IFJ .EQ. 4 ) THEN
               ! Information for spectral
+              FLJOIN = .FALSE.
               FLFRQ  = .TRUE.
               I1F=E3DF(2,4)
               I2F=E3DF(3,4)
@@ -1487,6 +1578,7 @@
             ! Second spreading frequency spectrum
             ELSE IF ( IFI .EQ. 3 .AND. IFJ .EQ. 5 ) THEN
               ! Information for spectral
+              FLJOIN = .FALSE.
               FLFRQ  = .TRUE.
               I1F=E3DF(2,5)
               I2F=E3DF(3,5)
@@ -1498,6 +1590,7 @@
             ! Wave numbers
             ELSE IF ( IFI .EQ. 3 .AND. IFJ .EQ. 6 ) THEN
               ! Information for spectral
+              FLJOIN = .FALSE.
               FLFRQ  = .TRUE.
               I1F=1
               I2F=NK
@@ -1789,7 +1882,7 @@
               CALL S2GRID(USSX(1:NSEA), XX)
               CALL S2GRID(USSY(1:NSEA), XY)
               !! Commented out unnecessary statements below for time being
-              !! TAUWIX, TAUWIY are in north-east convention and X1,X2
+              !! USSX, USSY are in north-east convention and X1,X2
               !! are not actually written out below
               !DO ISEA=1, NSEA
               !  CABS   = SQRT(USSX(ISEA)**2+USSY(ISEA)**2)
@@ -1807,15 +1900,32 @@
 !
             ! Power spectral density of equivalent surface pressure
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 7 ) THEN
-              NFIELD=2
-              CALL S2GRID(PRMS(1:NSEA), XX)
-              CALL S2GRID(TPMS(1:NSEA), XY)
+              ! This is an example of placing more than one parameter in the
+              ! same file even if TOGETHER is set as .FALSE. This is managed
+              ! by joining sub-parameters into into a common netCDF Id:
+              ! NCID = NCIDS(IFI, IFJ, 1)
+              NFS = 2 ! Number of sub-parameters in loop over IFS=1,NFS
+                      ! Hardcoded ! Check that NFS equals w3ounfmetamd SPIJ2(K)
+              ISUB=IFS
+!
+              IF ( IFS .EQ. 1 ) THEN
+                !ENAME  = '.p2s'
+                IF (NCVARTYPEI.EQ.3) NCVARTYPE=4 ! Else will miss low-seas values
+                CALL S2GRID(PRMS(1:NSEA), X1)
+              ELSE ! IFS==2
+                !ENAME  = '.pp2s'
+                ! This sub-parameter goes to the netCDF file id. NCIDS(6,7,1)
+                ! even if TOGETHER is set as .FALSE.
+                FLJOIN = .TRUE.
+                CALL S2GRID(TPMS(1:NSEA), X1)
+              END IF ! IFS
 !
             ! Spectral variance of surface stokes drift
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 8 ) THEN
               ! Information for spectral distribution of surface Stokes drift (2nd file)
-              FLFRQ=.TRUE.
               NFIELD=2
+              FLJOIN=.FALSE.
+              FLFRQ=.TRUE.
               I1F=US3DF(2)
               I2F=US3DF(3)
               DO IK= I1F,I2F
@@ -1832,6 +1942,7 @@
             ! Base10 logarithm of power spectral density of equivalent surface pressure
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ.  9 ) THEN
                 ! Information for spectral microseismic generation data (2nd file)
+                FLJOIN=.FALSE.
                 FLFRQ=.TRUE.
                 I1F=P2MSF(2)
                 I2F=P2MSF(3)
@@ -1868,6 +1979,7 @@
            ! Partitioned surface stokes drift
            ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 12 ) THEN
               ! Information for spectral distribution of surface Stokes drift (2nd file)
+              FLJOIN=.FALSE.
               FLFRQ=.TRUE.
               IF (USSPF(1)==1) THEN
                 CUSTOMFRQ=.TRUE.
@@ -1886,7 +1998,7 @@
                 XYK(:,:,IK) = XY
               END DO
 !
-            ! Total momentum to the ocean
+            ! Total wave stress to the ocean in coupling
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 13 ) THEN
 #ifdef W3_RTD
               ! Rotate x,y vector back to standard pole
@@ -1903,7 +2015,65 @@
                 CALL W3S2XY ( NSEA, NSEA, NX+1, NY, TAUOCY(1:NSEA)     &
                                                         , MAPSF, XY )
               ENDIF ! SMCGRD
+              ! CALL S2GRID(TAUOCX(1:NSEA), XX)
+              ! CALL S2GRID(TAUOCY(1:NSEA), XY)
               NFIELD=2
+#ifdef W3_XSTO
+     ELSE IF ( IFI .EQ. IXSP .AND. IFJ .EQ. JXSP ) THEN
+        ! The three subfields (NFS=3) are joined in the netCDF file
+        NFS = 3 ! Number of subfields loop over IFS=1,NFS
+        ISUB = IFS
+        FLJOIN = .TRUE.
+!
+        IF ( IFS .EQ. 1 ) THEN
+          ! Vertical profile of Stokes drift
+          DIM3NAME='zk'
+          NFIELD=2
+          I1F=1
+          I2F=NZO
+          DO IK = 4,NZO+3
+# ifdef W3_RTD
+            ! Rotate x,y vector back to standard pole
+            IF ( FLAGUNR ) CALL W3XYRTN(NSEA, UXSP(:,IK), UXSP(:,NZO+IK), AnglD)
+# endif
+            CALL S2GRID( UXSP(1:NSEA,IK), XX )
+            CALL S2GRID( UXSP(1:NSEA,NZO+IK), XY )
+            XXK(:,:,IK-3)=XX
+            XYK(:,:,IK-3)=XY
+          END DO
+!
+        ELSE IF ( IFS .EQ. 2 ) THEN
+          ! 'Wavenumber of the zero-upcrossing period'
+          NFIELD=1
+          ! NOTE: The magnitude of ksc spans from O(1e-2) to O(1e+1)
+          !       It can be scaled to a 16-bit integer only with an
+          !       accuracy of order O(1e-3), and a value of FSC larger
+          !       than about 0.0005.
+          IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
+          CALL S2GRID( UXSP(1:NSEA,1), X1 )
+!
+        ELSE IF ( IFS .EQ. 3 ) THEN
+          ! Vertically integrated Stokes drift == wave pseudo momentum
+          ! This variable is nearly the same as TUS, the
+          ! 'total Stokes transport', but possibly with an XSTO extended tail
+          NFIELD=2
+          ! NOTE: The magnitude of wave pseudo momentum may span from O(1e-3)
+          !       to O(1e+2). Thus it should not be scaled to a 16-bit integer
+          IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
+!
+# ifdef W3_RTD
+          ! Rotate x,y vector back to standard pole
+          IF ( FLAGUNR ) CALL W3XYRTN(NSEA, UXSP(1:NSEA,2), &
+                                      UXSP(1:NSEA,3), AnglD)
+# endif
+          CALL S2GRID( UXSP(1:NSEA,2), XX )
+          CALL S2GRID( UXSP(1:NSEA,3), XY )
+          END IF ! IFS .EQ. 3
+#endif
+!
+!
+!
+! 7) Wave-bottom layer
 !
             ! RMS of bottom displacement amplitude
             ELSE IF ( IFI .EQ. 7 .AND. IFJ .EQ. 1 ) THEN
@@ -1929,15 +2099,27 @@
 !
             ! Bottom roughness
             ELSE IF ( IFI .EQ. 7 .AND. IFJ .EQ. 3 ) THEN
+              NFS = 2 ! Number of sub-parameters in loop over IFS=1,NFS
+              ISUB=IFS
+!
+              IF ( IFS .EQ. 1 ) THEN
+                !ENAME  = '.bed'
+                CALL S2GRID(BEDFORMS(1:NSEA,1), X1)
+              ELSE ! if ( IFS == 2 )
+                !ENAME  = '.ripple'
+                ! SHOWEX potential 'ripple length' vector BEDFORM(2),BEDFORM(3)
+                ! of SUBROUTINE W3SBT4
+                ! This sub-parameter goes to the netCDF file id. NCIDS(7,3,1)
+                FLJOIN = .TRUE.
 #ifdef W3_RTD
-              ! Rotate x,y vector back to standard pole
-              IF ( FLAGUNR ) CALL W3XYRTN(NSEA, BEDFORMS(1:NSEA,2), &
+                ! Rotate x,y vector back to standard pole
+                IF ( FLAGUNR ) CALL W3XYRTN(NSEA, BEDFORMS(1:NSEA,2), &
                                            BEDFORMS(1:NSEA,3), AnglD)
 #endif
-              CALL S2GRID(BEDFORMS(1:NSEA,1), X1)
-              CALL S2GRID(BEDFORMS(1:NSEA,2), X2)
-              CALL S2GRID(BEDFORMS(1:NSEA,3), XY)
-              NFIELD=3
+                CALL S2GRID(BEDFORMS(1:NSEA,2), XX)
+                CALL S2GRID(BEDFORMS(1:NSEA,3), XY)
+                NFIELD=2
+              END IF
 !
             ! Wave dissipation in bottom boundary layer
             ELSE IF ( IFI .EQ. 7 .AND. IFJ .EQ. 4 ) THEN
@@ -2040,8 +2222,9 @@
             END IF ! IFI AND IFJ
 
             ! CB Get netCDF metadata for IFI, IFJ combination (all components).
+            ! CarstenHansen: ISUB > 0 is an index for a sub-parameter
             DO I=1,NFIELD
-              META(I) = GETMETA(IFI, IFJ, ICOMP=I, IPART=IPART)
+              META(I) = GETMETA(IFI, IFJ, ICOMP=I, IPART=IPART, ISUB=ISUB)
             ENDDO
 
 ! 2.2 Make map
@@ -2057,16 +2240,17 @@
                   XX(IX,IY) = UNDEF
                   XY(IX,IY) = UNDEF
                 END IF
-                IF ( X1(IX,IY) .EQ. UNDEF ) THEN
-                  MAP(IX,IY) = 0
-                ELSE
-                  MAP(IX,IY) = 1
-                END IF
-                IF ( X2(IX,IY) .EQ. UNDEF ) THEN
-                  MP2(IX,IY) = 0
-                ELSE
-                  MP2(IX,IY) = 1
-                END IF
+                ! CarstenHansen: Commented out MAP and MP2 not used anywhere.
+                ! IF ( X1(IX,IY) .EQ. UNDEF ) THEN
+                !   MAP(IX,IY) = 0
+                ! ELSE
+                !   MAP(IX,IY) = 1
+                ! END IF
+                ! IF ( X2(IX,IY) .EQ. UNDEF ) THEN
+                !   MP2(IX,IY) = 0
+                ! ELSE
+                !   MP2(IX,IY) = 1
+                ! END IF
               END DO
             END DO
             ENDIF ! CB
@@ -2074,33 +2258,55 @@
 
 ! 2.3 Setups the output type 4 ( NetCDF file )
 
+      ! Subsections:
+      ! 2.3.1 Flag FLJOIN for the variable to be together or in a separate netCDF
+      ! 2.3.2 Set variable name substring (META(1)%ENAME in FNAMENC)
+      ! 2.3.3 Initialize dimensions etc.
+      ! 2.3.4 Initialize an optional third dimension
+
+! 2.3.1 Flag FLJOIN for the variable to be together or in a separate netCDF file
+
+            ! A parameter, which is not a sub-parameter with IFS > 1, may be
+            ! forced to a separate file by setting FLJOIN = .FALSE. in the above
+            ! settings for each IFI,IFJ. For example, this is done presently for
+            ! all parameters with a frequency dimension (FLFRQ==.TRUE.). For
+            ! IFS == 1 you are not allowed to do the reverse logic: You cannot
+            ! overrule a False value of TOGETHER (since there is no 'samefile').
+            
+            IF ( IFS .EQ. 1 ) FLJOIN = ( FLJOIN .AND. TOGETHER )
+
+            ! From here a False value of FLJOIN implies that the variable
+            ! goes to a separate netCDF file. If IFS == 1 and FLJOIN
+            ! is True, the variable goes to a common netCDF id. NCIDS(1,1,1)
+            !
+            ! The index of variable and group at the first write to a file
+            ! in mode together
+            IF (I1.EQ.0 .AND. FLJOIN) I1=IFI
+            IF (J1.EQ.0 .AND. FLJOIN) J1=IFJ
+
+! 2.3.2 Set variable name substring (META(1)%ENAME in FNAMENC)
+
             S2=LEN_TRIM(META(1)%ENAME)
             S1=LEN_TRIM(FILEPREFIX)+S4
             FNAMENC(S1+1:128)='       '
             FNAMENC(S1+1:S1+1) = '_'
 
-            ! If flag TOGETHER and not variable with freq dim &
-            ! (ef, p2l, ...), no variable name in file name
-            IF (TOGETHER.AND.(.NOT.FLFRQ)) THEN
+            ! If flag TOGETHER and variable with FLJOIN == .True. (i.e. *not*
+            ! freq dim ef, p2l, ...), no variable name in file name            
+            IF (TOGETHER.AND.FLJOIN) THEN
               S2=0
-            ! If NOT flag TOGETHER or variable with freq dim &
-            ! (ef, p2l, ...), add variable name in file name
+            ! If NOT flag TOGETHER or variable with FLJOIN == .False. (i.e. freq
+            !  dim ef, p2l, ...), add variable name in file name
             ELSE
               FNAMENC(S1+2:S1+S2) = META(1)%ENAME(2:S2)
             ENDIF
             ! Defines the netcdf extension
             FNAMENC(S1+S2+1:S1+S2+3) = '.nc'
             FNAMENC(S1+S2+4:S1+S2+6) = '   '
-            ! If the flag frequency is .TRUE., defines the fourth dimension
-            IF (FLFRQ) THEN
-              DIMLN(4)=I2F-I1F+1
-              EXTRADIM=1
-            ELSE
-              DIMLN(4)=0
-              EXTRADIM=0
-            END IF
 
-            ! If regular grid, initializes the lat/lon or x/y dimension lengths
+! 2.3.3 Initialize the space-time grid dimension lengths for a new netCDF file
+
+            ! If regular grid, initializes the lat/lon or x/y dimension lenghts
             IF (GTYPE.NE.UNGTYPE) THEN
               IF( SMCGRD ) THEN
 #ifdef W3_SMC
@@ -2125,40 +2331,186 @@
               DIMLN(3)=NTRI
             ENDIF
 
-            ! Defines index of first field variable
-            IVAR1=21
+            ! Three arrays are defined here to contain netCDF id.'s:
+            !   DIMID is the netCDF dimension id.'s to be defined for each field,
+            !   DIMFIELD is the netCDF dimensions of the individual field, and
+            !   VARID the dimension variable id.'s corresponding to DIMID
+            !
+            ! For an unstructured mesh or an SMC flat grid there is no y
+            ! dimension. If the field has a third dimension (e.g. frequency 'f')
+            ! in FIELD(x,y,f,time), then the index in DIMID of the time dimension
+            ! is also shifted by one from 4 to 5. Let IT denote this index here:
+            !                                                                   
+            ! COORD TYPE:  Dims in DIMFIELD:  Dims in DIMID:
+            ! Regular   :  (x, y, [f,] time)  (lvl,    x,    y, [f,] time)
+            ! SMC flat  :  (cell, [f,] time)  (lvl, cell,   [], [f,] time)
+            ! Unstruct  :  (node, [f,] time)  (lvl, node, elem, [f,] time, noel)
+            ! INDEX in DIMID:                         2     3  [IT-1]  IT  IT+1
+            ! INDEX in VARID:                         1     2    10    3    4
+            ! (DIMID(1) (lvl='level') is not a dimension of any actual field)
 
+            ! Further, let TDIM be the index in DIMFIELD of the time dimension
+            ! If there is no third dimension:
+            TDIM = 3
+#ifdef W3_SMC
+            IF( SMCOTYPE .EQ. 1 ) TDIM = 2
+#endif
+            IF ( GTYPE.EQ.UNGTYPE ) TDIM = 2
+            ! If the variable has a third dimension, we will set TDIM = TDIM + 1
+
+! 2.3.4 Define a third dimension
+
+            IF ( FLFRQ ) DIM3NAME = 'f'
+
+            ! A new third dimension (in addition to 'f' for frequency) may
+            ! be added to the code, e.g. segmented frequencies DIM3NAME='fs'.
+            ! A true value of the flag FLFRQ is here translated to DIM3NAME='f'.
+            !
+            ! The netCDF attributes for a third dimension variable ('f' or 'fs')
+            ! are defined in the netCDF file using the subroutine W3NCDEF3.
+            ! The procedure is constructed so that when such a 3'rd dimension
+            ! is requested and FLJOIN is not False, the variable is put in a
+            ! netCDF file together with other variables. However, if a another
+            ! third dimension with the same name is requested for another
+            ! variable, output is forced to a separate netCDF file.
+
+            ! If the individual variable has such a third dimension, the time
+            ! dimension is shifted by one, by adding a value EXTRADIM=1. Also
+            ! the 'noel' dimension for unstructured grid will be shifted by one.
+            ! By default the variable has no third dimension:
+            EXTRADIM = 0
+            ! By default there is no third dimension to the netCDF file.
+            NEW3D = .FALSE.
+            DIMLN(4) = 0
+
+            ! If there is a third dimension:
+            IF ( TRIM(DIM3NAME) .NE. '' ) THEN
+              ! ( TRIM(DIM3NAME) .EQ. 'f' ).OR. ( TRIM(DIM3NAME) .EQ. 'zk' )
+              EXTRADIM = 1
+              TDIM = TDIM + 1
+
+              ! We only add a new third dimension if this is the first timestep
+              ! in the netCDF file
+              IF ( NTIM.EQ.1 ) NEW3D=.TRUE.
+            END IF
+
+            ! Contents of a new third dimension variable
+            IF ( NEW3D ) THEN
+              DIMLN(4) = I2F-I1F+1
+              ! ( I1F,I2F are specified if the field has a third dimension )
+              ALLOCATE(DIM3VAR(DIMLN(4)))
+              ! (DIM3VAR will be deallocated after write to netCDF)
+              IF ( TRIM(DIM3NAME) .EQ. 'f' ) THEN
+                ! Set frequency values
+                !BGR Here is where we should tell it what frequencies are.
+                IF (CUSTOMFRQ) THEN
+                   DIM3VAR(:) = sqrt(GRAV*USSP_WN(1:usspf(2)))*TPIINV
+                ELSE
+                   DIM3VAR(:) = SIG(I1F:I2F)*TPIINV
+                END IF
+#ifdef W3_XSTO
+              ELSE IF ( TRIM(DIM3NAME) .EQ. 'zk' ) THEN
+                ! May assert that for 'zk': NZO == I2F-I1F+1
+                ! Set values of the dimensionless depths
+                ! The dimensionless depths are distributed like
+                ! expA((i-1)^b)-1:
+                ! DIM3VAR(IZ)  = XSDS*(XZK**((IZ-1.)**XSBP) - 1.)
+                ! The exponential base XZK is defined so that the deepest
+                ! point is DIM3VAR(XSND) = XSDS
+                XZK = 2.**((XSND*1.-1.)**(-XSBP))
+                ! First calculate XZK**(IZ-1) for IZ = 1,NZO
+                do IZ = 1,NZO
+                  DIM3VAR(IZ) = XZK**((IZ*1.-1.)**XSBP)
+                end do
+                ! Then subtract 1 and multiply with the scale
+                DIM3VAR(:) = XSDS*(DIM3VAR(:) - 1.)
+#endif
+              ! The netCDF attributes of DIM3VAR are specified in the
+              ! subroutine W3NCDEF3
+              !
+              ! Here you may also assign an alternative third dimension, for
+              ! example an array 'fs' of segmented frequencies like:
+              ! ELSE IF ( TRIM(DIM3NAME) .EQ. 'fs' ) THEN
+              !   DIM3VAR(:) = sqrt(GRAV*XXXX_WN(1:DIMLN(4)))*TPIINV
+              END IF ! TRIM(DIM3NAME)
+            END IF ! .NEW3D.
+
+            ! If we need the third dimension in a netCDF file already open,
+            ! check if the third dimension exists, and if it matches
+            IF ( NEW3D .AND. FLJOIN ) THEN
+              ! Tentative id. if already open
+              OLDNCID = NCIDS(IFI,IFJ,1)
+              ! If all variables in the same file
+              IF ( TOGETHER ) OLDNCID = NCIDS(1,1,1)
+
+              CALL W3NCINQ3( OLDNCID, DIM3NAME, DIMID3, DIMLN(4), VCHCK=DIM3VAR )
+              IF ( DIMID3 .EQ. -1 ) THEN
+                ! If DIM3NAME is defined in the netCDF but doesn't match
+                ! DIM3VAR, then write to separate file
+                WRITE(NDSE,*) ' Must output to a separate file for IFI,IFJ=',&
+                                IFI,IFJ
+                FLJOIN = .FALSE.
+                ! Note: DIM3VAR is kept allocated as long as NEW3D is True
+              ELSE IF ( DIMID3 .GE. 1 ) THEN
+                ! DIM3NAME already exists in netCDF, and matches the dim var
+                NEW3D = .FALSE.
+                DEALLOCATE(DIM3VAR)
+              END IF
+            END IF
+
+
+! 2.4 Manage netCDF file id
+
+      ! Subsections:
+      ! 2.4.1 Save the id of the previous file
+      ! 2.4.2 Remove the new file (if not created by the run)
+      ! 2.4.3 Finalize the previous file (if a new one will be created)
 
 ! 2.4.1 Save the id of the previous file
 
-            IF (TOGETHER.AND.(.NOT.FLFRQ)) THEN
+            FEXIST = .FALSE.
+            ! The netCDF file already exists if a sub-parameter (with IFS>1) is
+            ! requested to go with the first sub-parameter (IFS==1) to a
+            ! common file (and not to its own separate file).
+            ! FLJOIN must be explicitely True in the configuration of the
+            ! individual (sub-)parameter in order to override a False value of
+            ! TOGETHER
+            !
+            IF ( .NOT. FLJOIN ) THEN
+              ! the variable in a separate file
+              OLDNCID = NCIDS(IFI,IFJ,IFS) ! IFS may be an index of a partition
+            ELSE IF (IFS .EQ. 1 .OR. INDEXIPART .NE. 1 .OR. TOGETHER) THEN
+              ! all variables in the same file
               OLDNCID = NCIDS(1,1,1)
             ELSE
-              OLDNCID = NCIDS(IFI,IFJ,IPART+1)
+              ! A False value of TOGETHER overridden for individual sub-parameter
+              FEXIST = .TRUE.
+              OLDNCID = NCIDS(IFI, IFJ, 1)
             END IF
-
 
 ! 2.4.2 Remove the new file (if not created by the run)
 
-            INQUIRE(FILE=FNAMENC, EXIST=FEXIST)
-            IF (FEXIST) THEN
-              FREMOVE = .FALSE.
+            ! Still, a False value of FEXIST means we don't know if a file
+            ! named FNAMENC exists. If it is created by another run, remove it.
+            IF (.NOT. FEXIST) THEN
+              INQUIRE(FILE=FNAMENC, EXIST=FEXIST)
               ! time splitted condition
-              IF (INDEX(TIMEID,OLDTIMEID).EQ.0) THEN
-                ! all variables in the samefile
-                IF (TOGETHER.AND.(.NOT.FLFRQ).AND.NCID.EQ.0) FREMOVE = .TRUE.
-                ! a file per variable
-                IF (.NOT.TOGETHER.OR.FLFRQ) FREMOVE = .TRUE.
-              END IF
-
-              IF (FREMOVE) THEN
+              IF (FEXIST .AND. INDEX(TIMEID,OLDTIMEID).EQ.0 .AND. &
+                ! a file per variable, or the variable is the first in a new file
+                  ( .NOT. FLJOIN .OR. FIRST_TOGETHER ) )  THEN
                 OPEN(UNIT=1234, IOSTAT=IRET, FILE=FNAMENC, STATUS='old')
                 IF (IRET == 0) CLOSE(1234, STATUS='delete')
                 FEXIST=.FALSE.
-              ELSE
-                NCID = OLDNCID
               END IF
             END IF
+
+            ! Set FIRST_TOGETHER FALSE for following parameters in the file
+            IF ( FLJOIN .AND. FIRST_TOGETHER ) FIRST_TOGETHER = .FALSE.
+
+            ! From here, a False value of FEXIST implies that a new file will be
+            ! created. If FEXIST is True the file is open with OLDNCID > 0.
+
+            IF (FEXIST) NCID = OLDNCID
 
 ! 2.4.3 Finalize the previous file (if a new one will be created)
 
@@ -2178,27 +2530,15 @@
 
 ! 2.5 Creates the netcdf file
 
+      ! Subsections:
+      ! 2.5.1 Creates the NetCDF file
+      ! 2.5.2 Generates Lat-Lon arrays
+      ! 2.5.3 Writes longitudes, latitudes, triangles, frequency and status map
+
             IF (.NOT.FEXIST) THEN
 
-              ! Initializes the time dimension length
+              ! Set the size of the 'level' dim
               DIMLN(1)=1
-
-              ! If NOT unstructure mesh (i.e. regular grid)
-!! CHRISB: VARNM for lat/lon not actually used below.
-!              IF (GTYPE.NE.UNGTYPE) THEN
-!                ! If spherical coordinate
-!                IF (FLAGLL) THEN
-!                  VARNM(NFIELD+1)='Longitude'
-!                  VARNM(NFIELD+2)='Latitude'
-!                ! If cartesian coordinate
-!                ELSE
-!                  VARNM(NFIELD+1)='x'
-!                  VARNM(NFIELD+2)='y'
-!                END IF
-!              END IF
-
-              ! Initializes the time iteration counter n
-              N=1
 
 ! 2.5.1 Creates the NetCDF file
               CALL W3CRNC(FNAMENC,NCID,DIMID,DIMLN,VARID, &
@@ -2206,11 +2546,17 @@
 
               ! Saves the NCID to keep the file opened to write all the variables
               ! and open/close at each time step
-              IF (TOGETHER.AND.(.NOT.FLFRQ)) THEN
+              IF ( FLJOIN ) THEN
                 NCIDS(1,1,1)=NCID
               ELSE
-                NCIDS(IFI,IFJ,IPART+1)=NCID
+                NCIDS(IFI,IFJ,IFS)=NCID
               END IF
+
+              ! Define a new third dimension if determined in Sect. 2.3.4
+              ! (Keep NEW3D = .TRUE. and DIM3VAR allocated to write the dimension
+              ! variable later after having left the netCDF define mode )
+              IF ( NEW3D ) &
+                CALL W3NCDEF3(NCID,DIM3NAME,DIMID(4),DIMLN(4),VARID(10))
 
               ! If curvilinear grid, instanciates lat / lon
               IF (GTYPE.EQ.CLGTYPE) THEN
@@ -2407,8 +2753,10 @@
               IF (GTYPE.EQ.UNGTYPE) THEN
                 LON(:)=XGRD(1,:)
                 LAT(:)=YGRD(1,:)
+                IF (.NOT.ALLOCATED(TRIGP2)) ALLOCATE(TRIGP2(3,NTRI))
                 DIMLN(2)=NX
                 DIMLN(3)=NTRI
+                TRIGP2=TRANSPOSE(TRIGP)
                 IF(FL_DEFAULT_GBL_META) THEN
                   IRET=NF90_PUT_ATT(NCID,NF90_GLOBAL, &
                                        'latitude_resolution','n/a')
@@ -2485,11 +2833,12 @@
               WRITE(STRSTARTDATE,'(I4.4,A,4(I2.2,A),I2.2)') STARTDATE(1),'-',STARTDATE(2),'-', &
                     STARTDATE(3),' ',STARTDATE(5),':',STARTDATE(6),':',STARTDATE(7)
 
-              ! End of define mode of NetCDF file
+! 2.5.3 Writes longitudes, latitudes, triangles, frequency and status map (mapsta) to netcdf file
+
+              ! End of define mode of netCDF file (will re-enter in Sect. 2.6.3
+              ! to define the variables identifiers)
               IRET = NF90_ENDDEF(NCID)
               CALL CHECK_ERR(IRET)
-
-! 2.5.3 Writes longitudes, latitudes, triangles, frequency and status map (mapsta) to netcdf file
 
               ! If regular grid
               IF (GTYPE.EQ.RLGTYPE .OR. GTYPE.EQ.SMCTYPE) THEN
@@ -2539,31 +2888,14 @@
                 CALL CHECK_ERR(IRET)
               END IF
 
-              ! Writes frequencies to netcdf file
-              IF (EXTRADIM.EQ.1) THEN
-                ALLOCATE(FREQ(I2F-I1F+1))
-                !BGR Here is where we should tell it what frequencies are.
-                IF (CUSTOMFRQ) THEN
-                   DO i=1,usspf(2)
-                      FREQ(i)=sqrt(GRAV*USSP_WN(i))*TPIINV
-                   ENDDO
-                ELSE
-                   DO i=1,I2F-I1F+1
-                      FREQ(i)=SIG(I1F-1+i)*TPIINV
-                   END DO
-                ENDIF
-                IRET=NF90_PUT_VAR(NCID,VARID(10),FREQ)
-                CALL CHECK_ERR(IRET)
-                DEALLOCATE(FREQ)
-              END IF
 
               ! Writes triangles to netcdf file
               IF (GTYPE.EQ.UNGTYPE) THEN
-                IRET=NF90_PUT_VAR(NCID,VARID(4),TRIGP)
+                IRET=NF90_PUT_VAR(NCID,VARID(4),TRIGP2)
                 CALL CHECK_ERR(IRET)
               END IF
 
-              ! Writes status map array at variable index 2+1+coordtype+idim-4
+              ! Writes status map array
               IF (MAPSTAOUT) THEN 
                 START(1)=1
                 START(2)=1
@@ -2592,98 +2924,23 @@
 
               WRITE (NDSO,973) FNAMENC
 
-! 2.5.4  Defines the field(LON,LAT,time) of the variable (i.e. ucur,vcur for current variable)
+              ! Now the netCDF file has been created with space-time dimensions
+              ! and attributes
 
-              IRET = NF90_REDEF(NCID)
-              CALL CHECK_ERR(IRET)
-              DO I=1,NFIELD
-                IVAR=IVAR1+I
-                IF (COORDTYPE.EQ.1) THEN
-                  IF (NCVARTYPE.EQ.2) THEN
-                    IF( SMCGRD ) THEN
-#ifdef W3_SMC
-                      IF( SMCOTYPE .EQ. 1 ) THEN
-                        ! SMC Flat file
-                        IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_SHORT, (/DIMID(2), DIMID(4+EXTRADIM)/), VARID(IVAR))
-                      ELSE
-                        ! SMC Regridded file
-                        IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_SHORT, DIMID(2:4+EXTRADIM), VARID(IVAR))
-                      ENDIF
-                      CALL CHECK_ERR(IRET)
-#endif
-                    ELSE ! SMCGRD
-                      IRET=NF90_DEF_VAR(NCID,META(I)%VARNM, NF90_SHORT, DIMID(2:4+EXTRADIM), VARID(IVAR))
-                      CALL CHECK_ERR(IRET)
-                    ENDIF ! SMCGRD
-                    IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(IVAR), 1, 1, DEFLATE)
-                    IF (NCTYPE.EQ.4) CALL CHECK_ERR(IRET)
-                  ELSE
-                    IF( SMCGRD ) THEN
-#ifdef W3_SMC
-                      IF( SMCOTYPE .EQ. 1 ) THEN
-                        ! SMC Flat file
-                        IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_FLOAT, (/DIMID(2), DIMID(4+EXTRADIM)/), VARID(IVAR))
-                      ELSE
-                        ! SMC Regridded file
-                        IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_FLOAT, DIMID(2:4+EXTRADIM), VARID(IVAR))
-                      ENDIF
-                      CALL CHECK_ERR(IRET)
-#endif
-                    ELSE ! SMCGRD
-                      IRET=NF90_DEF_VAR(NCID,META(I)%VARNM, NF90_FLOAT, DIMID(2:4+EXTRADIM), VARID(IVAR))
-                      CALL CHECK_ERR(IRET)
-                    ENDIF ! SMCGRD
-                    IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(IVAR), 1, 1, DEFLATE)
-                    IF (NCTYPE.EQ.4) CALL CHECK_ERR(IRET)
-                  END IF
-                ELSE
-                  DIMFIELD(1)=DIMID(2)
-                  DIMFIELD(2)=DIMID(4)
-                  DIMFIELD(3)=DIMID(5)
-                  IF (NCVARTYPE.EQ.2) THEN
-                    IRET = NF90_DEF_VAR(NCID,META(I)%VARNM, NF90_SHORT, DIMFIELD(1:2+EXTRADIM), VARID(IVAR))
-                    CALL CHECK_ERR(IRET)
-                    IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(IVAR), 1, 1, DEFLATE)
-                    IF (NCTYPE.EQ.4) CALL CHECK_ERR(IRET)
-                  ELSE 
-                    IRET = NF90_DEF_VAR(NCID,META(I)%VARNM, NF90_FLOAT, DIMFIELD(1:2+EXTRADIM), VARID(IVAR))
-                    CALL CHECK_ERR(IRET)
-                    IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(IVAR), 1, 1, DEFLATE)
-                    IF (NCTYPE.EQ.4) CALL CHECK_ERR(IRET)
-                  END IF  
-                END IF
-
-                ! Set scale factor to 1.0 if using FLOAT variables for output
-                IF(NCVARTYPE .GT. 2) META(I)%FSC = 1.0
-
-                !! CB - USE NEW W3META MODULE
-                CALL WRITE_META(NCID, VARID(IVAR), META(I), IRET) ! CB
-                CALL CHECK_ERR(IRET) ! CB
+! C. Hansen The former section 2.5.4 is shifted to section 2.6.3
 !
-             !! CHRISB: Commenting out below - will be handled by w3oundmeta module
-#ifdef W3_RTD
-
-        !        IF ( RTDL ) THEN
-        !          ! Add grid mapping attribute for rotated pole grids:
-        !          IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'grid_mapping',    &
-        !                            'rotated_pole')
-        !          CALL CHECK_ERR(IRET)
-        !          END IF
-
-#endif
-              END DO
-!
-              ! put START date in global attribute
-              IF(FL_DEFAULT_GBL_META) THEN
-                IRET=NF90_PUT_ATT(NCID,NF90_GLOBAL,'start_date',STRSTARTDATE)
-                CALL CHECK_ERR(IRET)
-              ENDIF
-!
-              IRET = NF90_ENDDEF(NCID)
-              CALL CHECK_ERR(IRET)
-
+              ! If it is the first time step (NTIM == 1) for the field, we
+              ! still need to define the fields (I=1,NFIELD) and optional third
+              ! 'spectral' dimension. This will be done in Sect. 2.6.3
 
 ! 2.6 Append data to the existing file
+
+      ! Subsections:
+      ! 2.6.1 Get the dimensions from the netcdf header
+      ! 2.6.2 (-> Sect. 1.3) Increments the time step for existing file
+      ! 2.6.3 Defines or gets the variables identifiers
+      ! 2.6.4 Defines the current time step and index
+      ! 2.6.5 Puts field(s) in NetCDF file
 
             ELSE  ! FEXIST
 
@@ -2723,135 +2980,223 @@
               END IF
               ! Get the dimension time
               IRET=NF90_INQ_DIMID (NCID, 'time', DIMID(4+EXTRADIM))
-              IRET=NF90_INQUIRE_DIMENSION (NCID, DIMID(4+EXTRADIM),len=N)
               CALL CHECK_ERR(IRET)
               IRET=NF90_INQ_VARID (NCID, 'time', VARID(3))
+              CALL CHECK_ERR(IRET)
+              
+              ! Define or get a third dimension (e.g. DIM3NAME='f')
+              IF ( NEW3D ) THEN
+                ! A new third dimension has to be defined in an existing file
+                IRET = NF90_REDEF(NCID)
+                CALL W3NCDEF3( NCID, DIM3NAME, DIMID(4), DIMLN(4), VARID(10) )
+                IF ( IRET .EQ. NF90_NOERR ) THEN
+                  IRET = NF90_ENDDEF(NCID)
+                  CALL CHECK_ERR(IRET)
+                END IF
+                ! (Keep NEW3D = .TRUE. and DIM3VAR allocated to write the
+                ! variable contents later)
+              ELSE IF (EXTRADIM.EQ.1) THEN
+                 IRET=NF90_INQ_DIMID (NCID, DIM3NAME, DIMID(4))
+              END IF
+              CALL CHECK_ERR(IRET)
               IF( FLGFC ) THEN
                 IRET = NF90_INQ_VARID(NCID, 'forecast_period', VARID(11))
                 CALL CHECK_ERR(IRET)
               ENDIF
-              ! Get the dimension f
-              IF (EXTRADIM.EQ.1) IRET=NF90_INQ_DIMID (NCID, 'f', DIMID(4))
 
-! 2.6.2 Increments the time step for existing file
+            END IF  ! FEXIST
 
-              ! If it is the first field of the file in mode together
-              ! or NOT together or variable with freq dim (ef or p2l)
-              ! ChrisBunney: Also - check IPART=TABIPART in case first
-              ! requested output is a partitioned field.
-              IF((TOGETHER .AND. IFI.EQ.I1 .AND. IFJ.EQ.J1 .AND. IPART.EQ.TABIPART(1))  &
-                 .OR.(.NOT.TOGETHER).OR.FLFRQ) n=n+1
+! C. Hansen The time increments in former sect. 2.6.2 is now handled elsewhere
+        ! The time step NTIM has been incremented in Sect. 1.3 .
+        ! NTIM is reset to 1 when the time stamp in files is updated
+        ! In sec. 2.6.4, time is put in NetCDF file
 
-! 2.6.3 Defines or gets the variables identifiers
+! 2.6.2 Defines or gets the variables identifiers
 
-              ! If it is the first time step, define all the variables and attributes
-              IF (N.EQ.1) THEN
-                IRET = NF90_REDEF(NCID)
+            ! Defines index of first field variable
+            IVAR1=21
+
+            ! If it is the first time step, define all the variables and attributes
+            IF (NTIM.EQ.1) THEN
+
+              ! We reach here from one of two cases:
+              ! - From Sect. 2.5 where the netCDF file was created for the first
+              !   output variable.
+              ! - From Sect. 2.6.1 for a new variable to existing file
+
+              ! If we require a new 3'rd dimension as determined in Sect. 2.3.4
+              IF ( NEW3D ) THEN
+                ! Write to netCDF, e.g. Frequencies
+                ! VARID(10) has been determined in Sect. 2.5.1 or 2.6.1
+                IRET = NF90_PUT_VAR(NCID, VARID(10), DIM3VAR)
                 CALL CHECK_ERR(IRET)
+                DEALLOCATE(DIM3VAR)
+                NEW3D=.FALSE.
+              END IF
 
-                ! Loops on all the fields of the variable (i.e. ucur/vcur for current)
-                DO I=1,NFIELD
-                  IVAR=IVAR1+I
-                  IF (COORDTYPE.EQ.1) THEN
-                    IF (NCVARTYPE.EQ.2) THEN
-                      IF( SMCGRD ) THEN
-#ifdef W3_SMC
-                        IF( SMCOTYPE .EQ. 1 ) THEN
-                          ! SMC Flat file
-                          IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_SHORT, (/DIMID(2), DIMID(4+EXTRADIM)/), VARID(IVAR))
-                        ELSE
-                          ! SMC Regridded file
-                          IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_SHORT, DIMID(2:4+EXTRADIM), VARID(IVAR))
-                        ENDIF
-#endif
-                      ELSE
-                         IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_SHORT, DIMID(2:4+EXTRADIM), VARID(IVAR))
-                         CALL CHECK_ERR(IRET)
-                      ENDIF ! SMCGRD
-                      IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(IVAR), 1, 1, DEFLATE)
-                    ELSE
-                      IF( SMCGRD ) THEN
-#ifdef W3_SMC
-                        IF( SMCOTYPE .EQ. 1 ) THEN
-                          ! SMC Flat file
-                          IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_FLOAT, (/DIMID(2), DIMID(4+EXTRADIM)/), VARID(IVAR))
-                        ELSE
-                          ! SMC Regridded file
-                          IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_FLOAT, DIMID(2:4+EXTRADIM), VARID(IVAR))
-                        ENDIF
-#endif
-                      ELSE
-                        IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_FLOAT, DIMID(2:4+EXTRADIM), VARID(IVAR))
-                        CALL CHECK_ERR(IRET)
-                      ENDIF ! SMCGRD
-                      IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(IVAR), 1, 1, DEFLATE)
-                      IF (NCTYPE.EQ.4) CALL CHECK_ERR(IRET)
-                    END IF
-                  ELSE
-                    DIMFIELD(1)=DIMID(2)
-                    DIMFIELD(2)=DIMID(4)
-                    DIMFIELD(3)=DIMID(5)
-                    IF (NCVARTYPE.EQ.2) THEN
-                      IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_SHORT, DIMFIELD(1:2+EXTRADIM), VARID(IVAR))
-                      CALL CHECK_ERR(IRET)
-                      IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(IVAR), 1, 1, DEFLATE)
-                      IF (NCTYPE.EQ.4) CALL CHECK_ERR(IRET)
-                    ELSE
-                      IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_FLOAT, DIMFIELD(1:2+EXTRADIM), VARID(IVAR))
-                      CALL CHECK_ERR(IRET)
-                      IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(IVAR), 1, 1, DEFLATE)
-                      CALL CHECK_ERR(IRET)
-                    END IF
-                  END IF
-!
-                  ! Set scale factor to 1.0 if using FLOAT variables for output
-                  IF(NCVARTYPE .GT. 2) META(I)%FSC = 1.0
+! 2.6.3  Defines the fields(LON,LAT,time) of the variable (i.e. ucur,vcur for current variable)
 
-                  !! CB - USE NEW W3META MODULE
-                  CALL WRITE_META(NCID, VARID(IVAR), META(I), IRET) ! CB
-                  CALL CHECK_ERR(IRET) ! CB
+              ! Re-enter define mode of netCDF file (we left define mode in
+              ! Sect. 2.5.3 to write dimensions variables and status map)
+              IRET = NF90_REDEF(NCID)
+              CALL CHECK_ERR(IRET)
+
+              ! The field indices depend on the grid being regular or 'flat'
+              ! TDIM: Index in DIMFIELD of time dimension. TDIM has been set
+              ! in Sect. 2.3.4
+
+              ! The first index is x, lon, SMC cell, or node:
+              DIMFIELD(1) = DIMID(2)
+              ! 'y' or 'lat' for regular grid, will else be overwritten:
+              DIMFIELD(2) = DIMID(3)
+              ! Third dimension (e.g. 'f'):
+              IF ( EXTRADIM.EQ.1 ) DIMFIELD(TDIM-1) = DIMID(4)
+              ! Time dimension:
+              DIMFIELD(TDIM) = DIMID(4+EXTRADIM)
+
+              ! Loops on all the fields of the variable (i.e. ucur/vcur for current)
+              DO I=1,NFIELD
+                IVAR=IVAR1+I
+
+                IF (NCVARTYPE.EQ.2) THEN
+                  IF( SMCGRD ) THEN
+#ifdef W3_SMC
+                    IF( SMCOTYPE .EQ. 1 ) THEN
+                      ! SMC Flat file
+                      IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_SHORT, (/DIMFIELD(1), DIMFIELD(TDIM)/), VARID(IVAR))
+                    ELSE
+                      ! SMC Regridded file
+                      IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_SHORT, DIMFIELD(1:TDIM), VARID(IVAR))
+                    ENDIF
+                    CALL CHECK_ERR(IRET)
+#endif
+                  ELSE ! SMCGRD
+                    IRET=NF90_DEF_VAR(NCID,META(I)%VARNM, NF90_SHORT, DIMFIELD(1:TDIM), VARID(IVAR))
+                    CALL CHECK_ERR(IRET)
+                  ENDIF ! SMCGRD
+                ELSE
+                  IF( SMCGRD ) THEN
+#ifdef W3_SMC
+                    IF( SMCOTYPE .EQ. 1 ) THEN
+                      ! SMC Flat file
+                      IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_FLOAT, (/DIMFIELD(1), DIMFIELD(TDIM)/), VARID(IVAR))
+                    ELSE
+                      ! SMC Regridded file
+                      IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_FLOAT, DIMFIELD(1:TDIM), VARID(IVAR))
+                    ENDIF
+                    CALL CHECK_ERR(IRET)
+#endif
+                  ELSE ! SMCGRD
+                    IRET=NF90_DEF_VAR(NCID,META(I)%VARNM, NF90_FLOAT, DIMFIELD(1:TDIM), VARID(IVAR))
+                    CALL CHECK_ERR(IRET)
+                  ENDIF ! SMCGRD
+                END IF
+                
+                IF (NCTYPE.EQ.4) THEN
+                  IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(IVAR), 1, 1, DEFLATE)
+                  CALL CHECK_ERR(IRET)
+                ENDIF
+
+                ! Set scale factor to 1.0 if using FLOAT variables for output
+                IF(NCVARTYPE .GT. 2) META(I)%FSC = 1.0
+
+                !! CB - USE NEW W3META MODULE
+                CALL WRITE_META(NCID, VARID(IVAR), META(I), IRET) ! CB
+                CALL CHECK_ERR(IRET) ! CB
 !
              !! CHRISB: Commenting out below - will be handled by w3oundmeta module
 #ifdef W3_RTD
 
-        !          IF ( RTDL ) THEN
-        !            ! Add grid mapping attribute for rotated pole grids:
-        !            IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'grid_mapping',   &
-        !                              'rotated_pole')
-        !            CALL CHECK_ERR(IRET)
-        !            END IF
+        !        IF ( RTDL ) THEN
+        !          ! Add grid mapping attribute for rotated pole grids:
+        !          IRET=NF90_PUT_ATT(NCID,VARID(IVAR),'grid_mapping',    &
+        !                            'rotated_pole')
+        !          CALL CHECK_ERR(IRET)
+        !          END IF
 
 #endif
-                END DO
-                IRET = NF90_ENDDEF(NCID)
-                CALL CHECK_ERR(IRET)
+              END DO
+!
+              ! put START date in global attribute
+              IRET=NF90_PUT_ATT(NCID,NF90_GLOBAL,'start_date',STRSTARTDATE)
+              CALL CHECK_ERR(IRET)
+!
+              IRET = NF90_ENDDEF(NCID)
+              CALL CHECK_ERR(IRET)
 
-              ! If it is not the first time step, get all VARID from the netcdf file opened
-              ELSE
-                IRET=NF90_REDEF(NCID)
+            END IF  ! NTIM.EQ.1
+
+           ! If it is not the first time step, get all VARID from the netcdf file opened
+            IF (NTIM.GT.1) THEN
+              DO I=1,NFIELD
+                ! Get meta-data for field
+                !META = GETMETA(IFI, IFJ, ICOMP=I, IPART=IPART)
+                IVAR=IVAR1+I
+                IRET=NF90_INQ_VARID (NCID, META(I)%VARNM, VARID(IVAR))
                 CALL CHECK_ERR(IRET)
-                DO I=1,NFIELD
-                  ! Get meta-data for field
-                  !META = GETMETA(IFI, IFJ, ICOMP=I, IPART=IPART)
-                  IVAR=IVAR1+I
-                  IRET=NF90_INQ_VARID (NCID, META(I)%VARNM, VARID(IVAR))
-                  CALL CHECK_ERR(IRET)
-                END DO
-                IRET=NF90_ENDDEF(NCID)
-                CALL CHECK_ERR(IRET)
-              END IF !   N.EQ.1
-            END IF  ! FEXIST
+              END DO
+            END IF
 
 ! 2.6.4 Defines the current time step and index
 
             CALL T2D(TIME,CURDATE,IERR)
+            OUTJULDAY=TSUB(REFDATE,CURDATE)
+
+            WRITETO=FNAMENC
+            ! If a sub-parameter and not TOGETHER, we forgot the file name
+            IF ( NCIDS(IFI,IFJ,IFS) .EQ. 0 .AND. NCIDS(IFI,IFJ,1) .NE. 0) &
+                 WRITETO(:)='(id.)'
             WRITE(NDSO,'(A,A9,A,I6,A,I4,A,I2.2,A,I2.2,A,I2.2,A,I2.2,A,I2.2,2A)')        &
-                    'Writing new record ', META(1)%ENAME(2:) ,'number ',N,    &
+                    'Writing new record ', META(1)%ENAME(2:) ,'number ',NTIM,    &
                     ' for ',CURDATE(1),':',CURDATE(2),':',CURDATE(3),'T',CURDATE(5),&
-                    ':',CURDATE(6),':',CURDATE(7),' in file ',TRIM(FNAMENC)
+                    ':',CURDATE(6),':',CURDATE(7),' in file ',TRIM(WRITETO)
 
+            ! Puts time in NetCDF file
+            IF ( (IFI.EQ.I1 .AND. IFJ.EQ.J1 .AND. IFS.EQ.1) &
+                 .OR. ( .NOT. FLJOIN ) ) THEN
+              IVAR1 = 21
+              IF(TIMEUNIT .EQ. 'S') THEN
+                ! Time in seconds
+                OUTSECS = TSUBSEC(EPOCHDATE,CURDATE)
+                IRET = NF90_PUT_VAR(NCID, VARID(3), OUTSECS, (/NTIM/))
+              ELSE
+                ! Time in days
+                OUTJULDAY = TSUB(EPOCHDATE,CURDATE)
+                IRET = NF90_PUT_VAR(NCID, VARID(3), OUTJULDAY, (/NTIM/))
+              ENDIF
+              CALL CHECK_ERR(IRET)
 
-
+              ! ChrisB: Calculate forecast period w.r.t. forecast reference time:
+              IF (FLGFC) THEN
+                OUTSECS = TSUBSEC(REFDATE, CURDATE)
+                IRET = NF90_PUT_VAR(NCID, VARID(11), OUTSECS, (/NTIM/))
+                CALL CHECK_ERR(IRET)
+              ENDIF
+            END IF
+!
+! 2.6.5 Puts field(s) in NetCDF file
+!
+            ! When writing to netCDF, we will allways specify the START and
+            ! COUNT dimension indices as START(1:TDIM),COUNT(1:TDIM). This is
+            ! constructed as follows.
+            !
+            ! First set the START and COUNT for EXTRADIM==0 and a regular 2D
+            ! grid. If EXTRADIM==1, START(EDIM=TDIM-1) will be incremented by 1
+            ! on each loop over the third array index IK=I1F,I2F (see below)
+            !
+            ! For a regular grid ( SMCOTYPE == 2 or .NOT.UNGTYPE ) we have
+            ! if EXTRADIM==0: TDIM=3; START=(/1,1,NTIM/); COUNT=(/NX,NY,1/)
+            ! if EXTRADIM==1: TDIM=4; START=(/1,1,IK,NTIM/); COUNT=(/NX,NY,1,1/)
+            !
+            ! For flat sea point array, let NX == COUNT(1) = IXN-IX1+1. We have:
+            ! if EXTRADIM==0: TDIM=2; START=(/1,NTIM/); COUNT=(/NX,1/)
+            ! if EXTRADIM==1: TDIM=3; START=(/1,IK,NTIM/); COUNT=(/NX,1,1/)
+            !
+            ! For flat sea point array IY1 = 1, IYN = 1, because
+            ! NY = 1 for GTYPE.EQ.UNGTYPE. This is set by ww3_grid. ww3_ounf
+            ! sets IY1 = MAX (NML_FILE%IY0, 1), IYN = MIN (NML_FILE%IYN, NY)
+            ! with default values IY0 = 1, IYN = 1.
+            
             ! Defines starting point and size of arrays to be written
             START(1)=1
             START(2)=1
@@ -2859,595 +3204,156 @@
             START(4)=1
 
             ! Sets time index
-            START(3+1-COORDTYPE+EXTRADIM)=N
+            START(TDIM)=NTIM
+            ! TDIM is the index in DIMFIELD of the time dim. (Sect. 2.3.4)
             COUNT(1)=IXN-IX1+1
             COUNT(2)=IYN-IY1+1
             COUNT(3)=1
             COUNT(4)=1
-            START1D(1)=1
-            START1D(2)=N
-            COUNT1D(1)=IXN-IX1+1
-            COUNT1D(2)=1
 
-            ! Puts time in NetCDF file
-            IF((IFI.EQ.I1.AND.IFJ.EQ.J1.AND.TOGETHER)  &
-               .OR.(.NOT.TOGETHER).OR.FLFRQ) THEN
-              IVAR1 = 21
-
-              IF(TIMEUNIT .EQ. 'S') THEN
-                ! Time in seconds
-                OUTSECS = TSUBSEC(EPOCHDATE,CURDATE)
-                IRET = NF90_PUT_VAR(NCID, VARID(3), OUTSECS, (/N/))
-              ELSE
-                ! Time in days
-                OUTJULDAY = TSUB(EPOCHDATE,CURDATE)
-                IRET = NF90_PUT_VAR(NCID, VARID(3), OUTJULDAY, (/N/))
-              ENDIF
-              CALL CHECK_ERR(IRET)
-
-              ! ChrisB: Calculate forecast period w.r.t. forecast reference time:
-              IF (FLGFC) THEN
-                OUTSECS = TSUBSEC(REFDATE, CURDATE)
-                IRET = NF90_PUT_VAR(NCID, VARID(11), OUTSECS, (/N/))
-                CALL CHECK_ERR(IRET)
-              ENDIF
-            END IF
-!
-! 2.6.5 Puts field(s) in NetCDF file
-
-! NFIELD=3
-            IF (NCVARTYPE.EQ.2) THEN
-              IF ( NFIELD.EQ.3 ) THEN
-                IF (SMCGRD) THEN
-#ifdef W3_SMC
-                  DO IX=IX1, IXN
-                    DO IY=IY1, IYN
-                      ! TODO: Find some other way to access MAPSTA
-                      IF ( X1(IX,IY) .EQ. UNDEF ) THEN
-                        MXX(IX,IY) = MFILL
-                        MYY(IX,IY) = MFILL
-                        MXY(IX,IY) = MFILL
-                      ELSE
-                        MXX(IX,IY) = NINT(X1(IX,IY)/META(1)%FSC)
-                        MYY(IX,IY) = NINT(X2(IX,IY)/META(2)%FSC)
-                        MXY(IX,IY) = NINT(XY(IX,IY)/META(3)%FSC)
-                      END IF
-                    END DO
-                  END DO
-                  IF(SMCOTYPE .EQ. 1) THEN
-                    IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                        MXX(IX1:IXN,IY1:IYN),(/START(1), START(3)/),(/COUNT(1), COUNT(3)/))
-                    call CHECK_ERR(IRET)
-                    IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),               &
-                        MYY(IX1:IXN,IY1:IYN),(/START(1), START(3)/),(/COUNT(1), COUNT(3)/))
-                    call CHECK_ERR(IRET)
-                    IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+3),               &
-                        MXY(IX1:IXN,IY1:IYN),(/START(1), START(3)/),(/COUNT(1), COUNT(3)/))
-                    call CHECK_ERR(IRET)
-                  ELSE
-                    IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                        MXX(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                    call CHECK_ERR(IRET)
-                    IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),               &
-                        MYY(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                    call CHECK_ERR(IRET)
-                    IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+3),               &
-                        MXY(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                    call CHECK_ERR(IRET)
-                  ENDIF
-#endif
-                ELSE ! IF(SMCGRD)
-                  DO IX=IX1, IXN
-                    DO IY=IY1, IYN
-                      IF ( MAPSTA(IY,IX) .LE. 0 .OR. X1(IX,IY) .EQ. UNDEF ) THEN
-                        MXX(IX,IY) = MFILL
-                        MYY(IX,IY) = MFILL
-                        MXY(IX,IY) = MFILL
-                      ELSE
-                        MXX(IX,IY) = NINT(X1(IX,IY)/META(1)%FSC)
-                        MYY(IX,IY) = NINT(X2(IX,IY)/META(2)%FSC)
-                        MXY(IX,IY) = NINT(XY(IX,IY)/META(3)%FSC)
-                      END IF
-                    END DO
-                  END DO
-
-                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),              &
-                          MXX(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                  CALL CHECK_ERR(IRET)
-                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),            &
-                          MYY(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                  CALL CHECK_ERR(IRET)
-                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+3),            &
-                          MXY(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                  CALL CHECK_ERR(IRET)
-                ENDIF ! SMCGRD
-! NFIELD=2
-              ELSE IF (NFIELD.EQ.2 ) THEN
-! EXTRADIM=0
-                IF (EXTRADIM.EQ.0) THEN
-                  IF (SMCGRD) THEN
-#ifdef W3_SMC
-                    DO IX=IX1, IXN
-                      DO IY=IY1, IYN
-                        ! TODO: Find some other way to access MAPSTA
-                        IF ( XX(IX,IY) .EQ. UNDEF ) THEN
-                          MXX(IX,IY) = MFILL
-                          MYY(IX,IY) = MFILL
-                        ELSE
-                          MXX(IX,IY) = NINT(XX(IX,IY)/META(1)%FSC)
-                          MYY(IX,IY) = NINT(XY(IX,IY)/META(2)%FSC)
-                        END IF
-                      END DO
-                    END DO
-                    IF(SMCOTYPE .EQ. 1) THEN
-                      IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                          MXX(IX1:IXN,IY1:IYN),(/START(1), START(3)/),(/COUNT(1), COUNT(3)/))
-                      call CHECK_ERR(IRET)
-                      IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),               &
-                          MYY(IX1:IXN,IY1:IYN),(/START(1), START(3)/),(/COUNT(1), COUNT(3)/))
-                      call CHECK_ERR(IRET)
-                    ELSE
-                      IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                          MXX(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                      call CHECK_ERR(IRET)
-                      IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),               &
-                          MYY(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                      call CHECK_ERR(IRET)
-                    ENDIF
-#endif
-                  ELSE ! IF(SMCGRD)
-                    DO IX=IX1, IXN
-                      DO IY=IY1, IYN
-                        IF ( MAPSTA(IY,IX) .LE. 0 .OR. XX(IX,IY) .EQ. UNDEF ) THEN
-                          MXX(IX,IY) = MFILL
-                          MYY(IX,IY) = MFILL
-                        ELSE
-                    !PRINT*,XX(IX,IY),XY(IX,IY)
-                    !STOP
-                          MXX(IX,IY) = NINT(XX(IX,IY)/META(1)%FSC)
-                          MYY(IX,IY) = NINT(XY(IX,IY)/META(2)%FSC)
-                        END IF
-                      END DO
-                    END DO
-                    IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),             &
-                              MXX(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                    CALL CHECK_ERR(IRET)
-                    IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),           &
-                            MYY(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                    CALL CHECK_ERR(IRET)
-                  ENDIF ! SMCGRD
-! EXTRADIM=1
-                ELSE
-                  START(3+1-COORDTYPE)=0
-                  DO IK=I1F,I2F
-                    START(3+1-COORDTYPE)=START(3+1-COORDTYPE)+1
-
-                    IF (SMCGRD) THEN
-#ifdef W3_SMC
-                      DO IX=IX1, IXN
-                        DO IY=IY1, IYN
-                          ! TODO: Find some other way to access MAPSTA
-                          IF ( XXK(IX,IY,IK) .EQ. UNDEF ) THEN
-                            MXX(IX,IY) = MFILL
-                            MYY(IX,IY) = MFILL
-                          ELSE
-                            MXX(IX,IY) = NINT(XXK(IX,IY,IK)/META(1)%FSC)
-                            MYY(IX,IY) = NINT(XYK(IX,IY,IK)/META(2)%FSC)
-                          END IF
-                        END DO
-                      END DO
-                      IF(SMCOTYPE .EQ. 1) THEN
-                        IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),                     &
-                            MXX(IX1:IXN,IY1:IYN),(/START(1), START(3), START(4)/), &
-                            (/COUNT(1), COUNT(3), COUNT(4)/))
-                        call CHECK_ERR(IRET)
-                        IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),                     &
-                            MXY(IX1:IXN,IY1:IYN),(/START(1), START(3), START(4)/), &
-                            (/COUNT(1), COUNT(3), COUNT(4)/))
-                        call CHECK_ERR(IRET)
-                      ELSE
-                        IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                            MXX(IX1:IXN,IY1:IYN),(/START(1:4)/),(/COUNT(1:4)/))
-                        call CHECK_ERR(IRET)
-                        IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                            MXX(IX1:IXN,IY1:IYN),(/START(1:4)/),(/COUNT(1:4)/))
-                        call CHECK_ERR(IRET)
-                      ENDIF
-#endif
-                    ELSE ! IF(SMCGRD)
-                      DO IX=IX1, IXN
-                        DO IY=IY1, IYN
-                          IF ( MAPSTA(IY,IX) .LE. 0 .OR.XXK(IX,IY,IK) .EQ. UNDEF ) THEN
-                            MXX(IX,IY) = MFILL
-                            MYY(IX,IY) = MFILL
-                          ELSE
-                            MXX(IX,IY) = NINT(XXK(IX,IY,IK)/META(1)%FSC)
-                            MYY(IX,IY) = NINT(XYK(IX,IY,IK)/META(2)%FSC)
-                          END IF
-                        END DO
-                      END DO
-                      IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                              MXX(IX1:IXN,IY1:IYN),(/START(1:4)/),(/COUNT(1:4)/))
-                      IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),             &
-                              MYY(IX1:IXN,IY1:IYN),(/START(1:4)/),(/COUNT(1:4)/))
-                    ENDIF ! SMCGRD
-                  END DO
-                END IF  ! EXTRADIM
-! NFIELD=1
-              ELSE
-! EXTRADIM=0
-                IF (EXTRADIM.EQ.0) THEN
-                  IF (SMCGRD) THEN
-#ifdef W3_SMC
-                    DO IX=IX1, IXN
-                      DO IY=IY1, IYN
-                        ! TODO: Find some other way to access MAPSTA
-                        IF ( X1(IX,IY) .EQ. UNDEF ) THEN
-                          MX1(IX,IY) = MFILL
-                        ELSE
-                          MX1(IX,IY) = NINT(X1(IX,IY)/META(1)%FSC)
-                        END IF
-                      END DO
-                    END DO
-                    IF(SMCOTYPE .EQ. 1) THEN
-                      IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                          MX1(IX1:IXN,IY1:IYN),(/START(1), START(3)/),(/COUNT(1), COUNT(3)/))
-                      call CHECK_ERR(IRET)
-                    ELSE
-                      IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                          MX1(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                      call CHECK_ERR(IRET)
-                    ENDIF
-#endif
-                  ELSE ! IF(SMCGRD)
-                    DO IX=IX1, IXN
-                      DO IY=IY1, IYN
-                        IF ( MAPSTA(IY,IX) .LE. 0 .OR.X1(IX,IY) .EQ. UNDEF ) THEN
-                          MX1(IX,IY) = MFILL
-                        ELSE
-                          MX1(IX,IY) = NINT(X1(IX,IY)/META(1)%FSC)
-                        END IF
-                      END DO
-                    END DO
-                    IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                            MX1(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                    CALL CHECK_ERR(IRET)
-                  ENDIF ! SMCGRD
-! EXTRADIM=1
-                ELSE
-                  START(3+1-COORDTYPE)=0
-                  DO IK=I1F,I2F
-                    START(3+1-COORDTYPE)=START(3+1-COORDTYPE)+1
-
-                    IF (SMCGRD) THEN
-#ifdef W3_SMC
-                      DO IX=IX1, IXN
-                        DO IY=IY1, IYN
-                          ! TODO: Find some other way to access MAPSTA
-                          IF ( XK(IX,IY,IK) .EQ. UNDEF ) THEN
-                            MX1(IX,IY) = MFILL
-                          ELSE
-                            MX1(IX,IY) = NINT(XK(IX,IY,IK)/META(1)%FSC)
-                          END IF
-                        END DO
-                      END DO
-                      IF(SMCOTYPE .EQ. 1) THEN
-                        IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                            MX1(IX1:IXN,IY1:IYN),(/START(1), START(3)/),(/COUNT(1), COUNT(3)/))
-                        call CHECK_ERR(IRET)
-                      ELSE
-                        IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                            MX1(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                        call CHECK_ERR(IRET)
-                      ENDIF
-#endif
-                    ELSE ! IF(SMCGRD)
-                      DO IX=IX1, IXN
-                        DO IY=IY1, IYN
-                          IF ( MAPSTA(IY,IX) .LE. 0 .OR.XK(IX,IY,IK) .EQ. UNDEF ) THEN
-                            MX1(IX,IY) = MFILL
-                          ELSE
-                            MX1(IX,IY) = NINT(XK(IX,IY,IK)/META(1)%FSC)
-                          END IF
-                        END DO
-                      END DO
-                      IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                          MX1(IX1:IXN,IY1:IYN),(/START(1:4)/),(/COUNT(1:4)/))
-                      CALL CHECK_ERR(IRET)
-                    ENDIF ! SMCGRD
-                  END DO
-                END IF   ! EXTRADIM
-              END IF   ! NFIELD
-!
-! Real output (NCVARTYPE.GE.3)
-!
+            IF (EXTRADIM.EQ.1) THEN
+              ! The field variable has a third 'spectral' dimension
+              EDIM = TDIM - 1
+              START(EDIM) = 0 ! To be incremented by 1 in each step IK=I1F,I2F
             ELSE
-              IF ( NFIELD.EQ.3 ) THEN
-                IF (SMCGRD) THEN
-#ifdef W3_SMC
-                  DO IX=IX1, IXN
-                    DO IY=IY1, IYN
-                      ! TODO: Find some other way to access MAPSTA
-                      IF ( X1(IX,IY) .EQ. UNDEF ) THEN
-                        MXXR(IX,IY) = MFILLR
-                        MYYR(IX,IY) = MFILLR
-                        MXYR(IX,IY) = MFILLR
-                      ELSE
-                        MXXR(IX,IY) = X1(IX,IY)
-                        MYYR(IX,IY) = X2(IX,IY)
-                        MXYR(IX,IY) = XY(IX,IY)
-                      END IF
-                    END DO
-                  END DO
-                  IF(SMCOTYPE .EQ. 1) THEN
-                    IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                        MXXR(IX1:IXN,IY1:IYN),(/START(1), START(3)/),(/COUNT(1), COUNT(3)/))
-                    call CHECK_ERR(IRET)
-                    IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),               &
-                        MYYR(IX1:IXN,IY1:IYN),(/START(1), START(3)/),(/COUNT(1), COUNT(3)/))
-                    call CHECK_ERR(IRET)
-                    IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+3),               &
-                        MXYR(IX1:IXN,IY1:IYN),(/START(1), START(3)/),(/COUNT(1), COUNT(3)/))
-                    call CHECK_ERR(IRET)
-                  ELSE
-                    IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                        MXXR(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                    call CHECK_ERR(IRET)
-                    IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),               &
-                        MYYR(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                    call CHECK_ERR(IRET)
-                    IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+3),               &
-                        MXYR(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                    call CHECK_ERR(IRET)
-                  ENDIF
-#endif
-                ELSE ! IF(SMCGRD)
-                  DO IX=IX1, IXN
-                    DO IY=IY1, IYN
-                      IF ( MAPSTA(IY,IX) .LE. 0 .OR. X1(IX,IY) .EQ. UNDEF ) THEN
-                        MXXR(IX,IY) = MFILLR
-                        MYYR(IX,IY) = MFILLR
-                        MXYR(IX,IY) = MFILLR
-                      ELSE
-                        MXXR(IX,IY) = X1(IX,IY)
-                        MYYR(IX,IY) = X2(IX,IY)
-                        MXYR(IX,IY) = XY(IX,IY)
-                      END IF
-                    END DO
-                  END DO
+              I1F = 0
+              I2F = 0
+              ! X1, X2, and XY are applied directly except if NFIELD.EQ.2,
+              IF (NFIELD.EQ.2) THEN
+                X1(:,:)=XX(:,:)
+                X2(:,:)=XY(:,:)
+              END IF
+            END IF
 
-                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),              &
-                          MXXR(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                  CALL CHECK_ERR(IRET)
-                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),            &
-                          MYYR(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                  CALL CHECK_ERR(IRET)
-                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+3),            &
-                          MXYR(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                  CALL CHECK_ERR(IRET)
-                ENDIF ! SMCGRD
-! NFIELD=2
-              ELSE IF (NFIELD.EQ.2 ) THEN
-! EXTRADIM=0
-                IF (EXTRADIM.EQ.0) THEN
-                  IF (SMCGRD) THEN
-#ifdef W3_SMC
-                    DO IX=IX1, IXN
-                      DO IY=IY1, IYN
-                        ! TODO: Find some other way to access MAPSTA
-                        IF ( XX(IX,IY) .EQ. UNDEF ) THEN
-                          MXXR(IX,IY) = MFILLR
-                          MYYR(IX,IY) = MFILLR
-                        ELSE
-                          MXXR(IX,IY) = XX(IX,IY)
-                          MYYR(IX,IY) = XY(IX,IY)
-                        END IF
-                      END DO
-                    END DO
-                    IF(SMCOTYPE .EQ. 1) THEN
-                      IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                          MXXR(IX1:IXN,IY1:IYN),(/START(1), START(3)/),(/COUNT(1), COUNT(3)/))
-                      call CHECK_ERR(IRET)
-                      IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),               &
-                          MYYR(IX1:IXN,IY1:IYN),(/START(1), START(3)/),(/COUNT(1), COUNT(3)/))
-                      call CHECK_ERR(IRET)
-                    ELSE
-                      IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                          MXXR(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                      call CHECK_ERR(IRET)
-                      IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),               &
-                          MYYR(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                      call CHECK_ERR(IRET)
-                    ENDIF
-#endif
-                  ELSE ! IF SMCGRD
-                    DO IX=IX1, IXN
-                      DO IY=IY1, IYN
-                        IF ( MAPSTA(IY,IX) .LE. 0 .OR. XX(IX,IY) .EQ. UNDEF ) THEN
-                          MXXR(IX,IY) = MFILLR
-                          MYYR(IX,IY) = MFILLR
-                        ELSE
-                          MXXR(IX,IY) = XX(IX,IY)
-                          MYYR(IX,IY) = XY(IX,IY)
-                        END IF
-                      END DO
-                    END DO
-                    IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),             &
-                              MXXR(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                    CALL CHECK_ERR(IRET)
-                    IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),           &
-                            MYYR(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                    CALL CHECK_ERR(IRET)
-                  ENDIF ! SMCGRD
-  ! EXTRADIM=1
+            DO IK=I1F,I2F
+              ! IK==I1F==I2F==0 unless EXTRADIM==1
+              IF (EXTRADIM.EQ.1) THEN
+                ! Increment START(EDIM) by 1
+                START(EDIM) = START(EDIM)+1
+                ! Copy the 2D field for each index IK of the third dim
+                IF ( NFIELD.EQ.1 ) THEN
+                  X1(:,:) = XK(:,:,IK)
+                ELSE IF ( NFIELD.EQ.2 ) THEN
+                  X1(:,:) = XXK(:,:,IK)
+                  X2(:,:) = XYK(:,:,IK)
                 ELSE
-                  START(4-COORDTYPE)=0
-                  DO IK=I1F,I2F
-                    START(4-COORDTYPE)=START(4-COORDTYPE)+1
-
-                    IF (SMCGRD) THEN
-#ifdef W3_SMC
-                      DO IX=IX1, IXN
-                        DO IY=IY1, IYN
-                          ! TODO: Find some other way to access MAPSTA
-                          IF ( XXK(IX,IY,IK) .EQ. UNDEF ) THEN
-                            MXXR(IX,IY) = MFILLR
-                            MYYR(IX,IY) = MFILLR
-                          ELSE
-                            MXXR(IX,IY) = XXK(IX,IY,IK)
-                            MYYR(IX,IY) = XYK(IX,IY,IK)
-                          END IF
-                        END DO
-                      END DO
-                      IF(SMCOTYPE .EQ. 1) THEN
-                        IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                            MXXR(IX1:IXN,IY1:IYN),(/START(1), START(3)/),(/COUNT(1), COUNT(3)/))
-                        call CHECK_ERR(IRET)
-                        IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),               &
-                            MYYR(IX1:IXN,IY1:IYN),(/START(1), START(3)/),(/COUNT(1), COUNT(3)/))
-                        call CHECK_ERR(IRET)
-                      ELSE
-                        IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                            MXXR(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                        call CHECK_ERR(IRET)
-                        IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),               &
-                            MYYR(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                        call CHECK_ERR(IRET)
-                      ENDIF
-#endif
-                    ELSE ! IF SMCGRD
-                      DO IX=IX1, IXN
-                        DO IY=IY1, IYN
-                          IF ( MAPSTA(IY,IX) .LE. 0 .OR.XXK(IX,IY,IK) .EQ. UNDEF ) THEN
-                            MXXR(IX,IY) = MFILLR
-                            MYYR(IX,IY) = MFILLR
-                          ELSE
-                            MXXR(IX,IY) = XXK(IX,IY,IK)
-                            MYYR(IX,IY) = XYK(IX,IY,IK)
-                          END IF
-                        END DO
-                      END DO
-                      IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                              MXXR(IX1:IXN,IY1:IYN),(/START(1:4)/),(/COUNT(1:4)/))
-                      IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),             &
-                              MYYR(IX1:IXN,IY1:IYN),(/START(1:4)/),(/COUNT(1:4)/))
-                    ENDIF ! SMCGRD
+                  ! Implementation of an eventual variable with NFIELD==3 and
+                  ! EXTRADIM==1 has to be completed here
+                  WRITE(NDSE,*) ' *** WAVEWATCH III ERROR IN OUNF :'
+                  WRITE(NDSE,*) ' No program code for NFIELD==3 with a third dim'
+                  CALL EXTCDE ( 45 )                  
+                END IF
+              END IF
+              
+              IF ( .NOT. SMCGRD ) THEN
+                DO IX=1, NX
+                  DO IY=1, NY
+                    IF ( MAPSTA(IY,IX) .LE. 0 ) &
+                         X1(IX,IY) = MFILLR
                   END DO
-                END IF  ! EXTRADIM
-! NFIELD=1
+                END DO
+              END IF
+
+              ! First, fill undefined elements of X1 
+              WHERE ( X1(IX1:IXN,IY1:IYN) .EQ. UNDEF )
+                X1(IX1:IXN,IY1:IYN) = MFILLR
+              END WHERE
+              
+!
+! Short type output (NCVARTYPE.EQ.2)
+!
+              IF ( NCVARTYPE.EQ.2 ) THEN
+                WHERE ( X1(IX1:IXN,IY1:IYN) .EQ. MFILLR )
+                  MX1(IX1:IXN,IY1:IYN) = MFILL
+                ELSEWHERE
+                  MX1(IX1:IXN,IY1:IYN) = NINT(X1(IX1:IXN,IY1:IYN)/META(1)%FSC)
+                END WHERE
+                IF (NFIELD.GE.2 ) THEN
+                  WHERE ( X1(IX1:IXN,IY1:IYN) .EQ. MFILLR )
+                    MXX(IX1:IXN,IY1:IYN) = MFILL
+                  ELSEWHERE
+                    MXX(IX1:IXN,IY1:IYN) = NINT(X2(IX1:IXN,IY1:IYN)/META(2)%FSC)
+                  END WHERE
+                END IF
+                IF (NFIELD.EQ.3 ) THEN
+                  WHERE ( X1(IX1:IXN,IY1:IYN) .EQ. MFILLR )
+                    MXY(IX1:IXN,IY1:IYN) = MFILL
+                  ELSEWHERE
+                    MXY(IX1:IXN,IY1:IYN) = NINT(XY(IX1:IXN,IY1:IYN)/META(3)%FSC)
+                  END WHERE
+                END IF
+!
+! Real type output (NCVARTYPE.GE.3)
+!
               ELSE
-! EXTRADIM=0
-                IF (EXTRADIM.EQ.0) THEN
-                  IF (SMCGRD) THEN
-#ifdef W3_SMC
-                    DO IX=IX1, IXN
-                      DO IY=IY1, IYN
-                        ! TODO: Find some other way to access MAPSTA
-                        IF ( X1(IX,IY) .EQ. UNDEF ) THEN
-                          MX1R(IX,IY) = MFILLR
-                        ELSE
-                          MX1R(IX,IY) = X1(IX,IY)
-                        END IF
-                      END DO
-                    END DO
-                    IF(SMCOTYPE .EQ. 1) THEN
-                      IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                          MX1R(IX1:IXN,IY1:IYN),(/START(1), START(3)/),(/COUNT(1), COUNT(3)/))
-                      call CHECK_ERR(IRET)
-                    ELSE
-                      IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                          MX1R(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                      call CHECK_ERR(IRET)
-                    ENDIF
-#endif
-                  ELSE ! IF SMCGRD
-                    DO IX=IX1, IXN
-                      DO IY=IY1, IYN
-                        IF ( MAPSTA(IY,IX) .LE. 0 .OR.X1(IX,IY) .EQ. UNDEF ) THEN
-                          MX1R(IX,IY) = MFILLR
-                        ELSE
-                          MX1R(IX,IY) = X1(IX,IY)
-                        END IF
-                      END DO
-                    END DO
-                    IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                            MX1R(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                    CALL CHECK_ERR(IRET)
-                  ENDIF ! SMCGRD
-! EXTRADIM=1
+                IF (NFIELD.GE.2 ) THEN
+                  WHERE ( X1(IX1:IXN,IY1:IYN) .EQ. MFILLR )
+                    X2(IX1:IXN,IY1:IYN) = MFILLR
+                  END WHERE
+                END IF                   
+                IF (NFIELD.EQ.3 ) THEN
+                  WHERE ( X1(IX1:IXN,IY1:IYN) .EQ. MFILLR )
+                    XY(IX1:IXN,IY1:IYN) = MFILLR
+                  END WHERE
+                END IF                    
+              END IF ! NCVARTYPE
+
+!
+! Write the fields to NetCDF
+!
+              IF ( NCVARTYPE.EQ.2 ) THEN
+                ! Short type output
+                IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
+                    MX1(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
+              ELSE
+                 ! Real type output
+                 IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
+                    X1(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
+              END IF              
+              call CHECK_ERR(IRET)              
+              IF (NFIELD.GE.2 ) THEN
+                IF ( NCVARTYPE.EQ.2 ) THEN
+                   IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),             &
+                       MXX(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
                 ELSE
-                  START(4-COORDTYPE)=0
-                  DO IK=I1F,I2F
-                    START(4-COORDTYPE)=START(4-COORDTYPE)+1
-                    IF (SMCGRD) THEN
-#ifdef W3_SMC
-                      DO IX=IX1, IXN
-                        DO IY=IY1, IYN
-                          ! TODO: Find some other way to access MAPSTA
-                          IF ( XK(IX,IY,IK) .EQ. UNDEF ) THEN
-                            MX1R(IX,IY) = MFILLR
-                          ELSE
-                            MX1R(IX,IY) = XK(IX,IY,IK)
-                          END IF
-                        END DO
-                      END DO
-                      IF(SMCOTYPE .EQ. 1) THEN
-                        IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                            MX1R(IX1:IXN,IY1:IYN),(/START(1), START(3)/),(/COUNT(1), COUNT(3)/))
-                        call CHECK_ERR(IRET)
-                      ELSE
-                        IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                            MX1R(IX1:IXN,IY1:IYN),(/START(1:3)/),(/COUNT(1:3)/))
-                        call CHECK_ERR(IRET)
-                      ENDIF
-#endif
-                    ELSE ! IF SMCGRD
-                      DO IX=IX1, IXN
-                        DO IY=IY1, IYN
-                          IF ( MAPSTA(IY,IX) .LE. 0 .OR.XK(IX,IY,IK) .EQ. UNDEF ) THEN
-                            MX1R(IX,IY) = MFILLR
-                          ELSE
-                            MX1R(IX,IY) = XK(IX,IY,IK)
-                          END IF
-                        END DO
-                      END DO
-                      IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+1),               &
-                          MX1R(IX1:IXN,IY1:IYN),(/START(1:4)/),(/COUNT(1:4)/))
-                      CALL CHECK_ERR(IRET)
-                    END IF ! SMCGRD
-                  END DO
-                END IF   ! EXTRADIM
-              END IF   ! NFIELD
-            END IF   ! NCVARTYPE
+                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),             &
+                       X2(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
+                END IF
+                call CHECK_ERR(IRET)
+              END IF
+              IF (NFIELD.EQ.3 ) THEN
+                IF ( NCVARTYPE.EQ.2 ) THEN
+                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+3),             &
+                       MXY(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
+                ELSE
+                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+3),             &
+                       XY(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
+                END IF
+                call CHECK_ERR(IRET)                
+              END IF
+!                  
+            END DO ! IK=I1F,I2F where IK==I1F==I2F==0 unless EXTRADIM==1
 
             ! updates the variable index
             IVAR1=IVAR1+NFIELD
 
-
-            ! Loops over IPART for partition variables
-            ! ChrisBunney: Don't loop IPART for last two entries in section 4
-            ! (16: total wind sea fraction, 17: number of parts) as these fields
-            ! do not have partitions.
-            IF (IFI .EQ. 4 .AND. IFJ .LE. NOGE(IFI) - 2) THEN
-560           CONTINUE
-              IF (INDEXIPART.LT.NBIPART) THEN
-                INDEXIPART=INDEXIPART+1
-                IF (TABIPART(INDEXIPART).EQ.-1) GOTO 560
-                IPART=TABIPART(INDEXIPART)
-                GOTO 555
-              END IF
-            ELSE
-              INDEXIPART=1
+          ! Cycle the loop over IFS if there are extra partitions or
+          ! sub-parameters for (IFI,IFJ)
+          IF ( NFS .GT. NFSMAX ) THEN
+            ! This must never occur for the user
+            WRITE(NDSE,*) 'Hardcoded configuration error: NFS > NFSMAX'
+            CALL EXTCDE(1)
             END IF
 !
-          END IF  ! FLG2D(IFI,IFJ)
-        END DO  ! IFI=1, NOGRP
-      END DO  ! IFJ=1, NGRPP
+          END DO ! WHILE IFS .LE. NFS
+!
+        END DO  ! IFJ=1, NGRPP
+      END DO  ! IFI=1, NOGRP
 !
 ! Clean up
-      DEALLOCATE(X1, X2, XX, XY, XK, XXK, XYK)
-      DEALLOCATE(MX1, MXX, MYY, MXY, MAPOUT)
-      DEALLOCATE(MX1R, MXXR, MYYR, MXYR)
+      DEALLOCATE(X1, X2, XX, XY)
+      IF ( ALLOCATED(XK) ) DEALLOCATE(XK, XXK, XYK)
+      DEALLOCATE(MX1, MXX, MXY, MAPOUT)
       DEALLOCATE(AUX1)
       IF (ALLOCATED(LON)) DEALLOCATE(LON, LAT)
       IF (ALLOCATED(LON2D)) DEALLOCATE(LON2D, LAT2D)
@@ -3483,6 +3389,7 @@
 !
 #ifdef W3_T
  9020 FORMAT (' TEST W3EXNC : OUTPUT FIELD : ',A)
+ 9021 FORMAT (' TEST W3EXNC : OUTPUT FIELD : ',A,' PART. ',I2)
 #endif
 !/
 
@@ -3493,22 +3400,143 @@
       END SUBROUTINE W3EXNC
 
 
+!--------------------------------------------------------------------------
+      SUBROUTINE W3NCINQ3(NCID,DIMNAME,DIMID3,DIMLN3,VCHCK)
+
+      ! Check if a third dimension is defined
+
+      USE NETCDF
+
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN)               :: NCID
+      CHARACTER*(*), INTENT(IN)         :: DIMNAME
+      INTEGER, INTENT(OUT)              :: DIMID3
+      INTEGER, INTENT(IN)               :: DIMLN3
+      REAL, INTENT(IN), OPTIONAL        :: VCHCK(:)
+
+!
+!/ ------------------------------------------------------------------- /
+!   Local parameters
+!
+      INTEGER                           :: DIMLNT, IRET, DIMIDT, VARID3
+      REAL                              :: VART(2)
+
+
+      ! Check for a dimension (e.g. DIMNAME='f') in the netCDF file.
+
+      ! Returns:
+      ! DIMID3 = 0  : DIMNAME not defined
+      ! DIMID3 > 0  : DIMNAME defined and matches
+      ! DIMID3 = -1 : DIMNAME defined but doesn't match DIMLN, VCHC
+
+      DIMID3 = 0
+
+      ! check that NCID is defined
+      IF ( NCID .EQ. 0 ) THEN
+        RETURN
+      END IF
+
+      ! get the DIMID of the dimension
+      IRET = NF90_INQ_DIMID(NCID, TRIM(DIMNAME), DIMIDT)
+
+      ! If DIMNAME not defined
+      IF ( IRET .NE. NF90_NOERR ) RETURN
+
+      ! If there is already a dimension named DIMNAME, analyze it and return
+      DIMID3 = -1
+      ! get the length of the dimension 
+      IRET = NF90_INQUIRE_DIMENSION(NCID, DIMIDT, LEN=DIMLNT)        
+      IF ( DIMLNT .NE. DIMLN3 ) RETURN
+
+      ! get the VARID of the dimension variable
+      IRET = NF90_INQ_VARID(NCID, TRIM(DIMNAME), VARID3)
+      IF ( IRET .NE. NF90_NOERR ) RETURN
+
+      !Check contents ...
+      IRET = NF90_GET_VAR(NCID,VARID3,VART, &
+                          START=(/1/), COUNT=(/2/), STRIDE=(/DIMLN3-1/))
+      IF (IRET .NE. NF90_NOERR) RETURN
+
+      IF ( PRESENT(VCHCK) ) THEN
+        IF (VART(1) .NE. VCHCK(1) .OR. VART(2) .NE. VCHCK(DIMLN3)) THEN
+          WRITE(NDSE,*) 'Dimension variable contents does not match'
+          RETURN
+        END IF
+      END IF
+
+      DIMID3 = DIMIDT
+
+      END SUBROUTINE W3NCINQ3
 
 
 !--------------------------------------------------------------------------
-!>
-!> @brief Desc not available.
-!>
-!> @param[in] NCFILE
-!> @param[out] NCID
-!> @param[out] DIMID
-!> @param[in] DIMLN
-!> @param[out] VARID
-!> @param[in] EXTRADIM
-!> @param[in] NCTYPE
-!> @param[in] MAPSTAOUT
-!>      
-!> @author NA @date NA
+      SUBROUTINE W3NCDEF3(NCID,DIMNAME,DIMID3,DIMLN3,VARID3)
+      
+      ! Define one of the known third dimensions (e.g. DIMNAME='f')
+      ! The netCDF file must be open in define mode
+
+      USE NETCDF
+
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN)               :: NCID
+      CHARACTER*(*), INTENT(IN)         :: DIMNAME
+      INTEGER, INTENT(OUT)              :: DIMID3
+      INTEGER, INTENT(IN)               :: DIMLN3
+      INTEGER, INTENT(OUT)              :: VARID3
+
+!
+!/ ------------------------------------------------------------------- /
+!   Local parameters
+!
+      INTEGER                           :: DEFLATE=1
+      INTEGER                           :: IRET
+
+      IRET = NF90_DEF_DIM(NCID, TRIM(DIMNAME), DIMLN3, DIMID3)
+      CALL CHECK_ERR(IRET)
+
+      IRET = NF90_DEF_VAR(NCID, TRIM(DIMNAME), NF90_FLOAT, DIMID3, VARID3)
+      IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID3, 1, 1, DEFLATE)
+      CALL CHECK_ERR(IRET)
+!
+! frequency
+!
+      IF ( TRIM(DIMNAME) .EQ. 'f' ) THEN
+        IRET=NF90_PUT_ATT(NCID,VARID3,'long_name','wave_frequency')
+        CALL CHECK_ERR(IRET)
+        IRET=NF90_PUT_ATT(NCID,VARID3,'standard_name','wave_frequency')
+        CALL CHECK_ERR(IRET)
+        IRET=NF90_PUT_ATT(NCID,VARID3,'units','s-1')
+        CALL CHECK_ERR(IRET)
+        IRET=NF90_PUT_ATT(NCID,VARID3,'axis','Hz')
+        CALL CHECK_ERR(IRET)
+#ifdef W3_XSTO
+! profile depth below surface
+!
+      ELSE IF ( TRIM(DIMNAME) .EQ. 'zk' ) THEN
+        IRET=NF90_PUT_ATT(NCID,VARID3,'long_name','normalized_depth')
+        CALL CHECK_ERR(IRET)
+        IRET=NF90_PUT_ATT(NCID,VARID3,'standard_name','normalized_depth_below_surface')
+        IRET=NF90_PUT_ATT(NCID,VARID3,'comment','zk = Z * ksc')
+        CALL CHECK_ERR(IRET)
+        IRET=NF90_PUT_ATT(NCID,VARID3,'units','1')
+        CALL CHECK_ERR(IRET)
+        IRET=NF90_PUT_ATT(NCID,VARID3,'axis','down')
+        CALL CHECK_ERR(IRET)
+#endif
+!
+! Here you may put netcdf attibutes for another third dim
+!
+      ! ELSE IF ( TRIM(DIMNAME) .EQ. 'fs' ) THEN
+      !   IRET=NF90_PUT_ATT(NCID,VARID3,'long_name','segmented_wave_frequency')
+      !   ...
+      END IF
+
+      END SUBROUTINE W3NCDEF3
+
+
+!--------------------------------------------------------------------------
       SUBROUTINE W3CRNC (NCFILE, NCID, DIMID, DIMLN, VARID,  &
                          EXTRADIM, NCTYPE, MAPSTAOUT )
 !
@@ -3541,6 +3569,15 @@
       INTEGER                           :: DEFLATE=1
 !
       CHARACTER                         :: ATTNAME*120,ATTVAL*120
+#ifdef W3_RTD
+!
+! RTDL == False for a standard lat-lon grid. Will be set to True if the
+! grid is rotated
+      LOGICAL                           :: RTDL = .FALSE.
+
+! Is the grid really rotated
+      IF ( Polat < 90. ) RTDL = .True.
+#endif
 !
       COORDS_ATTR = ''
 !
@@ -3552,8 +3589,8 @@
 !
 ! Define dimensions
 !
+! The atmospheric level (the surface), a dimension not used elsewise:
       IRET = NF90_DEF_DIM(NCID, 'level', DIMLN(1), DIMID(1))
-
 !
 ! Regular structured case
 !
@@ -3588,14 +3625,8 @@
         CALL CHECK_ERR(IRET)
       ENDIF
 !
-!
-
-
-      IF (EXTRADIM.EQ.1) THEN
-        IRET = NF90_DEF_DIM(NCID, 'f', DIMLN(4), DIMID(4))
-        CALL CHECK_ERR(IRET)
-      ENDIF
-
+! ( If EXTRADIM == 1, an extra (third) dimension will be defined in a separate
+!   subroutine W3NCDEF3 ).
       IRET = NF90_DEF_DIM(NCID, 'time',NF90_UNLIMITED, DIMID(4+EXTRADIM))
       CALL CHECK_ERR(IRET)
 
@@ -3799,23 +3830,8 @@
       IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(1), 1, 1, DEFLATE)
       IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(2), 1, 1, DEFLATE)
 
-!
-! frequency
-!
-      if (EXTRADIM.EQ.1) THEN
-        IRET = NF90_DEF_VAR(NCID, 'f', NF90_FLOAT, DIMID(4), VARID(10))
-        IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(10), 1, 1, DEFLATE)
-        CALL CHECK_ERR(IRET)
-        IRET=NF90_PUT_ATT(NCID,VARID(10),'long_name','wave_frequency')
-        CALL CHECK_ERR(IRET)
-        IRET=NF90_PUT_ATT(NCID,VARID(10),'standard_name','wave_frequency')
-        CALL CHECK_ERR(IRET)
-        IRET=NF90_PUT_ATT(NCID,VARID(10),'units','s-1')
-        CALL CHECK_ERR(IRET)
-        IRET=NF90_PUT_ATT(NCID,VARID(10),'axis','Hz')
-        CALL CHECK_ERR(IRET)
-      END IF
-
+! ( If EXTRADIM == 1, an extra (third) dimension will be defined in a separate
+!   subroutine W3NCDEF3 ).
 
 !
 !  time
@@ -3998,19 +4014,6 @@
 
 
 !/ ------------------------------------------------------------------- /
-
-!> @brief Expand the seapoint array to full grid with handling of
-!>  SMC regridding.
-!>
-!> @details The FLDIRN flag should be set to true for
-!>  directional fields. In this case, they will be decomposed
-!>  into U/V components for SMC grid interpolation and converted
-!>  to oceanograhic convention.
-!>
-!> @param[inout] S Sea point array
-!> @param[out] X Gridded array     
-!> @param[in] FLDIRN Directional field flag
-!> @author C Bunney  @date 03-Nov-2021
       SUBROUTINE S2GRID(S, X, FLDIRN)
 !/
 !/                  +-----------------------------------+
@@ -4077,18 +4080,6 @@
      END SUBROUTINE S2GRID
 
 
-!> @brief Converts fields formulated as U/V vectors into
-!>  magnitude and direction fields.
-!>
-!> @details Conversion is
-!>  done in-place. U becomes magnitude, V becomes
-!>  direction. Optional TOLERANCE sets minimum
-!>  magnitude.
-!>
-!> @param[inout] U
-!> @param[inout] V
-!> @param[in]    Tolerance
-!> @author NA  @date NA
      SUBROUTINE UV_TO_MAG_DIR(U, V, TOLERANCE)
      ! Converts fields formulated as U/V vectors into
      ! magnitude and direction fields. Conversion is
@@ -4122,11 +4113,6 @@
 
 !==============================================================================
 
-!> @brief Desc not available.
-!>
-!> @param IRET
-!> @param ILINE
-!> @author NA  @date NA
       SUBROUTINE CHECK_ERROR(IRET, ILINE)
 
       USE NETCDF
