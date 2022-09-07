@@ -144,7 +144,7 @@
 !        13-19    [Reserved for future use]
 !        20       MAPSTA
 !
-!     Indices 21 - 300 are for storage of field output variable IDs.
+!    Indices 21 - 300 are for storage of field output variable IDs.
 !
 !     The program ww3_ounf3 does all that its parent ww3_ounf can do,
 !     and furter allow for different sub-fields to be output together in
@@ -1080,7 +1080,7 @@
       CHARACTER*30            :: FORMAT1
       CHARACTER*30            :: STRSTARTDATE
       CHARACTER               :: FNAMENC*128
-      ! C Hansen, removed obsolete CHARACTER FORMF*11
+      
       CHARACTER               :: WRITETO*50
       CHARACTER, SAVE         :: OLDTIMEID*16 = '0000000000000000'
       CHARACTER, SAVE         :: TIMEID*16 = '0000000000000000'

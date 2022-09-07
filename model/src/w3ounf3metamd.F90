@@ -260,11 +260,13 @@
       ! Storage for storage of meta data aggregated by sub-field ...
       TYPE SUBFIELD_T
         TYPE(META_T), POINTER :: META(:)
-      END TYPE SUBFIELD_T         
+      END TYPE SUBFIELD_T
        
       !> Type for storage of meta data aggregated by component (NFIELD)
       TYPE FIELD_T
         TYPE(META_T), POINTER :: META(:) !< Pointer to meta data for field
+        !< Sub-field is one level deeper ...
+        TYPE(SUBFIELD_T), ALLOCATABLE :: SUBFIELD(:)
       END TYPE FIELD_T
 
       !> Type for storage of meta data aggregated by field (IFI)
@@ -378,9 +380,6 @@
       ! SMC type 3/4 outputs are currently on standard pole grid only
       IF(SMCOTYPE .EQ. 3 .OR. SMCOTYPE .EQ. 4) FLRTD = .FALSE.
 #endif
-#endif
-#ifdef W3_RTD
- !
 #endif
 
       ! Sub-field id.'s
@@ -3694,8 +3693,9 @@
       ! First sub-field
       META => GROUP(6)%FIELD(7)%SUBFIELD(1)%META
       IF ( NCVARTYPE .EQ. 2 ) THEN
-        ! In ww3_ounf3.F90: IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
-        ! Warning: For short data type, you get only high seas results
+        ! This is if you specifically choose a short data type setting
+        ! FIELD%TYPE = 2 in ww3_ounf.nml
+        ! Setting FIELD%TYPE = 3 or 4 leads to a float data type (NCVARTYPE=4)
         META(1)%FSC    = 0.01
         META(1)%VMIN = -150
         META(1)%VMAX = 320

@@ -537,9 +537,10 @@
 !/
 !/ ------------------------------------------------------------------- /
 !/
-#ifdef W3_S
-      CALL STRACE (IENT, 'WAVNU2')
-#endif
+! ??? "IENT does not work with PURE subroutines" ???
+! #ifdef W3_S
+!       CALL STRACE (IENT, 'WAVNU2')
+! #endif
 !
 !/
 !/ End of WAVNU_LOCAL------------------------------------------------- /
