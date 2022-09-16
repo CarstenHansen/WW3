@@ -104,66 +104,68 @@
 !>    Example ounfmeta.inp file:
 !>
 !>    @verbatim
-!>    $ Lines starting with dollars are comments.
-!>    $ The line starts a meta-data section for the depth field
-!>    META DPT
-!>      standard_name = depth
-!>      long_name = "can be quoted string"
-!>      comment = or an unquoted string
-!>      vmax = 999.9
-!>
-!>    $ Next one is HSig (group 2, field 1)
-!>    META 2 1
-!>      varns = "sig. wave height"
-!>      varnl = "this is long name"
-!>
-!>    $ Next one is second component of wind. It also sets an
-!>    $ "extra" meta data value (height - a float)
-!>    META WND 2
-!>      standard_name = "v-wind"
-!>      height = 10.0 "r"
-!>
-!>    $ User defined partitioned parameters template strings:
-!>    TEMPLATE PARTSTR
-!>      wind wave
-!>      primary swell
-!>      secondary swell
-!>
-!>    $ Use partition templates in partitioned Hs field:
-!>    $ (SPART and IPART are built-in)
-!>    META PHS
-!>      standard_name = "<SPART_>_sigificant_wave_height"
-!>      long_name = "<PARTSTR>"
-!>      partition_number = "<IPART>"
-!>
-!>    $ Coordinate reference system:
-!>    CRS crs
-!>      grid_mapping_name = "latitude_longitude"
-!>      semi_major_axis = 6371000.0 f
-!>      inverse_flattening = 0 f
-!>
-!>    $ Global metadata:
-!>    META global
-!>      institution = UKMO
-!>      comment "space seperated strings should be quoted" c
-!>      version = 1.0 r
-!>
-!>    $ BED output, with sub-fields:
-!>    $ Sub-field 1 (a scalar)
-!>    META BED 1 1
-!>      standard_name = "sea_bottom_roughness_length"
-!>      varng = ''
-!>      fsc = 0.0001
-!>      units = 'm'
-!>      vmin = 0.
-!>      vmax = 3.
-!>    $ Sub-field 2, component 1: ripple-x
-!>    META BED 1 2
-!>      standard_name = "eastward_ripple_wavelength"
-!>      varnd = ''
-!>    $ Sub-field 2, component 2: ripple-y
-!>    META BED 2 2
-!>      long_name = "northward_ripple_wavelength"
+!>    $ Lines starting with dollars are comments.                               
+!>    $ The line starts a meta-data section for the depth field                 
+!>    META DPT                                                                  
+!>      standard_name = depth                                                   
+!>      long_name = "can be quoted string"                                      
+!>      comment = or an unquoted string                                         
+!>      vmax = 999.9                                                            
+!>                                                                              
+!>    $ Next one is HSig (group 2, field 1)                                     
+!>    META 2 1                                                                  
+!>      varns = "sig. wave height"                                              
+!>      varnl = "this is long name"                                             
+!>                                                                              
+!>    $ Next one is second component of wind. It also sets an                   
+!>    $ "extra" meta data value (height - a float)                              
+!>    META WND 2                                                                
+!>      standard_name = "v-wind"                                                
+!>      height = 10.0 "r"                                                       
+!>                                                                              
+!>    $ User defined partitioned parameters template strings:                   
+!>    TEMPLATE PARTSTR                                                          
+!>      wind wave                                                               
+!>      primary swell                                                           
+!>      secondary swell                                                         
+!>                                                                              
+!>    $ Use partition templates in partitioned Hs field:                        
+!>    $ (SPART and IPART are built-in)                                          
+!>    META PHS                                                                  
+!>      standard_name = "<SPART_>_sigificant_wave_height"                       
+!>      long_name = "<PARTSTR>"                                                 
+!>      partition_number = "<IPART>"                                            
+!>                                                                              
+!>    $ Coordinate reference system:                                            
+!>    CRS crs                                                                   
+!>      grid_mapping_name = "latitude_longitude"                                
+!>      semi_major_axis = 6371000.0 f                                           
+!>      inverse_flattening = 0 f                                                
+!>                                                                              
+!>    $ Global metadata:                                                        
+!>    META global                                                               
+!>      institution = UKMO                                                      
+!>      comment "space seperated strings should be quoted" c                    
+!>      version = 1.0 r                                                         
+!>                                                                              
+!>    $ BED output, with sub-fields:                                            
+!>    $ Note, the sub-field component is the index IFS as defined in ww3_ounf.F90
+!>    $ defined in the ww3_shel/ww3_multi program code.                         
+!>    $ Sub-field 1 (a scalar)                                                  
+!>    META BED 1 1                                                              
+!>      standard_name = "sea_bottom_roughness_length"                           
+!>      varng = ''                                                              
+!>      fsc = 0.0001                                                            
+!>      units = 'm'                                                             
+!>      vmin = 0.                                                               
+!>      vmax = 3.                                                               
+!>    $ Sub-field 2, component 1: ripple-x                                      
+!>    META BED 1 2                                                              
+!>      standard_name = "eastward_ripple_wavelength"                            
+!>      varnd = ''                                                              
+!>    $ Sub-field 2, component 2: ripple-y                                      
+!>    META BED 2 2                                                              
+!>      long_name = "northward_ripple_wavelength"                               
 !>      varnd = ''
 !>    @endverbatim
 !>
@@ -196,12 +198,6 @@
 !/    23-Feb-2022 : Extra (subfield-)components under switch XSTO
 !/                                           (C.Hansen) ( version X.XX )
 !/
-!
-! TODO 23-Feb-2022, C.Hansen:
-!     Test the "Example ounfmeta.inp file" with the BED example:
-!     This has sub-fields IFS=1 and IFS=2. (IFS defaults to 0 if no sub-fields)
-!     META [ IFI [ IFJ ]  |  FLDID ] [ IFC ] [ IFS ]
-!
 !/ ------------------------------------------------------------------- /
 !/
       USE NETCDF
@@ -2634,8 +2630,9 @@
 #endif
       IMPLICIT NONE
       TYPE(META_T), POINTER :: META(:)
+      INTEGER :: IFJ
 #ifdef W3_XSTO
-      INTEGER :: IFI, IFJ
+      INTEGER :: IFI
 #endif
 !
 !----------GROUP 1 ----------------
@@ -3875,22 +3872,8 @@
 ! Parameter 'XSP'
       CALL W3FLDTOIJ('XSP   ', IFI, IFJ, 1, 1, 1)
 !
+! First sub-field svp:'Vertical profile of Stokes drift'
       META => GROUP(IFI)%FIELD(IFJ)%SUBFIELD(1)%META
-      ! First sub-field ksc:'Wavenumber of the zero-upcrossing period'
-      META(1)%FSC  = 0.0002
-      META(1)%VMIN = 0.0002
-      META(1)%VMAX = 6.5532 ! 32766*0.0002
-      META(1)%UNITS  = 'm-1'
-      META(1)%ENAME  = '.ksc'
-      META(1)%VARNM='ksc'
-      META(1)%VARNL='Wavenumber of zero-upcross'
-      META(1)%VARNS=''
-      META(1)%VARNG=''
-      META(1)%VARNC='Profile depths Z = zk / ksc'
-      META(1)%VARND=''
-!
-! Second sub-field svp:'Vertical profile of Stokes drift'
-      META => GROUP(IFI)%FIELD(IFJ)%SUBFIELD(2)%META
       META(1)%FSC    = 1./30000.
       META(1)%ENAME  = '.svp'
       META(1)%VMIN = -1.
@@ -3898,15 +3881,31 @@
       META(1)%UNITS   = 'm s-1'
       META(1)%VARNM='usvp'
       META(1)%VARNL='eastward stokes drift profile'
-      META(1)%VARNS='eastward_stokes_drift_profile'
+      !META(1)%VARNS='eastward_stokes_drift_profile'
+      META(1)%VARNS=''
       META(1)%VARNG=''
-      META(1)%VARNC='Try piece-wise interpolation of u(Z) + jv(Z)'
+      META(1)%VARNC='Suggestion: piece-wise interpolation of u(Z) + jv(Z); ' // &
+                    'u(Z) + jv(Z) = (u(0) + jv(0)) e^{j B zk} e^{A zk^0.5}'
       META(1)%VARND = DIRCOM
       META(2)=META(1)
       META(2)%VARNM='vsvp'
       META(2)%VARNL='northward stokes drift profile'
-      META(2)%VARNS='northward_stokes_drift_profile'
-      META(2)%VARNC='u(Z) + jv(Z) = (u(0) + jv(0)) e^{j B zk} e^{A zk^0.5}'
+      !META(2)%VARNS='northward_stokes_drift_profile'
+      META(2)%VARNS=''
+!
+! Second sub-field ksc:'Stokes profile wavenumber scale'
+      META => GROUP(IFI)%FIELD(IFJ)%SUBFIELD(2)%META
+      META(1)%FSC  = 0.0002
+      META(1)%VMIN = 0.0002
+      META(1)%VMAX = 6.5532 ! 32766*0.0002
+      META(1)%UNITS  = 'm-1'
+      META(1)%ENAME  = '.ksc'
+      META(1)%VARNM='ksc'
+      META(1)%VARNL='Stokes profile wavenumber scale'
+      META(1)%VARNS=''
+      META(1)%VARNG=''
+      META(1)%VARNC='Profile depths Z = zk / ksc'
+      META(1)%VARND=''
 !
 ! Third sub-field xsm:'Total Stokes drift'
       META => GROUP(IFI)%FIELD(IFJ)%SUBFIELD(3)%META
@@ -3919,12 +3918,12 @@
       META(1)%UNITS  = 'm2 s-1'
       META(1)%VARNM='uxsm'
       META(1)%VARNL='eastward wave pseudo momentum'
-      META(1)%VARNS='eastward_wave_pseudo_momentum'
+      !META(1)%VARNS='eastward_wave_pseudo_momentum'
       META(1)%VARNC=''
       META(2)=META(1)
       META(2)%VARNM='vxsm'
       META(2)%VARNL='northward wave pseudo momentum'
-      META(2)%VARNS='northward_wave_pseudo_momentum'
+      !META(2)%VARNS='northward_wave_pseudo_momentum'
 #endif
 !
 !---------- GROUP 7 ----------------

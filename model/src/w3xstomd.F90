@@ -1,3 +1,6 @@
+!> @file w3ounfmetamd.F90
+!> @brief Extended spectral tail for Stokes drift profile.
+!> @author Carsten Hansen @date 21-Jan-2021
 #include "w3macros.h"
 !/ ------------------------------------------------------------------- /
       MODULE W3XSTOMD
@@ -5,9 +8,9 @@
 !/                  +------------------------------------------+
 !/                  | Extended spectral tail for Stokes drift  |
 !/                  |          Carsten Hansen                  |
-!/                  | Joint GEOMETOC Support Center Denmark    |
+!/                  | Danish defence Joint GEOMETOC Support    |
 !/                  |                            FORTRAN 90    |
-!/                  | Last update :             09-OCT-2019    |
+!/                  | Last update :             21-Jan-2021    |
 !/                  +------------------------------------------+
 !/
 !/
@@ -59,208 +62,215 @@
 !/                  "Mean Stokes drift profile from a wave model with a
 !/                  parametric extension of the spectral tail".
 !-------------------
-!/
-!  1. Purpose, and output data
-!
-!  Calculate the vertical profile of the Stokes drift, using a directional
-!  distribution (Ewans, 1997) for the diagnostic parts of the spectrum at
-!  high frequencies in conjunction with an assumed power-law spectral tail.
-!
-!  All calculations are performed in parallel and the Stokes drift is calculated
-!  at NDEPTH discrete depths given in an array Z_S(1:NDEPTH).
-!  The sum of prognostic and diagonostic (tail) contributions are stored in
-!  arrays U_S(1:NDEPTH), V_S(1:NDEPTH).
-!
-!  2. Usage
-!
-!  a) In ww3_grid.inp/ww3_grid.nml, you may modify four namelist variables:
-!     $ NDP: Number of depths (->NDEPTH)
-!     $ DSC: Depth scale specifying the largest depth Z(NDP)=DSC/(2pi/Tz)^2*GRAV
-!     $ BP: Power of profile depth progression
-!     $ TYP: Tail type (C*4); 'DoEw': Donelan-Ewans,
-!     $                       'None': Prognostic spectrum frequencies, only
-!     &XSTO NDP = 11, DSC = 2.0, BP = 2.0, TYP = 'DoEw' /
-!
-!  ( TODO: In ww3_shel.nml, you may in the future set namelist variable
-!     XSVB: Verboseness level [0..4] of output. Default XSVB=1 )
-!
-!  3. Estimation of Stokes drift of the diagnostic tail.
-!
-!  For wind waves over deep water, and following Ewans (1997), the
-!  contribution in the frequency bin df to the directionally integrated
-!  Stokes drift is
-!    d Stokes(omega) = 2 g omega^3 m1(omega) S(omega) d omega
-!  where the directionally integrated spectrum is
-!    S(omega) = int_-pi^pi S(omega,theta) d theta
-!
-!  Following Ewans (1997) m1(omega) is denoted the 'first circular moment' of
-!  the spectrum S(omega,theta),
-!    m1(omega) = int_-pi^pi cos(theta) S(omega,theta) d theta / S(omega)
-!
-!  Based on observational data (the 'Maui' experiment) Ewans (1997) suggests
-!  a mathematical model to fit the data, which results in the
-!  following expression for the first circular moment:
-!    m1E(omega) = cos(theta_E(f/fP)) exp( -(sigma(f/fP)**2)/2 ),
-!  where f/fP is the ratio of local spectral frequency f=omega/2pi over the
-!  peak frequency fP. Ewans provides expressions for theta_E, the reflection
-!  from the mean direction of two 'binodal' directional peaks, and sigma, the
-!  standard deviation of Gaussian-shaped distributions around each of the two
-!  peaks.
-
-!  In the present usage ('Donelan-Ewans': subroutine diag_DE_init(NP)),
-!  Ewans' m1 is approximated by a function,
-!    m1t(f/fP) = m1E(f/fP=1) * exp( a sinh(phih * (f/fP - 1)) )
-!  where a = 1.25 and phih = -0.187 is a negative factor representing the
-!  increasing directional spread with increasing f/fP.
-
-!  A formula for the spectral tail is assumed in the form of Donelan et. al
-!  (1985),
-!    S(omega) = alpha U10 g omega^-4,
-!  where the factor alpha may vary with the integral wave properties, among
-!  which the dependance on wave age (U10/cP)*cos(theta_mean-theta_U) has been
-!  investigated. In the present usage, alpha is estimated based on a few of
-!  the highest frequency bins of the prognostic spectrum.
-!  We note that the resulting estimates of alpha is sensitive to the choice of
-!  formulation of wind input. It was first tested (and tuned) with the
-!  Tolman-Chalikov input terms formulation ( WW3 switch '/ST2'), and is
-!  also consistent with ST4-Romero or ST6, which are supposed with certain
-!  parameter combinations to have an omega^-4 spectral tail up to f/fP ~ 3-4.
-!
-!  With the spectrum of Donelan et. al and Ewans' formula for m1(omega), the
-!  integrated Stokes drift int_omegat^inf d Stokes(omega) will *not* converge,
-!  because the binodal direction theta_E(f/fP) converges to a value slightly
-!  larger that pi/2 as f/fP -> infinity. However, it is realistic that
-!  at values of f/fP in the range 3 to 6 there exist a further transition to
-!  a spectrum of satutated form, going asymptotically as omega^-5. Such
-!  spectral tail works as a low-pass filter, and the exact shape of m1 beyond
-!  frequencies of order f/fP ~ 6 does only influence the integrated Stokes
-!  drift by a small amount. The applied approximation m1t(omega) to Ewans'
-!  formula for m1(omega) provides a low-pass filter at an equivalent frequency
-!  scale. Thus it is suggested that there will be little effect of applying
-!  an explicit formula of an omega^-5 spectral tail.
-!
-!  4. Integrated pseudo-momentum over the diagnostic spectral tail
-!
-!  A common look-up table for this, Im(nt), is calculated in a subroutine
-!  specfic for the parametric tail (for Donelan-Ewans: subroutine
-!  diag_DE_init(NP)).
-!
-!  The index nt corresponds to fd/fp rounded to nearest integer:
-!  fd/fp = DFH**ntf; nt=nint( ntf )
-
-!  The spectrum is normalized by the spectral level. For Donelan-Ewans
-!  this is estimated from the omnidirectional spectrum S(omega) as
-!  Dsn = S(omega)*omega^4.
-
-!  Im(nt), where ft/fP = fhn = DFH**n, n = 1, ..., Np
-!  Im(nt) = sum_fhn^fhcut m1(fh) fh^-2 log(DFH)
-!  The integrated momentum of the spectral tail is
-!  M(ft) = GRAV * Dsn sigP^-2 Im(n), n = log(ft/fP)/log(DFH)
-!
-!  M is a first 'kv/sig'-moment - like the the first spectral moment
-!  (that determines the mean wave period) but considered a vector sum.
-!  kv is the wave number vector, kv = k * (cos(theta), sin(theta))
-!
-!
-!  5. Diagnostic tail until Ncut
-!
-!  The diagnostic tail contribution is calculated in the subroutine
-!  CALC_XSTOKES(A) using a common 2-D array SBDiaZ(:,:) for the
-!  normalized Stokes drift.
-!
-!  The look-up array start index nt, and the spectral level Dsn, are
-!  defined as above
-!
-!  StkDiag(:) = SBDiaZ(:,nt) * (1. - ntf) ! Fraction at fd/fp
-!  do ntt = nt+1, min(ntr,NP)
-!    StkDiag(:) = StkDiag(:) + SBDiaZ(:,ntt)
-!  end do
-!
-!  Starting at the surface, SBDiaZ(0,:) = DStkOsn(:). This is calculated
-!  in a subroutine specfic for the parametric tail. This example is for
-!  Donelan-Ewans, subroutine diag_DE_init(NP):
-!
-!  fh = fht
-!  do ntt = Np+1, Ncut
-!        DStkOsn(ntt) = exp( aa * sinh(phih * (fh - 1.)) )
-!        Sum = Sum + DStkOsn(ntt)
-!        fh = fh * DFH
-!  end do
-!  DStkOsn(Np+1)=Sum
-!
-!  The depth dependent array SBDiaZ(1:NZ,:) is calculated in the
-!  subroutine XSTOKES_INIT:
-!
-!  Let XKH = DFH**2
-!
-!  Initial value of ratio of wavenumbers:
-!  Rk = fOfp(JSEA)**2
-!  ! Loop over spectral bins
-!  do ntt = NP + 1, Ncut
-!    ! Loop over depth bins
-!    do iz = 1,NZ
-!      ! Assume no shallow water effect at high frequencies
-!      A2S = EXP( - 2 * Rk * ZK_S(iz) )
-!      SBDiaZ(iz,ntt) =  DStkOsn(ntt) * A2S
-!      end do
-!    ! Increment the ratio of wavenumbers
-!    Rk = Rk * XKH
-!    end do
-!
-!  5b. Tail of the tail:
-!  ! Not implemented for now: 
-!  ! A supplement tail may be appended at the *end* of the discretized
-!  ! diagnostic range.
-!
-!  6. Implementation in the WW3 code:
-!
-!  Code lines in WW3 cource files other than w3xstomd.ftn have all been
-!  added under the compile switch '!/XSTO'
-!
-!  a) In w3iogomd.ftn
-!     In CALC_XSTOKES() (w3xstomd.ftn) the stokes drift profile is calculated
-!     by a call of DSTOKES(A, JSEA, U10, UDIR, T02). (For the initial scale
-!     value for wave period [Ts] the zero upcrossing period T02 is chosen.)
-!
-!
-!  b) In w3gdatmd.ftn, w3iogrmd.ftn, ww3_grid.ftn:
-!       Part of the GRIDS structure (W3GDATMD) and stored in mod_def
-!       XSND: Number of depths for Stokes profile U_S(1:XSND)
-!       XSDS: Depth scale specifying the largest depth Z(XSND) for the profile
-!       XSBP: Power of profile depth progression
-!       XSTY: Tail par. type. 'DoEw': Donelan-Ewans,
-!                             'None': Prognostic spectrum frequencies, only
-!
-!  c) In w3adatmd.ftn:
-!       Declare and allocate arrays ZK_S (Z*K_S) and
-!       UXSP: The full Stokes 2D profile and integral parameters M_X, M_Y, K_S
-!
-!  d) Modify the makefile scripts (make_makefile.sh, w3_new) as
-!     described in the WW3 manual chpt. 5.5
-!     make_makefile.sh:
-!       for type in ...  xsto; do
-!       (...)
-!
-!     w3_new:
-!       case $... in
-!       (...)
-!
-!  7. Subroutines and functions :
-!
-!      Name      Type  Scope    Description
-!     ----------------------------------------------------------------
-!      CALC_XSTOKES    Public  Interface routine for Stokes drift
-!                              profile calculation
-!     ----------------------------------------------------------------
-!
-!  8. Switches :
-!
-!       !/SHRD  Switch for shared / distributed memory architecture.
-!       !/DIST  Id.
-!
-!
-!  9. Source code :
-!
+!>
+!>  @brief Purpose, and output data.
+!>
+!>  @details
+!>  Calculate the vertical profile of the Stokes drift, using a
+!>  directional distribution (Ewans, 1997) for the diagnostic parts of the
+!>  spectrum at high frequencies in conjunction with an assumed power-law
+!>  spectral tail.
+!>
+!>  All calculations are performed in parallel and the Stokes drift is calculated
+!>  at NDEPTH discrete depths given in an array Z_S(1:NDEPTH).
+!>  The sum of prognostic and diagonostic (tail) contributions are stored in
+!>  arrays U_S(1:NDEPTH), V_S(1:NDEPTH).
+!>
+!>  @brief Usage.
+!>
+!>  @details
+!>  In ww3_grid.inp/ww3_grid.nml, you may modify four namelist variables:
+!>  - NDP: Number of depths (->NDEPTH)
+!>  - DSC: Depth scale specifying the largest depth Z(NDP)=DSC/(2pi/Tz)^2*GRAV
+!>  - BP: Power of profile depth progression
+!>  - TYP: Tail type (C*4); 'DoEw': Donelan-Ewans,
+!>  -                       'None': Prognostic spectrum frequencies, only
+!>  @verbatim
+!>  &XSTO NDP = 11, DSC = 2.0, BP = 2.0, TYP = 'DoEw' /
+!>  @endverbatim
+!>
+!>  @brief Estimation of Stokes drift of the diagnostic tail.
+!>
+!>  @details
+!>  The Stokes drift is determined by the wave spectrum H(sig,theta) over
+!>  (intrinsic) frequencies sig (= 2 pi f in the absense of currents) and
+!>  directions theta. For wind waves over deep water, and following
+!>  Ewans (1997), the contribution in a frequency bin dsig to the
+!>  directionally integrated Stokes drift is 
+!>  @verbatim
+!>    d Stokes(sig) = 2 g sig^3 m1(sig) S(sig) d sig
+!>  where the directionally integrated spectrum is
+!>    S(sig) = int_-pi^pi H(sig,theta) d theta
+!>  @endverbatim
+!>
+!>  Following Ewans (1997) m1(sig) is denoted the 'first circular moment' of
+!>  the spectrum H(sig,theta),
+!>  @verbatim
+!>    m1(sig) = int_-pi^pi cos(theta) H(sig,theta) d theta / S(sig)
+!>  @endverbatim
+!>
+!>  Based on observational data (the 'Maui' experiment) Ewans (1997) suggests
+!>  a mathematical model to fit the data, which results in the
+!>  following expression for the first circular moment:
+!>  @verbatim
+!>    m1E(sig) = cos(theta_E(f/fp)) exp( -(Sigma(f/fp)**2)/2 ),
+!>  @endverbatim
+!>  where f/fp is the ratio of local spectral frequency f=sig/2pi over the
+!>  peak frequency fp. Ewans provides expressions for theta_E, the reflection
+!>  from the mean direction of two 'binodal' directional peaks, and Sigma,
+!>  the standard deviation of Gaussian-shaped distributions around each of
+!>  the two peaks.
+!>
+!>  In the present usage ('Donelan-Ewans': subroutine diag_DE_init(NP)),
+!>  Ewans' m1 is approximated by a function,
+!>  @verbatim
+!>    m1t(f/fp) = m1E(f/fp=1) * exp( a sinh(phih * (f/fp - 1)) )
+!>  @endverbatim
+!>  where a = 1.25 and phih = -0.187 is a negative factor representing the
+!>  increasing directional spread with increasing f/fp.
+!>
+!>  A formula for the spectral tail is assumed in the form of Donelan et. al
+!>  (1985),
+!>  @verbatim
+!>    S(sig) = alpha U10 g sig^-4,
+!>  @endverbatim
+!>  where the factor alpha may vary with the integral wave properties, among
+!>  which the dependance on wave age (U10/cP)*cos(theta_mean-theta_U) has been
+!>  investigated. In the present usage, alpha is estimated based on a few of
+!>  the highest frequency bins of the prognostic spectrum.
+!>  We note that the resulting estimates of alpha is sensitive to the choice of
+!>  formulation of wind input. It was first tested (and tuned) with the
+!>  Tolman-Chalikov input terms formulation ( WW3 switch '/ST2'), and is
+!>  also consistent with ST4-Romero or ST6, which are supposed with certain
+!>  parameter combinations to have an sig^-4 spectral tail up to f/fp ~ 3-4.
+!>
+!>  With the spectrum of Donelan et. al and Ewans' formula for m1(sig), the
+!>  integrated Stokes drift int_sigt^inf d Stokes(sig) will *not* converge,
+!>  because the binodal direction theta_E(f/fp) converges to a value slightly
+!>  larger that pi/2 as f/fp -> infinity. However, it is realistic that
+!>  at values of f/fp in the range 3 to 6 there exist a further transition to
+!>  a spectrum of satutated form, going asymptotically as sig^-5. Such
+!>  spectral tail works as a low-pass filter, and the exact shape of m1 beyond
+!>  frequencies of order f/fp ~ 6 does only influence the integrated Stokes
+!>  drift by a small amount. The applied approximation m1t(sig) to Ewans'
+!>  formula for m1(sig) provides a low-pass filter at an equivalent frequency
+!>  scale. Thus it is suggested that there will be little effect of applying
+!>  an explicit formula of an sig^-5 spectral tail.
+!>
+!>  @brief Integrated pseudo-momentum over the diagnostic spectral tail.
+!>
+!>  @details
+!>  The integrated momentum of the spectral tail has a form
+!>  @verbatim
+!>    M(ft) = GRAV * Dsn fp^-2 Im(nt), nt = log(ft/fp)/log(DFH)
+!>  @endverbatim
+!>  where ft it the tail start frequency, Dsn is the prognostic spectral level
+!>  at ft, and fp is a 'peak frequency' value that makes the tail extension
+!>  match the prognostic spectrum at ft.
+!>
+!>  M is a first 'kv/sig'-moment - like the the first spectral moment
+!>  (that determines the mean wave period) but considered a vector sum.
+!>  kv is the wave number vector, kv = k * (cos(theta), sin(theta))
+!>
+!>  Assuming a Donelan-Ewans spectral tail form, Dsn is estimated from the 
+!>  omnidirectional spectrum S(sig) as Dsn = S(sig)*sig^4.
+!>          
+!>  A common look-up table for Im(nt) is calculated in a subroutine specfic
+!>  for the parametric tail (for Donelan-Ewans: subroutine diag_DE_init(NP)).
+!>  The index nt corresponds to ft/fp rounded to nearest integer:   
+!>  @verbatim
+!>    ft/fp = DFH**ntf; nt=nint( ntf )
+!>  @endverbatim
+!>        
+!>
+!>  @brief Diagnostic tail until Ncut.
+!>
+!>  @details
+!>  The diagnostic tail contribution is calculated in the subroutine
+!>  CALC_XSTOKES(A) using a common 2-D array SBDiaZ(:,:) for the
+!>  normalized Stokes drift.
+!>
+!>  The look-up array start index nt, and the spectral level Dsn, are
+!>  defined as above
+!>
+!>  @verbatim
+!>  StkDiag(:) = SBDiaZ(:,nt) * (1. - ntf) ! Fraction at fd/fp
+!>  do ntt = nt+1, min(ntr,NP)
+!>    StkDiag(:) = StkDiag(:) + SBDiaZ(:,ntt)
+!>  end do
+!>  @endverbatim
+!>
+!>  Starting at the surface, SBDiaZ(0,:) = DStkOsn(:). This is calculated
+!>  in a subroutine specfic for the parametric tail. This example is for
+!>  Donelan-Ewans, subroutine diag_DE_init(NP):
+!>
+!>  @verbatim
+!>  fh = fht
+!>  do ntt = Np+1, Ncut
+!>        DStkOsn(ntt) = exp( aa * sinh(phih * (fh - 1.)) )
+!>        Sum = Sum + DStkOsn(ntt)
+!>        fh = fh * DFH
+!>  end do
+!>  DStkOsn(Np+1)=Sum
+!>  @endverbatim
+!>
+!>  The depth dependent array SBDiaZ(1:NZ,:) is calculated in the
+!>  subroutine XSTOKES_INIT:
+!>
+!>  Let XKH = DFH**2
+!>
+!>  Initial value of ratio of wavenumbers:
+!>  @verbatim
+!>  Rk = fOfp(JSEA)**2
+!>  ! Loop over spectral bins
+!>  do ntt = NP + 1, Ncut
+!>    ! Loop over depth bins
+!>    do iz = 1,NZ
+!>      ! Assume no shallow water effect at high frequencies
+!>      A2S = EXP( - 2 * Rk * ZK_S(iz) )
+!>      SBDiaZ(iz,ntt) =  DStkOsn(ntt) * A2S
+!>      end do
+!>    ! Increment the ratio of wavenumbers
+!>    Rk = Rk * XKH
+!>    end do
+!>  @endverbatim
+!>
+!>  @Brief Implementation in the WW3 code.
+!>
+!>  @details
+!>  Code lines in WW3 cource files other than w3xstomd.ftn have all been
+!>  added under the compile switch 'XSTO'
+!>
+!>  a) In w3iogomd.F90:
+!>       CALC_XSTOKES(A) is called from W3OUTG()
+!>
+!>  b) In w3gdatmd.F90, w3iogrmd.F90, w3gridmd.F90:
+!>       Part of the GRIDS structure (W3GDATMD) and stored in mod_def
+!>  @verbatim
+!>       XSND: Number of depths for Stokes profile U_S(1:XSND)
+!>       XSDS: Depth scale specifying the largest depth Z(XSND) for the profile
+!>       XSBP: Power of profile depth progression
+!>       XSTY: Tail par. type. 'DoEw': Donelan-Ewans,
+!>                             'None': Prognostic spectrum frequencies, only
+!>  @endverbatim
+!>
+!>  c) In w3adatmd.F90:
+!>       Declare and allocate arrays ZK_S, U_S, V_S together with the integral
+!>       parameters M_X, M_Y, K_S, all to be written to the output packed in
+!>       a 2D array UXSP
+!>
+!>
+!>  @Brief Subroutines and functions.
+!>
+!>  @details
+!>  @verbatim
+!>      Name      Type  Scope    Description
+!>     ----------------------------------------------------------------
+!>      CALC_XSTOKES    Public  Interface routine for Stokes drift
+!>                              profile calculation
+!>     ----------------------------------------------------------------
+!>  @endverbatim
+!>
 
 !/ ------------------------------------------------------------------- /
       USE CONSTANTS, ONLY: GRAV, TPI, RADE, TSTOUT
@@ -287,8 +297,8 @@
       USE W3DISPMD, ONLY: DSIE, N1MAX, ECG1, EWN1
 
 ! Lowpass cutoff frequencies for specific output fields. These are namelist
-! parameters for ww3_shel and declared in W3ODATMD in order not to link
-! w3nmlshelmd with the program ww3_ounf
+! parameters for ww3_shel (and declared in W3ODATMD in order not to link
+! w3nmlshelmd with the program ww3_ounf)
       USE W3ODATMD, ONLY: OFCUT, OFCUT_COUNT
 
 ! TODO, like OFCUT:
@@ -361,20 +371,21 @@
 
 
 !/ ------------------------------------------------------------------- /
-!/ Step a) XSTOKES_INIT(): Initialisation. A few
-!/         input lines are read from ww3_shel.inp. Lookup tables are
-!/         calculated for the diagnostic tail
-!/
+!> @brief XSTOKES_INIT(): Initialisation.
+!>        
+!> @details        
+!>  Common parameters and arrays are set based on the namelist settings.
+!>  Lookup tables are calculated for the diagnostic tail.
+!>
 !/ ------------------------------------------------------------------- /
-!/
       SUBROUTINE XSTOKES_INIT ()
 
-!/                  +-------------------------------------+
-!/                  | FCOO Stokes Drift for WAVEWATCH III |
-!/                  |           Carsten Hansen            |
-!/                  |                        FORTRAN 90   |
-!/                  | Last update :         22-Dec-2017   |
-!/                  +-------------------------------------+
+!/            +------------------------------------------+
+!/            | Extended spectral tail for Stokes drift  |
+!/            |          Carsten Hansen                  |
+!/            | Danish defence Joint GEOMETOC Support    |
+!/            | Last update :             22-Dec-2017    |
+!/            +------------------------------------------+
 !/
 !/    02-May-2011 : Origination. Development program w3stokes.ftn converted
 !/                  from tested Python code
@@ -383,14 +394,6 @@
 !/    22-Dec-2017 : Adoption to version WW3 v5.16
 !/    15-Aug-2019 : Adoption to version WW3 v6.07
 !/                  Called in first call CALC_XINIT()
-!
-!  1. Purpose :
-!
-!      Initialize parameters and control arrays.
-!      Stokes drift for the diagnostic tail: Calculate the look-up array
-!      SBDiaZ(1:XSND,1:NK-2)
-!
-! 10. Source code :
 !
       USE W3SERVMD, ONLY : EXTCDE
 
@@ -658,21 +661,27 @@
 
 
 !/ ------------------------------------------------------------------- /
-! Step b) CALC_XSTOKES (). An interface to DSTOKES(): At each WW3 output time
-!         step, calculation of a Stokes drift profile is provided in arrays
-!                 U_S(1:XSND), V_S(1:XSND)
-!         The Stokes profile is a sum of a prognostic part and a tail part
-!         StkDiag(1:XSND), where the depths are given in the array Z_S(1:XSND)
+!> @brief CALC_XSTOKES (A) - an interface to DSTOKES().
+!>      
+!> @details
+!>  At each WW3 output time step, calculation of a Stokes drift profile is
+!>  provided in arrays
+!> @verbatim
+!>                 U_S(1:XSND), V_S(1:XSND)
+!> @endverbatim
+!>  The Stokes profile is a sum of a prognostic part and a tail part
+!>  StkDiag(1:XSND), where the depths are given in the array Z_S(1:XSND)
 !/ ------------------------------------------------------------------- /
 
       SUBROUTINE CALC_XSTOKES (A)
 !/
-!/                  +-------------------------------------+
-!/                  | FCOO Stokes Drift for WAVEWATCH III |
-!/                  |           Carsten Hansen            |
-!/                  |                        FORTRAN 90   |
-!/                  | Last update :         22-Dec-2017   |
-!/                  +-------------------------------------+
+!/            +------------------------------------------+
+!/            | Extended spectral tail for Stokes drift  |
+!/            |          Carsten Hansen                  |
+!/            | Danish defence Joint GEOMETOC Support    |
+!/            |                        FORTRAN 90        |
+!/            | Last update :              22-Dec-2017   |
+!/            +------------------------------------------+
 !/
 !/
 !/    10-Oct-2011: Interface routine for Stokes drift profile calculation
@@ -683,7 +692,7 @@
 
 
 !/    Remarks: This subroutine must be called after T02 has been calculated
-!/             This subroutine can only be called under switch !/XSTO.
+!/             This subroutine can only be called under switch XSTO.
 
 ! UXSP: Full Stokes profile variables + M_X, M_Y, K_S, but not ZK_S
       USE W3ADATMD, ONLY: T02, UXSP
@@ -850,7 +859,7 @@
       KDPT = K_S * DEPTH
 
       ! numDepths: Number of depths of the discrete profile above the sea floor
-      numDepths = XSND ! XSND: Configured value
+      numDepths = XSND ! XSND is the configured value
 
       DO IZ = XSND,1,-1
         IF ( ZK_S(IZ) > KDPT ) CYCLE
@@ -983,13 +992,6 @@
                ' Mdiag = ', Mdiag
         END IF
 
-        ! IF ( ntr == NP ) THEN
-
-          !
-          ! Not implemented for now: Remaining 'tail of the tail', see end of
-          ! SUBROUTINE diag_DE_init.
-        !   END IF
-
         ! Multiply with the normalization factor (spectral level * U10)
         StkDiag(:) = StkDiag(:) * Dsn
 
@@ -1004,14 +1006,13 @@
         WRITE (NDSV, 912), '    .. for the prognostic part'
       END IF
 
-      ! Stokes exponential shape (profile in deep water) at ISEA for IK=1:
-      ! ETKZ(:) = EXP( -2. * WN * Z_S(:) )
+      ! Stokes profile exponential shape for IK=1:
       ETKZ(:) = 1
 
       MprogX = 0.
       MprogY = 0.
 
-      ! In XSTOKES_INIT:
+      ! From XSTOKES_INIT:
       ! For calculating exp(-2 K Z) = exp(-2 K0 Z) * exp( -2 (K-K0) Z ),
       ! DWN(IK) = K - K0 = WN(IK) - WN(IK-1)
       DWN(1) = WN(1,ISEA)
@@ -1026,7 +1027,7 @@
         ! CG: Group velocity
         ! DDEN(IK): Spectrum 2D bin size DTH * DSII(IK)
         ! WN(IK,ISEA): Wave number of the spectral bin IK
-        ! (Same calculation as in CALC_U3STOKES, except for shallow water)
+        ! (Same calculation as in CALC_U3STOKES at Z=0 in w3iogomd)
 
         ! Action-to-momentum factor, times angular frequency.
         ! M = A k, also in shallow water.
@@ -1036,7 +1037,7 @@
         ! Action-to-pseudo-momentum factor
         A2M = A2M / SIG(IK)
 
-        ! Stokes profile exponential shape at ISEA for IK:
+        ! Stokes profile exponential shape in deep water at ISEA for IK:
         ! ETKZ(:) = EXP( - 2. * WN * Z_S(:) )
         ! Remember, the values of Z_S depend on the actual value of K_S
         ! ETKZ(1) == 1. at the surface, always
@@ -1086,12 +1087,9 @@
       IF (xsto_verbose .gt. 1 .and. NIK > 0) &
         WRITE (NDSV, 907), '    .. for the transitional tail',IKST, 'to', IKT
 
-      ! Stokes exponential shape at ISEA for IK=IKST-1:
-      ! ETKZ(:) == EXP( WN(IKST-1,ISEA) * TZ_S(:) )
-
       DO IK=IKST, IKT
 
-        ! ( We silently ignore a possible case that the bin of the peak > IKST
+        ! ( We silently ignore a possible case that the peak is above IKST
         ! This has little influence when IKST is large enough that the Stokes
         ! drift becomes small anyway.)
 
@@ -1229,7 +1227,7 @@
       !  Calculation of the tail directional spreading:
       !
       !  Given a spectrum of shape
-      !  S(omega) = H(omega,theta) * alpha * U * g * omega^{-4}
+      !  S(sig) = H(sig,theta) * alpha * U * g * sig^{-4}
       !
       !  Let fh = f/fP denote the ratio of spectral bin frequency to the peak
       !
@@ -1237,7 +1235,7 @@
       !  to the surface Stokes drift is alpha * U times the factor
       !    SOsn = 2 * ( first circular moment ) * d f / f
       !  The first circular moment is defined as
-      !    m1 = int_{-pi}^pi cos(theta) H(omega,theta) d theta
+      !    m1 = int_{-pi}^pi cos(theta) H(sig,theta) d theta
       !  Ewans (1997) provides an expression given as a function
       !  m1E(f/fP), based on at fit to observations (the 'Maui'
       !  experiment).
@@ -1436,7 +1434,7 @@
           deallocate ( DTHsig5_G )
         END IF
 
-! Integrate over wave action in bands (As in subroutine CALC_U3STOKES, 2.b,
+! Integrate over wave action in bands (As in subroutine CALC_U3STOKES,
 ! in w3iogomd)
       SUM=0.
       SUMX=0.
@@ -1548,7 +1546,8 @@
 
 !/ ------------------------------------------------------------------- /
 !/
-! Numerical recipes Par. 9.4: Newton-Raphson Method Using Derivative
+!     Application of Numerical Recipes Par. 9.4:
+!     Root of function by Newton-Raphson Method Using Derivative
 !
       REAL FUNCTION rtnewt(funcd,rtnewtv,x1,x2,xacc,status)
 
@@ -1612,6 +1611,9 @@
 
 !/ ------------------------------------------------------------------- /
 !/
+!     Subroutine to determine with rtnewt() at which value of f/fp the first
+!     directional moment m1 of Ewans 1998 equals the value at the tail cut-off
+!
       SUBROUTINE m1Ed_Ew98(fOfp, f, df)
 
       IMPLICIT NONE
