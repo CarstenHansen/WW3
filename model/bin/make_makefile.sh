@@ -116,6 +116,7 @@
   progs="ww3_grid ww3_strt ww3_prep ww3_prnc ww3_shel ww3_multi ww3_sbs1
          ww3_outf ww3_outp ww3_trck ww3_trnc ww3_grib gx_outf gx_outp ww3_ounf
          ww3_ounp ww3_gspl ww3_gint ww3_bound ww3_bounc ww3_systrk $tideprog"
+  progs="$progs ww3_ounf3"
   progs="$progs ww3_multi_esmf  ww3_uprstr"
   progs="$progs libww3"
   progs="$progs libww3.so"
@@ -141,6 +142,7 @@
       ww3_sbs1) IDstring='Multi-grid shell sbs version' ;;
       ww3_outf) IDstring='Gridded output' ;;
       ww3_ounf) IDstring='Gridded NetCDF output' ;;
+      ww3_ounf3) IDstring='Gridded NetCDF output' ;;
       ww3_outp) IDstring='Point output' ;;
       ww3_ounp) IDstring='Point NetCDF output' ;;
       ww3_trck) IDstring='Track output post' ;;
@@ -416,10 +418,10 @@
          'W3NMLOUNPMD'  ) modtest=w3nmlounpmd.o ;;
          'W3NMLTRNCMD'  ) modtest=w3nmltrncmd.o ;;
          'W3NMLBOUNCMD' ) modtest=w3nmlbouncmd.o ;;
+         'W3NMLBOUNDMD' ) modtest=w3nmlboundmd.o ;;
          'W3NMLSHELMD'  ) modtest=w3nmlshelmd.o ;;
          'W3NMLGRIDMD'  ) modtest=w3nmlgridmd.o ;;
          'W3NMLUPRSTRMD' ) modtest=w3nmluprstrmd.o ;;
-         'W3NETCDF'     ) modtest=w3netcdf.o ;;
          'YOWFUNCTION'  ) modtest=yowfunction.o ;;
          'YOWDATAPOOL'  ) modtest=yowdatapool.o ;;
          'YOWNODEPOOL'  ) modtest=yownodepool.o ;;
@@ -434,6 +436,7 @@
          'W3PARALL'     ) modtest=w3parall.o ;;
          'W3SMCOMD'     ) modtest=w3smcomd.o ;;
          'W3OUNFMETAMD' ) modtest=w3ounfmetamd.o ;;
+         'W3OUNF3METAMD' ) modtest=w3ounf3metamd.o ;;
          'W3METAMD'     ) modtest=w3metamd.o ;;
          'W3GRIDMD'     ) modtest=w3gridmd.o ;;
          'W3XSTOMD'     ) modtest=w3xstomd.o ;;

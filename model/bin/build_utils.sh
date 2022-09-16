@@ -806,7 +806,7 @@ create_file_list()
                prop="$smcm"
             sourcet="$pdlibcode $pdlibyow $db $bt $setupcode $tr $trx $stx $nlx $btx $is wmmdatmd w3parall w3triamd $uostmd"
                  IO='w3iobcmd w3iogrmd w3dispmd w3gsrumd'
-                aux="constants w3servmd w3timemd w3arrymd w3cspcmd" ;;
+                aux="constants w3servmd w3timemd w3arrymd w3cspcmd w3nmlboundmd" ;;
       ww3_bounc)
                core=
                data="w3adatmd $memcode w3gdatmd w3wdatmd w3idatmd w3odatmd"
@@ -907,6 +907,14 @@ create_file_list()
                  IO="w3iogrmd w3iogomd w3iorsmd w3iopomd $xstomd"
                 aux="constants w3servmd w3timemd w3arrymd w3dispmd w3gsrumd"
                 aux="$aux w3nmlounfmd $smco w3ounfmetamd w3metamd" ;;
+      ww3_ounf3)
+               core='w3initmd'
+               data="wmmdatmd $memcode w3gdatmd w3wdatmd w3adatmd w3idatmd w3odatmd"
+               prop=
+            sourcet="$pdlibcode $pdlibyow $db $bt $setupcode w3parall w3triamd $stx $flx $nlx $btx  $is $uostmd"
+                 IO="w3iogrmd w3iogomd w3iorsmd w3iopomd $xstomd"
+                aux="constants w3servmd w3timemd w3arrymd w3dispmd w3gsrumd"
+                aux="$aux w3nmlounfmd $smco w3ounf3metamd w3metamd" ;;
       ww3_outp) 
                core=
                data="wmmdatmd w3parall w3triamd $memcode w3gdatmd w3wdatmd w3adatmd w3idatmd w3odatmd"

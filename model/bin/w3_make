@@ -147,6 +147,7 @@
   # PRNC OUNF OUNP BOUNC TRNC
   cdf_programs="ww3_prnc"
   cdf_programs="$cdf_programs ww3_ounf"
+  cdf_programs="$cdf_programs ww3_ounf3"
   cdf_programs="$cdf_programs ww3_ounp"
   cdf_programs="$cdf_programs ww3_bounc"
   cdf_programs="$cdf_programs ww3_trnc"

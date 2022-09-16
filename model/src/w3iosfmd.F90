@@ -486,7 +486,7 @@
                     ERR=800,IOSTAT=IERR)
             ELSE
               OPEN (NDSPT,FILE=FNMPRE(:J)//'partition.'//FILEXT(:I),   &
-                    FORM='UNFORMATTED',ERR=800,IOSTAT=IERR)
+                    form='UNFORMATTED',convert=file_endian,ERR=800,IOSTAT=IERR)
             END IF
 !
           REWIND (NDSPT)
@@ -540,7 +540,7 @@
           DTSIZ  = ICPRT(NSEAL+1,2) - 1
 #endif
 !
-#ifdef W3_T
+#ifdef W3_MPIT
              WRITE (NDST,9021)  IAPROC, NAPPRT, DTSIZ
 #endif
 !
@@ -587,7 +587,7 @@
             DTSIZ  = ICP(JSLM+1,2) - 1
 #endif
 !
-#ifdef W3_T
+#ifdef W3_MPIT
                WRITE (NDST,9031)  JAPROC, DTSIZ
 #endif
 !
