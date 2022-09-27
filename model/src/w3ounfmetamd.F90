@@ -14,7 +14,7 @@
 !>    Entries in the file are formatted as follows:
 !>
 !>    @verbatim
-!>    META [ IFI [ IFJ ]  |  FLDID ]   [ IFC ]
+!>    META [ IFI [ IFJ ]  |  FLDID ]   [ IFC ] [ IFS ]
 !>      attr_name = attr_value
 !>      attr_name = attr_value
 !>      extra_attr = extra_value [type]
@@ -24,7 +24,9 @@
 !>    An output field is selected using the META keyword followed by
 !>    either an [IFI, IFJ] integer pair or a FieldID string. Optionally,
 !>    either form may be followed by an integer value to select the
-!>    component in multi-component fields (such as wind).
+!>    component in multi-component fields (such as wind). A further optional
+!>    integer IFS may be given, identifying a sub-field (requires setting IFC,
+!>    see the example "BED output, with sub-fields" below)
 !>
 !>    Blank lines and comments lines (starting with $) are ignored.
 !>
@@ -145,6 +147,24 @@
 !>      institution = UKMO
 !>      comment "space seperated strings should be quoted" c
 !>      version = 1.0 r
+!>
+!>    $ BED output, with sub-fields:
+!>    $ Sub-field 1 (a scalar)
+!>    META BED 1 1
+!>      standard_name = "sea_bottom_roughness_length"
+!>      varng = ''
+!>      fsc = 0.0001
+!>      units = 'm'
+!>      vmin = 0.
+!>      vmax = 3.
+!>    $ Sub-field 2, component 1: ripple-x
+!>    META BED 1 2
+!>      standard_name = "eastward_ripple_wavelength"
+!>      varnd = ''
+!>    $ Sub-field 2, component 2: ripple-y
+!>    META BED 2 2
+!>      long_name = "northward_ripple_wavelength"
+!>      varnd = ''
 !>    @endverbatim
 !>
 !> @author Chris Bunney @date 02-Nov-2020
@@ -159,7 +179,7 @@
 !> 22-Mar-2021 | 7.12 | Add extra coupling fields
 !> 02-Sep-2021 | 7.12 | Add coordinates attribute
 !>
-      MODULE W3OUNFMETAMD
+      MODULE W3OUNF3METAMD
 !/
 !/    02-Nov-2020 : Creation                            ( version 7.12 )
 !/    26-Jan-2021 : Added TP and alternative dir/mag    ( version 7.12 )
@@ -171,7 +191,16 @@
 !/                  template string implementation.
 !/    22-Mar-2021 : Adds extra coupling fields          ( version 7.13 )
 !/    02-Sep-2021 : Add coordinates attribute           ( version 7.12 )
+!/    23-Feb-2022 : Sub-fields and more than one        ( version X.XX )
+!/                  'fourth' dimension (in preparation, C. Hansen)    
 !/
+!
+! TODO 23-Feb-2022, Carsten Hansen:
+!     Test the "Example ounfmeta.inp file" with the BED example:
+!     This has sub-fields IFS=1 and IFS=2. (IFS defaults to 0 if no sub-fields)
+!     META [ IFI [ IFJ ]  |  FLDID ] [ IFC ] [ IFS ]
+!     When accepted, implement as a new name 'ounfmeta.inp'
+!
 !/ ------------------------------------------------------------------- /
 !/
       USE NETCDF
@@ -183,7 +212,7 @@
 #ifdef W3_SMC
       USE W3SMCOMD, ONLY : SMCOTYPE
 #endif
-      USE W3ODATMD, ONLY: PTMETH, PTFCUT, NOGRP, NOGE, NGRPP,           &
+      USE W3ODATMD, ONLY: PTMETH, PTFCUT, NOGRP, NOGE,           &
                           NDSE, FNMPRE, NOSWLL
       USE W3SERVMD, ONLY: EXTCDE, STR_TO_UPPER
 
@@ -229,6 +258,11 @@
         CHARACTER(LEN=6) :: FLDID = ''  !< Field ID to update
       ENDTYPE META_T
 
+      ! Storage for storage of meta data aggregated by sub-field ...
+      TYPE SUBFIELD_T
+        TYPE(META_T), POINTER :: META(:)
+      END TYPE SUBFIELD_T         
+       
       !> Type for storage of meta data aggregated by component (NFIELD)
       TYPE FIELD_T
         TYPE(META_T), POINTER :: META(:) !< Pointer to meta data for field
@@ -268,6 +302,7 @@
       !> User-defined partitionted paratmeters template strings
       TYPE(PART_TMPL_T), POINTER :: PART_TMPL
 
+      INTEGER            :: NFSMAX      !< Max number of sub-fields
       INTEGER            :: NCVARTYPE   !< NetCDF variable type (2=int, 3=real, 4=depends)
       CHARACTER(LEN=30)  :: DIRCOM      !< Directional convention comment
       CHARACTER(LEN=128) :: PARTCOM     !< Partitioning method comment
@@ -314,6 +349,8 @@
 !     Allocates space for the META_T arrays and sets some constants.
 !
 !/ ------------------------------------------------------------------- /
+      USE W3IOGOMD, ONLY: W3FLDTOIJ
+
       IMPLICIT NONE
 
       LOGICAL, INTENT(IN), OPTIONAL  :: VEC
@@ -322,7 +359,14 @@
 !/ Local parameters
 !/
       LOGICAL :: FLGNML
-      INTEGER :: I, J
+      INTEGER :: I, J, K, S, NOGMAX
+      
+      ! These fields have sub-fields I,J = (6,7)  , (7,3)
+      CHARACTER (LEN=6), DIMENSION(2) :: SPS = (/ 'P2S   ', 'BED   ' /)
+      ! Number of sub-fields for each element in SPS
+      INTEGER, DIMENSION(2)           :: NSP = (/ 2,        2 /)
+      ! Sub-field unique integer id.'s
+      INTEGER, DIMENSION(2) :: SPIJ2
 
       VECTOR = .TRUE.
       IF(PRESENT(VEC)) VECTOR = VEC
@@ -340,12 +384,35 @@
  !
 #endif
 
+      ! Sub-field id.'s
+      NOGMAX = MAXVAL(NOGE)
+      DO K = 1,SIZE(SPS)
+         CALL W3FLDTOIJ(SPS(K), I, J, 1, 1, 1)
+         SPIJ2(K) = I*NOGMAX+J
+      ENDDO   
+         
       ! 1. Allocate nested GROUP, FIELD structure:
       ALLOCATE(GROUP(NOGRP))
+      
+      NFSMAX=0
       DO I = 1,NOGRP
         ALLOCATE(GROUP(I)%FIELD(NOGE(I)))
         DO J = 1,NOGE(I)
-          ALLOCATE(GROUP(I)%FIELD(J)%META(3)) ! Hardcode to 3 components for the moment
+          ! Does the field have sub-fields?
+          S=I*NOGMAX+J
+          DO K=1,size(SPIJ2)
+            IF ( SPIJ2(K) .EQ. S ) EXIT
+          ENDDO
+          IF ( SPIJ2(K) .NE. S ) THEN
+            ALLOCATE(GROUP(I)%FIELD(J)%META(3)) ! Hardcode to 3 components for the moment
+          ELSE 
+            ! If S is one of the fields with sub-fields
+            NFSMAX = MAX( NFSMAX, NSP(K) )
+            ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(NSP(K)))
+            DO S = 1,NSP(K)
+              ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(S)%META(2)) ! Hardcode to 2 components
+            ENDDO
+          ENDIF
         ENDDO
       ENDDO
 
@@ -397,7 +464,7 @@
         WRITE(PARTCOM, '("PTM_",I1,"_Unknown")') PTMETH
       ENDIF
 
-      ! 3. Set the default values for the OUNF netCDF meta data.
+      ! 3. Set the default values for the OUNF3 netCDF meta data.
       CALL DEFAULT_META()
 
       ! Set the default coordiante reference system (if applicable)
@@ -439,11 +506,19 @@
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
-      INTEGER :: I, J
+      INTEGER :: I, J, S
 
       DO I = 1,NOGRP
         DO J = 1,NOGE(I)
-          DEALLOCATE(GROUP(I)%FIELD(J)%META)
+          IF ( ALLOCATED(GROUP(I)%FIELD(J)%SUBFIELD) ) THEN
+            ! If it has sub-fields
+            DO S = 1,SIZE(GROUP(I)%FIELD(J)%SUBFIELD)
+              DEALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(S)%META)
+            ENDDO
+            DEALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD)            
+          ELSE
+            DEALLOCATE(GROUP(I)%FIELD(J)%META)
+          END IF
         ENDDO
         DEALLOCATE(GROUP(I)%FIELD)
       ENDDO
@@ -599,7 +674,7 @@
       WRITE(NDSE, 1000) FN_META, ILINE, IERR
       CALL EXTCDE(10)
 !
- 1000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : '/           &
+ 1000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : '/           &
                '     ERROR READING METADATA FILE'/                    &
                '     FILENAME = ', A /                                &
                '     LINE NO = ', I5 /                                &
@@ -760,7 +835,7 @@
       TYPE(META_T), POINTER :: PMETA
       CHARACTER(LEN=32) :: TEST, TESTU
 
-      INTEGER :: IFI, IFJ, IFC
+      INTEGER :: IFI, IFJ, IFC, IFS
       INTEGER :: ILINE, MCNT
       LOGICAL :: EOF
 
@@ -795,7 +870,7 @@
 
            ! Get the IFI, IFJ, IFC values from the header:
            I = INDEX(BUF, TRIM(TEST)) + 4 ! Handles lower/mixed-case META keyword
-           CALL DECODE_HEADER(BUF(I:), ILINE, IFI, IFJ, IFC)
+           CALL DECODE_HEADER(BUF(I:), ILINE, IFI, IFJ, IFC, IFS)
            IF(IFI .EQ. -1) THEN
               WRITE(NDSE, 5011) TRIM(BUF(I:)), TRIM(FN_META), ILINE
               CALL EXTCDE(10)
@@ -822,7 +897,11 @@
           ENDIF
 
            ! Select correct variable metadata entry:
-           PMETA => GROUP(IFI)%FIELD(IFJ)%META(IFC)
+           IF ( IFS == 0 ) THEN
+             PMETA => GROUP(IFI)%FIELD(IFJ)%META(IFC)
+           ELSE
+             PMETA => GROUP(IFI)%FIELD(IFJ)%SUBFIELD(IFS)%META(IFC)
+           ENDIF
 
            ! Update the metadata with values from file:
            CALL READ_META_PAIRS(NDMI, PMETA, ILINE)
@@ -852,35 +931,35 @@
               '     and: ',I3,' global meta data entries' /           &
               '     and: ',I3,' CRS meta data entries' /)
 !
- 5010 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : '/           &
+ 5010 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : '/           &
                '     ERROR OPENING METADATA FILE'/                    &
                '     FILENAME = ', A /                                &
                '     IOSTAT =', I5 /)
 !
- 5011 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : '/           &
+ 5011 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : '/           &
                '     UNKNOWN FIELD ID: ',A /                          &
                '     FILENAME = ', A /                                &
                '     LINE =', I5 /)
 !
- 5012 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : '/           &
+ 5012 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : '/           &
                '     SYNTAX ERROR ' /                                 &
                '     FILENAME = ', A /                                &
                '     LINE =', I5 /                                    &
                '  => ', A /)
 !
- 5013 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : ' /          &
+ 5013 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : ' /          &
                '     IFI value should be in range 1,',I2 /            &
                '     FILENAME = ', A /                                &
                '     LINE =', I5 /                                    &
                '  => ', A /)
 !
- 5014 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : ' /          &
+ 5014 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : ' /          &
                '     IFJ value should be in range 1,',I2 /            &
                '     FILENAME = ', A /                                &
                '     LINE =', I5 /                                    &
                '  => ', A /)
 !
- 5015 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : ' /          &
+ 5015 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : ' /          &
                '     IFC value should be in range 1,3' /              &
                '     FILENAME = ', A /                                &
                '     LINE =', I5 /                                    &
@@ -907,7 +986,7 @@
 !>
 !> @author Chris Bunney @date 02-Feb-2021
 !/ ------------------------------------------------------------------- /
-      SUBROUTINE DECODE_HEADER(BUF, ILINE, IFI, IFJ, IFC)
+      SUBROUTINE DECODE_HEADER(BUF, ILINE, IFI, IFJ, IFC, IFS)
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -944,6 +1023,7 @@
 !       IFI     Int.  O  Output group number
 !       IFJ     Int.  O  Output field number
 !       IFC     Int.  O  Component number (defaults to 1)
+!       IFS     Int.  O  Sub-field number (defaults to 0)
 !     ----------------------------------------------------------------
 !
 !/ ------------------------------------------------------------------- /
@@ -953,7 +1033,7 @@
 
       CHARACTER(*), INTENT(IN) :: BUF
       INTEGER, INTENT(IN) :: ILINE
-      INTEGER, INTENT(OUT) :: IFI, IFJ, IFC
+      INTEGER, INTENT(OUT) :: IFI, IFJ, IFC, IFS
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
@@ -963,24 +1043,32 @@
       IFI = 0
       IFJ = 1
       IFC = 1
+      IFS = 0
       FLD = ''
 
       ! Is first value an int?
       READ(BUF, *, IOSTAT=IERR) IFI
       IF(IERR .EQ. 0) THEN
-        ! Try reading 3 values:
-        READ(BUF, *, iostat=IERR) IFI, IFJ, IFC
-        IF(IERR .NE. 0) THEN
-          ! Try just two values:
-          READ(BUF, *, IOSTAt=IERR) IFI, IFJ
+        ! Try reading four values (group, field, vector-comp., sub-field):
+        READ(BUF, *, iostat=IERR) IFI, IFJ, IFC, IFS
+        IF(IERR .NE. 0) THEN        
+          ! Try reading three values:
+          READ(BUF, *, iostat=IERR) IFI, IFJ, IFC
+          IF(IERR .NE. 0) THEN
+            ! Try just two values:
+            READ(BUF, *, IOSTAt=IERR) IFI, IFJ
+          ENDIF
         ENDIF
       ELSE
-        ! Try reading field ID plus component
-        READ(BUF, *, IOSTAT=IERR) FLD, IFC
-
+        ! Try reading field ID plus component plus sub-field
+        READ(BUF, *, IOSTAT=IERR) FLD, IFC, IFS
         IF(ierr .NE. 0) THEN
-          ! Try just fldid
-          READ(BUF, *, IOSTAT=IERR) FLD
+          ! Try reading field ID plus component
+          READ(BUF, *, IOSTAT=IERR) FLD, IFC
+          IF(ierr .NE. 0) THEN
+            ! Try just fldid
+            READ(BUF, *, IOSTAT=IERR) FLD
+          ENDIF
         ENDIF
       ENDIF
 
@@ -1020,7 +1108,7 @@
 
       IF(DEBUG) WRITE(*,'(6X,A20,1X,I4,2I2)') '[IFI, IFJ, IFC]', IFI,IFJ,IFC
 !
- 6000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : '/           &
+ 6000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : '/           &
                '     SYNTAX ERROR IN SECTION HEADER. ' /              &
                '     FILENAME = ', A /                                &
                '     LINE NO =', I5 /                                 &
@@ -1191,14 +1279,14 @@
 
       RETURN
 !
- 7000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : '/           &
+ 7000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : '/           &
                '     SYNTAX ERROR IN METADATA FILE ' /                &
                '     SHOULD BE "attr_name = attr_value" ' /           &
                '     FILENAME = ', A /                                &
                '     LINE NO =', I5 /                                 &
                '  => ', A /)
 !
- 7002 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : '/           &
+ 7002 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : '/           &
                '     IO ERROR READING ATTRIBUTE' /                    &
                '     FILENAME = ', A /                                &
                '     LINE NO =', I5 /                                 &
@@ -1309,13 +1397,13 @@
 
       END SELECT
 !
- 8001 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : '/           &
+ 8001 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : '/           &
                '     VALUE IS NOT A VALID ', A /                      &
                '     FILENAME = ', A /                                &
                '     LINE NO =', I5 /                                 &
                '  => ', A /)
 !
- 8002 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : '/           &
+ 8002 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : '/           &
                '     ATTRIBUTE TYPE SHOULD BE ONE OF [c,i,r] '/       &
                '     FILENAME = ', A /                                &
                '     LINE NO =', I5 /                                 &
@@ -1433,7 +1521,7 @@
 
       ENDDO
 !
- 9000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : '/           &
+ 9000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : '/           &
                '     SYNTAX ERROR IN METADATA FILE ' /                &
                '     SHOULD BE "attr_name = attr_value" ' /           &
                '     FILENAME = ', A /                                &
@@ -1524,7 +1612,7 @@
 
       RETURN
 
- 1000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : '/           &
+ 1000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : '/           &
                '     ERROR READING CRS HEADER - MISSING CRS NAME?' )
 !
  1001 FORMAT (/' *** WARNING : USER DEFINED CRS SECTION WILL ' /      &
@@ -1535,7 +1623,7 @@
                '     OVERRIDE PREVIOUS CRS DEFINITION' /              &
                '     PREV CRS = ', A )
 !
- 1003 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : '/           &
+ 1003 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : '/           &
                '     CRS SECTION DOES NOT CONTAIN MANDATORY '/        &
                '     ATTRIBUTE "grid_mapping_name"' )
 
@@ -1611,7 +1699,7 @@
 !>
 !> @author Chris Bunney @date 02-Nov-2020
 !/ ------------------------------------------------------------------- /
-      FUNCTION GETMETA(IFI, IFJ, ICOMP, IPART) RESULT(META)
+      FUNCTION GETMETA(IFI, IFJ, ICOMP, IPART, ISUB) RESULT(META)
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -1622,6 +1710,7 @@
 !/                  +-----------------------------------+
 !/
 !/    09-Nov-2020 : Creation                            ( version 7.12 )
+!/    16-Feb-2022 : ISUB > 0 for sub-fields             ( version X.XX )
 !/
 !
 !  1. Purpose :
@@ -1632,7 +1721,7 @@
 !  2. Method :
 !
 !     A copy of the meta-data is returned, rather than a pointer. This
-!     is because in the case of paritioned parameters, the metadata
+!     is because in the case of partitioned fields, the metadata
 !     will be updated with the partition number.
 !
 !  3. Parameters :
@@ -1643,23 +1732,26 @@
 !       IFJ     Int.  I  Output field number
 !       ICOMP   Int.  I  Component number (defaults to 1)
 !       IPART   Int.  I  Partition number (defaults to 1)
+!       ISUB    Int.  I  Sub-field number (defaults to 0 meaning no sub-fields)
 !     ----------------------------------------------------------------
 !
 !/ ------------------------------------------------------------------- /
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: IFI, IFJ
-      INTEGER, INTENT(IN), OPTIONAL :: ICOMP, IPART
+      INTEGER, INTENT(IN), OPTIONAL :: ICOMP, IPART, ISUB
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
-      INTEGER :: IFP, IFC
+      INTEGER :: IFP, IFC, IFS
       TYPE(META_T) :: META ! Not pointer as we might need to modify it
 
       IFC = 1
       IFP = 1
+      IFS = 0
       IF(PRESENT(ICOMP)) IFC = ICOMP
       IF(PRESENT(IPART)) IFP = IPART
+      IF(PRESENT(ISUB))  IFS = ISUB
 
       ! Error checking on size of IFJ, ICOMP, IPART.
       IF(IFI .LT. 1 .OR. IFI .GT. NOGRP) THEN
@@ -1675,7 +1767,11 @@
         CALL EXTCDE(1)
       ENDIF
 
-      META = META_DEEP_COPY(GROUP(IFI)%FIELD(IFJ)%META(IFC))
+      IF ( IFS == 0 ) THEN
+        META = META_DEEP_COPY(GROUP(IFI)%FIELD(IFJ)%META(IFC))
+      ELSE
+        META = META_DEEP_COPY(GROUP(IFI)%FIELD(IFJ)%SUBFIELD(IFS)%META(IFC))
+      ENDIF
 
       ! For partitioned data, expand in the partition number:
       IF(IFI .EQ. 4) THEN
@@ -1684,13 +1780,13 @@
 
       RETURN
 
- 1000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : '            / &
+ 1000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : '            / &
                '     GETMETA: IFI value should be in range 1,',I2     / )
 !
- 1001 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : '           / &
+ 1001 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : '           / &
                '     GETMETA: IFJ value should be in range 1,',I2    / )
 !
- 1002 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : '           / &
+ 1002 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : '           / &
                '     GETMETA: IFC value should be in range 1,3'      / )
 !
       END FUNCTION GETMETA
@@ -1736,7 +1832,7 @@
 !     Reads in a TEMPLATE section from file.
 !     This section defines a list of text strings that will be used
 !     to replace a "placeholder string" when generating metadata for
-!     partitioned parameters.
+!     partitioned fields.
 !
 !     Format of section is:
 !
@@ -1832,7 +1928,7 @@
 
       RETURN
 !
- 1000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : '/           &
+ 1000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : '/           &
                '     ERROR READING PART HEADER - MISSING TEMPLATE ID?'/ &
                '     FILENAME = ', A /                                &
                '     LINE NO =', I5 /                                 &
@@ -2087,7 +2183,7 @@
 
       RETURN
 
- 1000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : '            / &
+ 1000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : '            / &
                '     NOT ENOUGH USER DEFINED ENTRIES FOR TEMPLATE'    / &
                '     TEMPLATE ID     : ',A                            / &
                '     NUM ENTRIES     : ',I2                           / &
@@ -2371,7 +2467,7 @@
         P => P%NEXT
       ENDDO
 !
-  1000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNFMETA : '            / &
+  1000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3META : '            / &
                 '     WRITE_FREEFORM_META: Unknown attribute'          / &
                 '     data type: ', A1         / )
 !
@@ -2516,7 +2612,7 @@
 !
 !  1. Purpose :
 !
-!     Populates the default meta data for ww3_ounf.
+!     Populates the default meta data for ww3_ounf3.
 !
 !  2. Remarks :
 !
@@ -2531,6 +2627,7 @@
 !/ ------------------------------------------------------------------- /
       IMPLICIT NONE
       TYPE(META_T), POINTER :: META(:)
+      INTEGER :: IFJ
 !
 !----------GROUP 1 ----------------
 !
@@ -3482,7 +3579,7 @@
       !META(1)%VARNS='radiation_stress_component_sxx'
       META(1)%VARNS=''
 
-      ! S6cond component
+      ! Second component
       META(2) = META(1)
       META(2)%VARNM='syy'
       META(2)%VARNL='Radiation stress component Syy'
@@ -3595,28 +3692,40 @@
       META(2)%VARNG='northward_surface_stokes_drift'
       WRITE(META(2)%VARNC,'(A,F8.4,A,F8.4,A)') 'Frequency range ',SIG(1)*TPIINV,' to ',SIG(NK)*TPIINV,' Hz'
 ! IFI=6, IFJ=7, P2S
-      META => GROUP(6)%FIELD(7)%META
-      META(1)%FSC    = 0.01
+      ! First sub-field
+      META => GROUP(6)%FIELD(7)%SUBFIELD(1)%META
+      IF ( NCVARTYPE .EQ. 2 ) THEN
+        ! In ww3_ounf3.F90: IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
+        ! Warning: For short data type, you get only high seas results
+        META(1)%FSC    = 0.01
+        META(1)%VMIN = -150
+        META(1)%VMAX = 320
+      ELSE
+        META(1)%FSC  = 1.
+        META(1)%VMIN = 0.
+        META(1)%VMAX = 1.e6         
+      ENDIF
+
       META(1)%ENAME  = '.p2s'
       META(1)%UNITS  = 'm4'
-      META(1)%VMIN = -150
-      META(1)%VMAX = 320
 
-      ! First component
       META(1)%VARNL='power spectral density of equivalent surface pressure'
       !META(1)%VARNS='power_spectral_density_of_equivalent_surface_pressure'
       META(1)%VARNS=''
       META(1)%VARNG='power_spectral_density_of_equivalent_surface_pressure'
       META(1)%VARNM='fp2s'
 
-      ! Second component
-      META(2) = META(1)
-      META(2)%VARNM='pp2s'
-      META(2)%UNITS= 's-1'
-      META(2)%VARNL='peak period of power spectral density of equivalent surface pressure'
-      !META(2)%VARNS='peak_period_of_power_spectral_density_of_equivalent_surface_pressure'
-      META(2)%VARNS=''
-      META(2)%VARNG='peak_period_of_power_spectral_density_of_equivalent_surface_pressure'
+      ! Second sub-field
+      META => GROUP(6)%FIELD(7)%SUBFIELD(2)%META
+      META(1)%FSC    = 0.01
+      META(1)%ENAME  = '.pp2s'
+      META(1)%UNITS= 's-1'
+      META(1)%VMIN = -150
+      META(1)%VMAX = 320
+      META(1)%VARNM='pp2s'
+      META(1)%VARNL='peak period of power spectral density of equivalent surface pressure'
+      META(1)%VARNS=''
+      META(1)%VARNG='peak_period_of_power_spectral_density_of_equivalent_surface_pressure'
 
 ! IFI=6, IFJ=8, USF
       META => GROUP(6)%FIELD(8)%META
@@ -3804,7 +3913,8 @@
       META(2)%VARNS=''
       META(2)%VARNG='rms_of_bottom_velocity_amplitude_meridional'
 ! IFI=7, IFJ=3, BED
-      META => GROUP(7)%FIELD(3)%META
+      ! First sub-field
+      META => GROUP(7)%FIELD(3)%SUBFIELD(1)%META
       META(1)%FSC    = 0.001
       META(1)%UNITS  = 'm'
       META(1)%ENAME  = '.bed'
@@ -3812,31 +3922,36 @@
       META(1)%VMAX = 30
       META(1)%VARND = DIRCOM
 
-      ! First component
       META(1)%VARNM='bed'
       META(1)%VARNL='bottom roughness'
       !META(1)%VARNS='sea bottom roughness length'
       META(1)%VARNS=''
       META(1)%VARNG='ripple_wavelength'
       META(1)%VARNC='ripple_length=sqrt(ripplex**2+rippley**2)'
-
+      
+      ! Second sub-field
+      META => GROUP(7)%FIELD(3)%SUBFIELD(2)%META
+      META(1)%FSC    = 0.001
+      META(1)%UNITS  = 'm'
+      META(1)%ENAME  = '.ripple'
+      META(1)%VMIN = -30.
+      META(1)%VMAX = 30.
+      META(1)%VARND = DIRCOM
+      ! First component
+      META(1)%VARNM='ripplex'
+      META(1)%VARNL='eastward sea bottom ripple wavelength'
+      !META(1)%VARNS='eastward_ripple_wavelength'
+      META(1)%VARNS=''
+      META(1)%VARNG='eastward_ripple_wavelength'
+      META(1)%VARNC='ripple_length=sqrt(ripplex**2+rippley**2)'
       ! Second component
       META(2) = META(1)
-      META(2)%VARNM='ripplex'
-      META(2)%VARNL='eastward sea bottom ripple wavelength'
-      !META(2)%VARNS='eastward_ripple_wavelength'
+      META(2)%VARNM='rippley'
+      META(2)%VARNL='northward sea bottom ripple wavelength'
+      !META(2)%VARNS='northward_ripple_wavelength'
       META(2)%VARNS=''
-      META(2)%VARNG='eastward_ripple_wavelength'
+      META(2)%VARNG='northward_ripple_wavelength'
       META(2)%VARNC='ripple_length=sqrt(ripplex**2+rippley**2)'
-
-      ! Third component
-      META(3) = META(1)
-      META(3)%VARNM='rippley'
-      META(3)%VARNL='northward sea bottom ripple wavelength'
-      !META(3)%VARNS='northward_ripple_wavelength'
-      META(3)%VARNS=''
-      META(3)%VARNG='northward_ripple_wavelength'
-      META(3)%VARNC='ripple_length=sqrt(ripplex**2+rippley**2)'
 ! IFI=7, IFJ=4, FBB
       META => GROUP(7)%FIELD(4)%META
       META(1)%FSC    = 0.1
@@ -4029,19 +4144,21 @@
 !
 ! ------ Group 10 (User defined) -------
 !
-! IFI=10, IFJ=1
-      META => GROUP(10)%FIELD(1)%META
-      META(1)%FSC    = 0.1
-      META(1)%UNITS  = 'm'
-      META(1)%VMIN = 0
-      META(1)%VMAX = 0
-      WRITE (META(1)%ENAME,'(A2,I2.2)') '.u'
-      WRITE (META(1)%VARNM,'(A1,I2.2)') 'u'
-      WRITE (META(1)%VARNL,'(A12,I2.2)') 'User_defined'
-      WRITE (META(1)%VARNS,'(A12,I2.2)') 'User_defined'
-      WRITE (META(1)%VARNG,'(A12,I2.2)') 'user_defined'
+! IFI=10
+      DO IFJ = 1,NOGE(10)
+        META => GROUP(10)%FIELD(IFJ)%META
+        META(1)%FSC    = 0.1
+        META(1)%UNITS  = 'm'
+        META(1)%VMIN = 0
+        META(1)%VMAX = 0
+        WRITE (META(1)%ENAME,'(A2,I2.2)') '.u',IFJ
+        WRITE (META(1)%VARNM,'(A1,I2.2)') 'u',IFJ
+        WRITE (META(1)%VARNL,'(A12,I2.2)') 'User_defined',IFJ
+        WRITE (META(1)%VARNS,'(A12,I2.2)') 'User_defined',IFJ
+        WRITE (META(1)%VARNG,'(A12,I2.2)') 'user_defined',IFJ
+      ENDDO
 !
       END SUBROUTINE DEFAULT_META
 !/ ------------------------------------------------------------------- /
 
-      END MODULE W3OUNFMETAMD
+      END MODULE W3OUNF3METAMD
