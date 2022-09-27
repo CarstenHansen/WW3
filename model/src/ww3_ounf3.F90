@@ -234,9 +234,6 @@
       USE W3IOGOMD, ONLY: W3IOGO, W3READFLGRD, W3FLGRDFLAG
       USE W3INITMD, ONLY: WWVER, SWITCHES
       USE W3ODATMD, ONLY: NAPROC, NOSWLL, PTMETH, PTFCUT
-#ifdef W3_DEBUG
-      USE W3ODATMD, only : IAPROC
-#endif
 !/
       USE W3GDATMD
       USE W3WDATMD, ONLY: TIME, WLV, ICE, ICEH, ICEF, BERG,            &
@@ -371,12 +368,6 @@
 !--- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ! 3.  Read general data and first fields from file
 !
-#ifdef W3_DEBUG
-      WRITE (NDSO,*) 'Before FLOGRD(2,1)=', FLOGRD(2,1)
-      WRITE (NDSO,*) 'IAPROC=', IAPROC
-      WRITE(740+IAPROC,*) 'Calling W3IOGO from ww3_ounf3'
-      FLUSH(740+IAPROC)
-#endif
       CALL W3IOGO ( 'READ', NDSOG, IOTEST )
 !
       WRITE (NDSO,930)
