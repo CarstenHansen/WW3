@@ -2499,6 +2499,23 @@
                 ELSE
                    DIM3VAR(:) = SIG(I1F:I2F)*TPIINV
                 END IF
+#ifdef W3_XSTO
+              ELSE IF ( TRIM(DIM3NAME) .EQ. 'zk' ) THEN
+                ! May assert that for 'zk': NZO == I2F-I1F+1
+                ! Set values of the dimensionless depths
+                ! The dimensionless depths are distributed like
+                ! expA((i-1)^b)-1:
+                ! DIM3VAR(IZ)  = XSDS*(XZK**((IZ-1.)**XSBP) - 1.)
+                ! The exponential base XZK is defined so that the deepest
+                ! point is DIM3VAR(XSND) = XSDS
+                XZK = 2.**((XSND*1.-1.)**(-XSBP))
+                ! First calculate XZK**(IZ-1) for IZ = 1,NZO
+                do IZ = 1,NZO
+                  DIM3VAR(IZ) = XZK**((IZ*1.-1.)**XSBP)
+                end do
+                ! Then subtract 1 and multiply with the scale
+                DIM3VAR(:) = XSDS*(DIM3VAR(:) - 1.)
+#endif
                 ! The netCDF attributes of DIM3VAR are specified in the
                 ! subroutine W3NCDEF3
                 !

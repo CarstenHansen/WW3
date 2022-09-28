@@ -730,6 +730,7 @@
 #else
         IF ( TSTOUT ) THEN
           INQUIRE (MDS(3),OPENED=OPENED)
+#endif
           IF ( .NOT. OPENED ) OPEN                                    &
                (MDS(3),FILE=FNMPRE(:J)//TFILE(:IFT),ERR=889,IOSTAT=IERR)
           END IF ! TSTOUT
