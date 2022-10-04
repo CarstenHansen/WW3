@@ -176,11 +176,6 @@
 !
 !      UXSP      R.A.  Public   EXtended Spectrum Stokes drift Profile /XSTO
 !
-!    Old parameters not yet in new structure ...
-!
-!      FP1       R.A.  Public   Wind sea peak frequency. (parked in 2)
-!      THP1      R.A.  Public   Wind sea peak direction. (parked in 2)
-!
 !    Orphans, commented out here, now automatic arrays in W3WAVE, ....
 !
 !      DRAT      R.A.  Public   Density ration air/water. Was
@@ -383,13 +378,13 @@
 !
         REAL, POINTER         :: HS(:),  WLM(:),  T02(:), T0M1(:),   &
                                  T01 (:),  FP0(:),  THM(:),          &
-                                 THS(:),  THP0(:),  FP1(:), THP1(:), &
+                                 THS(:),  THP0(:),                   &
                                  HSIG(:), STMAXE(:), STMAXD(:),      &
                                  HMAXE(:), HCMAXE(:), HMAXD(:),      &
                                  HCMAXD(:), QP(:), WBT(:), WNMEAN(:)
         REAL, POINTER         :: XHS(:), XWLM(:), XT02(:), XT0M1(:),  &
                                  XT01 (:), XFP0(:), XTHM(:),          &
-                                 XTHS(:), XTHP0(:), XFP1(:), XTHP1(:),&
+                                 XTHS(:), XTHP0(:),                   &
                                  XHSIG(:), XSTMAXE(:), XSTMAXD(:),    &
                                  XHMAXE(:), XHCMAXE(:), XHMAXD(:),    &
                                  XHCMAXD(:), XQP(:), XWBT(:),         &
@@ -444,7 +439,7 @@
         REAL, POINTER         :: XP2SMS(:,:), XUS3D(:,:), XUSSP(:,:)
 #ifdef W3_XSTO
 !
-! Declare UXSP(1,1),XUXSP(1,1)
+! Declare UXSP(1,1),XUXSP(1,1) to be used under switch XSTO, only
 #endif
         REAL, POINTER         ::  UXSP(:,:)
         REAL, POINTER         ::  XUXSP(:,:)
@@ -575,7 +570,7 @@
 !
       REAL, POINTER           :: HS(:), WLM(:),  T02(:), T0M1(:),     &
                                  T01 (:), FP0(:), THM(:), THS(:),     &
-                                 THP0(:), FP1(:), THP1(:), HSIG(:),   &
+                                 THP0(:), HSIG(:),                    &
                                  STMAXE(:), STMAXD(:), HMAXE(:),      &
                                  HCMAXE(:), HMAXD(:), HCMAXD(:),      &
                                  QP(:), WBT(:), WNMEAN(:)
@@ -1039,8 +1034,7 @@
                  WADATS(IMOD)%T02  (NSEALM), WADATS(IMOD)%T0M1(NSEALM), &
                  WADATS(IMOD)%T01  (NSEALM), WADATS(IMOD)%FP0 (NSEALM), &
                  WADATS(IMOD)%THM  (NSEALM), WADATS(IMOD)%THS (NSEALM), &
-                 WADATS(IMOD)%THP0 (NSEALM), WADATS(IMOD)%FP1 (NSEALM), &
-                 WADATS(IMOD)%THP1 (NSEALM), WADATS(IMOD)%HSIG(NSEALM), &
+                 WADATS(IMOD)%THP0 (NSEALM), WADATS(IMOD)%HSIG(NSEALM), &
                  WADATS(IMOD)%STMAXE (NSEALM),                          &
                  WADATS(IMOD)%STMAXD(NSEALM),                           &
                  WADATS(IMOD)%HMAXE(NSEALM), WADATS(IMOD)%HMAXD(NSEALM),&
@@ -1060,8 +1054,6 @@
       WADATS(IMOD)%THM    = UNDEF
       WADATS(IMOD)%THS    = UNDEF
       WADATS(IMOD)%THP0   = UNDEF
-      WADATS(IMOD)%FP1    = UNDEF
-      WADATS(IMOD)%THP1   = UNDEF
       WADATS(IMOD)%HSIG   = UNDEF
       WADATS(IMOD)%STMAXE = UNDEF
       WADATS(IMOD)%STMAXD = UNDEF
@@ -1800,22 +1792,6 @@
           CHECK_ALLOC_STATUS ( ISTAT )
         END IF
 !
-!     IF ( OUTFLAGS( 2,xx) ) THEN
-!         ALLOCATE ( WADATS(IMOD)%XFP1(NXXX), STAT=ISTAT )
-!         CHECK_ALLOC_STATUS ( ISTAT )
-!       ELSE
-!         ALLOCATE ( WADATS(IMOD)%XFP1(1), STAT=ISTAT )
-!         CHECK_ALLOC_STATUS ( ISTAT )
-!       END IF
-!
-!     IF ( OUTFLAGS( 2,xx) ) THEN
-!         ALLOCATE ( WADATS(IMOD)%XTHP1(NXXX), STAT=ISTAT )
-!         CHECK_ALLOC_STATUS ( ISTAT )
-!       ELSE
-!         ALLOCATE ( WADATS(IMOD)%XTHP1(1), STAT=ISTAT )
-!         CHECK_ALLOC_STATUS ( ISTAT )
-!       END IF
-!
       WADATS(IMOD)%XHS    = UNDEF
       WADATS(IMOD)%XWLM   = UNDEF
       WADATS(IMOD)%XT02   = UNDEF
@@ -1834,8 +1810,6 @@
       WADATS(IMOD)%XHCMAXD= UNDEF
       WADATS(IMOD)%XWBT   = UNDEF
       WADATS(IMOD)%XWNMEAN= UNDEF
-!     WADATS(IMOD)%XFP1   = UNDEF
-!     WADATS(IMOD)%XTHP1  = UNDEF
 !
       IF ( OUTFLAGS( 3, 1) ) THEN
           ALLOCATE ( WADATS(IMOD)%XEF(NXXX,E3DF(2,1):E3DF(3,1)), STAT=ISTAT )
@@ -2913,8 +2887,6 @@
           THM    => WADATS(IMOD)%THM
           THS    => WADATS(IMOD)%THS
           THP0   => WADATS(IMOD)%THP0
-          FP1    => WADATS(IMOD)%FP1
-          THP1   => WADATS(IMOD)%THP1
           HSIG   => WADATS(IMOD)%HSIG
           STMAXE => WADATS(IMOD)%STMAXE
           STMAXD => WADATS(IMOD)%STMAXD
@@ -3018,8 +2990,8 @@
           U_S => WADATS(IMOD)%U_S
           V_S => WADATS(IMOD)%V_S
           ZK_S => WADATS(IMOD)%ZK_S
-! For storage in out_grd.ww3: UXSP and XUXSP
 #endif
+! Defined under switch XSTO but always store in out_grd.ww3: UXSP and XUXSP
           UXSP => WADATS(IMOD)%UXSP
 !
           IF ( FL_ALL ) THEN
@@ -3273,8 +3245,6 @@
           QP     => WADATS(IMOD)%XQP
           WBT    => WADATS(IMOD)%XWBT
           WNMEAN => WADATS(IMOD)%XWNMEAN
-!         FP1    => WADATS(IMOD)%XFP1
-!         THP1   => WADATS(IMOD)%XTHP1
 !
           EF     => WADATS(IMOD)%XEF
           TH1M   => WADATS(IMOD)%XTH1M
