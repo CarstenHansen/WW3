@@ -2347,7 +2347,7 @@
 
 
 #ifdef W3_MPI
-      USE W3ADATMD, ONLY: T0M1, THM, THS, FP0, THP0, FP1, THP1,   &
+      USE W3ADATMD, ONLY: T0M1, THM, THS, FP0, THP0,             &
                           DTDYN, FCUT, SPPNT, ABA, ABD, UBA, UBD,&
                           SXX, SYY, SXY, USERO, PHS, PTP, PLP,   &
                           PDIR, PSI, PWS, PWST, PNR, PHIAW, PHIOC,&
@@ -2362,9 +2362,9 @@
                           STMAXE, STMAXD, HMAXE, HCMAXE, HMAXD,  &
                           HCMAXD, QP, PTHP0, PQP, PPE, PGW, PSW, &
                           PTM1, PT1, PT2, PEP, WBT, CX, CY,      &
-#ifdef W3_XSTO
+# ifdef W3_XSTO
                           UXSP,                                  &
-#endif
+# endif
 # ifdef W3_MFIT
                           XSMH,                                  &
 # endif
