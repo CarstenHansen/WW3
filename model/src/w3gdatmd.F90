@@ -698,6 +698,9 @@
         INTEGER          :: E3DF(3,5), P2MSF(3), US3DF(3), USSPF(2) ! freq. indices for 3D output
         REAL             :: USSP_WN(25) !Max set to 25 decay scales.
 !
+        CHARACTER(LEN=4) :: USXT ! Spectral tail to add for Stokes drift
+        REAL             :: USXF ! High frequency cutoff (Hz) for Stokes drift
+        
         TYPE(T_GSU) :: GSU ! Grid search utility object
 !
         REAL                  :: FFACBERG    ! mutiplicative factor for iceberg mask
@@ -1076,6 +1079,8 @@
       INTEGER, POINTER        :: NX, NY, NSEA, NSEAL, TRFLAG
       INTEGER, POINTER        :: E3DF(:,:), P2MSF(:), US3DF(:), USSPF(:)
       REAL,    POINTER        :: USSP_WN(:)
+      CHARACTER(LEN=4), POINTER :: USXT
+      REAL,    POINTER          :: USXF
 #ifdef W3_REF1
       REAL,    POINTER        :: REFLC(:,:)
       INTEGER, POINTER        :: REFLD(:,:)
@@ -2301,6 +2306,8 @@
       US3DF  => GRIDS(IMOD)%US3DF
       USSPF  => GRIDS(IMOD)%USSPF
       USSP_WN => GRIDS(IMOD)%USSP_WN
+      USXT   => GRIDS(IMOD)%USXT
+      USXF   => GRIDS(IMOD)%USXF
 #ifdef W3_REF1
       REFLC  => GRIDS(IMOD)%REFLC
       REFLD  => GRIDS(IMOD)%REFLD

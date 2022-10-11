@@ -1007,13 +1007,15 @@
           WRITE (NDSM)                                                &
                MAPWN, MAPTH, DTH, TH, ESIN, ECOS, ES2, ESC, EC2,      &
                XFR, FR1, SIG, SIG2, DSIP, DSII, DDEN, DDEN2, FTE,     &
-               FTF, FTWN, FTTR, FTWL, FACTI1, FACTI2, FACHFA, FACHFE
+               FTF, FTWN, FTTR, FTWL, FACTI1, FACTI2, FACHFA, FACHFE, &
+               USXT, USXF
         ELSE
           IF (.NOT.SINIT) CALL W3DIMS ( IGRD, NK, NTH, NDSE, NDST )
           READ (NDSM,END=801,ERR=802,IOSTAT=IERR)                     &
                MAPWN, MAPTH, DTH, TH, ESIN, ECOS, ES2, ESC, EC2,      &
                XFR, FR1, SIG, SIG2, DSIP, DSII, DDEN, DDEN2, FTE,     &
-               FTF, FTWN, FTTR, FTWL, FACTI1, FACTI2, FACHFA, FACHFE
+               FTF, FTWN, FTTR, FTWL, FACTI1, FACTI2, FACHFA, FACHFE, &
+               USXT, USXF
         END IF
 
 !

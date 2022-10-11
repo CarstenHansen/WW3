@@ -642,6 +642,8 @@
                                  STH2MF, I1STH2M, I2STH2M
       ! STK_WN are the decays for Stokes drift partitions
       REAL                    :: STK_WN(25)
+      CHARACTER(LEN=4)        :: USXTT
+      REAL                    :: USXFM
 
 !
 #ifdef W3_LN1
@@ -1103,6 +1105,7 @@
                              STH1MF, I1STH1M, I2STH1M,                &
                              TH2MF, I1TH2M, I2TH2M,                   &
                              STH2MF, I1STH2M, I2STH2M
+           NAMELIST /XSTP/ USXTT, USXFM
 #ifdef W3_IS1
            NAMELIST /SIS1/ ISC1, ISC2
 #endif
@@ -2758,6 +2761,17 @@
       STH2MF=0 
       I1STH2M=1
       I2STH2M=NK
+
+! Parametric spectral tails to add for integral parameters
+! Mean Stokes drift (projected on the mean direction)
+      USXTT='none' ! Tail type USXT (C*4)
+      ! Implemented values:
+      ! USXT='none': Cut-off at NK.
+      ! USXT='Pf-5': Spectrum of Stokes drift with a SIG^{-2} tail as for a
+      !              variance spectrum with a Phillips (1958) freq^{-5} tail
+      !              and a constant directional spread.
+      USXFM=10     ! Cut-off frequency USXF (Real) (Hz).
+      ! USXF>=10Hz means integration to infinity.
 !
       FACBERG=1.
 #ifdef W3_IS0
@@ -2978,6 +2992,22 @@
       DO J=1,USSPF(2)
          WRITE(NDSO,4975) J,USSP_WN(J)
       ENDDO
+!
+! Parametric spectral tail to add for integral parameter fields
+!
+      CALL READNL ( NDSS, 'XSTP', STATUS )
+      WRITE (NDSO,4850) STATUS
+!
+      ! Stokes drift
+      USXT = USXTT
+      USXF = MAX ( USXFM, SIG(NK)/TPI )
+      WRITE (NDSO,4851) USXT
+      WRITE (NDSO,4852) USXF
+      IF ( USXT .NE. 'none' .AND. USXT .NE. 'Pf-5' ) THEN
+         WRITE(NDSE,1055) 'USXTT', USXT
+         CALL EXTCDE ( 41 )
+      ENDIF
+      IF ( USXF .GT. USXFM) WRITE (NDSO,4853) USXFM
 !
       CALL READNL ( NDSS, 'MISC', STATUS )
       WRITE (NDSO,960) STATUS
@@ -3323,6 +3353,8 @@
                              STH1MF, I1STH1M, I2STH1M,                &
                              TH2MF, I1TH2M, I2TH2M,                   &
                              STH2MF, I1STH2M, I2STH2M
+!
+        WRITE (NDSO,2853)    USXT, USXF    
 !
 #ifdef W3_REF1
          WRITE(NDSO,2986) REFCOAST, REFFREQ, REFSLOPE, REFMAP,  &
@@ -6739,6 +6771,12 @@
  4974 FORMAT ( '       Partions of Uss             :',2I4)
  4975 FORMAT ( '       Partition wavenumber #',I2,'   : ',1F6.3)
 
+ 4850 FORMAT (/'  Spectral tail to add for integral parameters ', A/   &
+               ' --------------------------------------------------')
+ 4851 FORMAT ( ' Tail type for mean Stokes drift               :', A)
+ 4852 FORMAT ( ' High frequency cutoff (Hz) for Stokes drift   :', F6.3)
+ 4853 FORMAT ( ' Warning: USXF = SIG(NK)*2pi > USXFM =', F6.3)
+     
 !
  4980 FORMAT (/'  Coastal / iceberg reflection  ',A/                   &
                ' --------------------------------------------------')
@@ -6803,6 +6841,8 @@
                '        TH2MF =',I2,', I1TH2M =',I3,', I2TH2M =',I3,','/&  
                '        STH2MF=',I2,', I1STH2M=',I3,', I2STH2M=',I3,' /')
 !
+ 2853  FORMAT ( '  &XSTP USXT = ',A4,' , USXF = ', F6.2 ,' /')
+!     
  2986 FORMAT ( '  &REF1 REFCOAST =',F5.2,', REFFREQ =',F5.2,', REFSLOPE =',F5.3, &
                ', REFMAP =',F4.1, ', REFMAPD =',F4.1, ', REFSUBGRID =',F5.2,','/ &   
                '        REFRMAX=',F5.2,', REFFREQPOW =',F5.2,                    &
@@ -7089,6 +7129,8 @@
  1053 FORMAT (/' *** WAVEWATCH III ERROR IN W3GRID :'/                &
                '     WITH NAMELIST VALUE BPLAT == 90, BPLON MUST BE -180')
 #endif
+ 1055 FORMAT (/' *** WAVEWATCH III ERROR IN W3GRID :'/                &
+               '  Unknown value of namelist parameter', A8,' = ', A)
 !
  1040 FORMAT ( '       Space-time extremes DX      :',F10.2)
  1041 FORMAT ( '       Space-time extremes DX      :',F10.2)
@@ -7407,6 +7449,8 @@
                           READ (NDS,NML=UNST,END=801,ERR=802,IOSTAT=J)
                         CASE('OUTS')
                           READ (NDS,NML=OUTS,END=801,ERR=802,IOSTAT=J)
+                        CASE('XSTP')
+                          READ (NDS,NML=XSTP,END=801,ERR=802,IOSTAT=J)
                         CASE('MISC')
                           READ (NDS,NML=MISC,END=801,ERR=802,IOSTAT=J)
                         CASE DEFAULT

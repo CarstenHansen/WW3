@@ -1946,10 +1946,18 @@
         SYY(JSEA) = SYY(JSEA) + FTE * ABYY(JSEA) / CG(NK,ISEA)
         SXY(JSEA) = SXY(JSEA) + FTE * ABXY(JSEA) / CG(NK,ISEA)
 !
-! Tail for surface stokes drift is commented out: very sensitive to tail power
-!
-!       USSX(JSEA)  = USSX(JSEA) + 2*GRAV*ETUSCX(JSEA)/SIG(NK)
-!       USSY(JSEA)  = USSY(JSEA) + 2*GRAV*ETUSCY(JSEA)/SIG(NK)
+! Tail for surface Stokes drift: very sensitive to tail power
+        IF ( USXT .EQ. 'Pf-5' ) THEN
+          ! Assume the Stokes spectrum has a SIG^{-2} tail
+          USSX(JSEA)  = USSX(JSEA) + 2*GRAV*ETUSCX(JSEA)/SIG(NK)
+          USSY(JSEA)  = USSY(JSEA) + 2*GRAV*ETUSCY(JSEA)/SIG(NK)
+          IF ( USXF .LT. 10.0 ) THEN
+            ! High-freq cut-off at SIG = USXF*TPI
+            USSX(JSEA) = USSX(JSEA) - 2*GRAV*ETUSCX(JSEA)/USXF/TPI
+            USSY(JSEA) = USSY(JSEA) - 2*GRAV*ETUSCY(JSEA)/USXF/TPI
+          END IF
+          END IF
+        
         UBS(JSEA) = UBS(JSEA) + FTWL * EBAND/GRAV
         END DO
 !
