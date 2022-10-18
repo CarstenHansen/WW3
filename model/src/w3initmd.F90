@@ -440,13 +440,11 @@ CONTAINS
 #ifdef W3_TIMINGS
     USE W3PARALL, ONLY: PRINT_MY_TIME
 #endif
-#ifdef W3_PDLIB
-#ifdef W3_DEBUGCOH
+#if defined W3_PDLIB && defined W3_DEBUGCOH
     USE PDLIB_W3PROFSMD, ONLY: ALL_VA_INTEGRAL_PRINT, TEST_MPI_STATUS
 #endif
-#ifdef W3_DEBUGINIT
+#if defined W3_PDLIB && defined W3_DEBUGINIT
     USE PDLIB_W3PROFSMD, ONLY: PRINT_WN_STATISTIC
-#endif
 #endif
 #ifdef W3_UOST
     USE W3UOSTMD, ONLY: UOST_SETGRID
@@ -953,15 +951,11 @@ CONTAINS
     NT     = NTTOT
 #ifdef W3_DIST
     IF ((LPDLIB .eqv. .FALSE.).or.(GTYPE .NE. UNGTYPE)) THEN
-#endif
       !
-#ifdef W3_DIST
       DO
-#endif
         !
         ! 2.c.5 First sweep filling IAPPRO
         !
-#ifdef W3_DIST
         DO IP=1, NAPROC
           ISTEP  = IP
           ISP    = 0
@@ -985,11 +979,9 @@ CONTAINS
             END IF
           END DO
         END DO
-#endif
         !
         ! 2.c.6 Second sweep filling IAPPRO
         !
-#ifdef W3_DIST
         DO IP=1, NAPROC
           IF ( NT(IP) .LT. NTTARG ) THEN
             DO ISP=1, NSPEC
@@ -1004,11 +996,9 @@ CONTAINS
             END DO
           END IF
         END DO
-#endif
         !
         ! 2.c.7 Check if all served
         !
-#ifdef W3_DIST
         IF ( MINVAL(IAPPRO(1:NSPEC)) .GT. 0 ) THEN
           EXIT
         ELSE
@@ -1016,9 +1006,7 @@ CONTAINS
           IF ( NTTARG .GE. NTTMAX ) EXIT
           IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,8028)
         END IF
-#endif
         !
-#ifdef W3_DIST
       END DO
     END IF
 #endif
@@ -1033,9 +1021,7 @@ CONTAINS
     DO IP=1, NAPROC
       WRITE (NDST,9021) IP, NT(IP), NTTARG
     END DO
-#endif
     !
-#ifdef W3_T
     WRITE (NDST,9025)
     DO IK=NK, 1, -1
       WRITE (NDST,9026) IK, (IAPPRO(ITH+(IK-1)*NTH),ITH=1,MIN(24,NTH))
@@ -1627,19 +1613,12 @@ CONTAINS
 #ifdef W3_DEBUGCOH
     CALL ALL_VA_INTEGRAL_PRINT(IMOD, "W3INIT, step 8.3", 1)
 #endif
-#ifdef W3_DEBUGCOH
-    CALL ALL_VA_INTEGRAL_PRINT(IMOD, "W3INIT, step 8.4", 1)
-#endif
     !
     ! 8.  Final MPI set up ----------------------------------------------- /
     !
 #ifdef W3_MPI
     CALL W3MPII ( IMOD )
-#endif
-#ifdef W3_MPI
     CALL W3MPIO ( IMOD )
-#endif
-#ifdef W3_MPI
     IF ( FLOUT(2) ) CALL W3MPIP ( IMOD )
 #endif
     !
@@ -1657,15 +1636,11 @@ CONTAINS
 820 CONTINUE
     IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,8020) NSEA, NAPROC
     CALL EXTCDE ( 820 )
-#endif
     !
-#ifdef W3_DIST
 821 CONTINUE
     IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,8021) NSPEC, NAPROC
     CALL EXTCDE ( 821 )
-#endif
     !
-#ifdef W3_DIST
 829 CONTINUE
     IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,8029)
     CALL EXTCDE ( 829 )
@@ -1772,30 +1747,22 @@ CONTAINS
 9002 FORMAT ( '             DATA SET NUMBERS      : ',4I4)
 9003 FORMAT ( '             LOG FILE              : [',A,']'/     &
          '             TEST FILE             : [',A,']')
-#endif
     !
-#ifdef W3_T
 9020 FORMAT (' TEST W3INIT : IP, NTTOT, NTTARG :')
 9021 FORMAT ( '         ',3I8)
 9025 FORMAT (' TEST W3INIT : MPP PROPAGATION MAP SPECTRAL COMP.')
 9026 FORMAT (4X,I4,2X,24I4)
 9027 FORMAT (10X,24I4)
-#endif
     !
-#ifdef W3_T
 9030 FORMAT (' TEST W3INIT : INITIALIZATION USING WINDS, ',       &
          'PERFORMED IN W3WAVE')
 9031 FORMAT (' TEST W3INIT : STARTING FROM CALM CONDITIONS')
-#endif
     !
-#ifdef W3_T
 9040 FORMAT (' TEST W3INIT : OUTPUT DATA, FIRST TIME, STEP, FLAG')
 9041 FORMAT ('              ',I9.8,I7.6,F8.1,3X,L1)
 9042 FORMAT (' TEST W3INIT : FIRST TIME :')
 9043 FORMAT ('              ',I9.8,I7.6)
-#endif
     !
-#ifdef W3_T
 9050 FORMAT (' TEST W3INIT : INITIAL DEPTHS')
 #endif
 #ifdef W3_T1
@@ -1965,15 +1932,9 @@ CONTAINS
 #ifdef W3_MPI
     CALL MPI_TYPE_VECTOR ( NSEALM, 1, NAPROC, MPI_REAL,        &
          WW3_FIELD_VEC, IERR_MPI )
-#endif
-#ifdef W3_MPI
     CALL MPI_TYPE_VECTOR ( NSEALM, 1, NSPEC, MPI_REAL,         &
          WW3_SPEC_VEC, IERR_MPI )
-#endif
-#ifdef W3_MPI
     CALL MPI_TYPE_COMMIT ( WW3_FIELD_VEC, IERR_MPI )
-#endif
-#ifdef W3_MPI
     CALL MPI_TYPE_COMMIT ( WW3_SPEC_VEC, IERR_MPI )
 #endif
     !
@@ -2006,9 +1967,7 @@ CONTAINS
       DO ISP=1, NSPEC
         IF ( IAPPRO(ISP) .EQ. IAPROC ) NSPLOC = NSPLOC + 1
       END DO
-#endif
       !
-#ifdef W3_MPI
       NRQSG1 = NSPEC - NSPLOC
       ALLOCATE ( WADATS(IMOD)%IRQSG1(MAX(1,NRQSG1),2) )
       IRQSG1 => WADATS(IMOD)%IRQSG1
@@ -2050,15 +2009,11 @@ CONTAINS
            WADATS(IMOD)%GSTORE(NAPROC*NSEALM,MPIBUF),      &
            WADATS(IMOD)%SSTORE(NAPROC*NSEALM,MPIBUF) )
       NRQSG2 = NAPROC - 1
-#endif
       !
-#ifdef W3_MPI
       IRQSG2 => WADATS(IMOD)%IRQSG2
       GSTORE => WADATS(IMOD)%GSTORE
       SSTORE => WADATS(IMOD)%SSTORE
-#endif
       !
-#ifdef W3_MPI
       IH     = 0
       ISPLOC = 0
       IBFLOC = 0
@@ -2075,27 +2030,19 @@ CONTAINS
 #ifdef W3_MPI
       DO ISP=1, NSPEC
         IF ( IAPPRO(ISP) .EQ. IAPROC ) THEN
-#endif
           !
-#ifdef W3_MPI
           ISPLOC = ISPLOC + 1
           IBFLOC = IBFLOC + 1
           IF ( IBFLOC .GT. MPIBUF ) IBFLOC = 1
-#endif
           !
           ! 3.b Loop over non-local processes
           !
-#ifdef W3_MPI
           DO IP=1, NAPROC
             IF ( IP .NE. IAPROC ) THEN
-#endif
               !
-#ifdef W3_MPI
               ITARG  = IP - 1
               IH     = IH + 1
-#endif
               !
-#ifdef W3_MPI
               CALL MPI_RECV_INIT                             &
                    ( WADATS(IMOD)%GSTORE(IP,IBFLOC), 1,        &
                    WW3_FIELD_VEC, ITARG, ISP, MPI_COMM_WAVE, &
@@ -2115,9 +2062,7 @@ CONTAINS
 #ifdef W3_MPI
             END IF
           END DO
-#endif
           !
-#ifdef W3_MPI
         END IF
       END DO
 #endif
@@ -2148,9 +2093,6 @@ CONTAINS
          '              WW3_FIELD_VEC : ',I10/   &
          '              WW3_SPEC_VEC  : ',I10)
 9011 FORMAT ( ' TEST W3MPII: NO COMPUTATIONS ON THIS NODE')
-#endif
-    !
-#ifdef W3_MPIT
 9020 FORMAT ( ' TEST W3MPII: W3WAVE COMM. SET UP FINISHED'/    &
          '              NRQSG1        : ',I10)
 9021 FORMAT (/' TEST W3MPII: COMMUNICATION CALLS FOR W3WAVE '/ &
@@ -2161,9 +2103,6 @@ CONTAINS
 9022 FORMAT ( ' |',3(I5,' |'),2(I9,I4,' |'))
 9023 FORMAT (                                                  &
          ' +------+------+------+--------------+--------------+'/)
-#endif
-    !
-#ifdef W3_MPIT
 9030 FORMAT ( ' TEST W3MPII: GATH/SCAT COMM. SET UP FINISHED'/ &
          '              NSPLOC        : ',I10/            &
          '              NRQSG2        : ',I10/            &
@@ -2390,20 +2329,15 @@ CONTAINS
         FLGRDARST(J,K) =  (FLGRDALL(J,K) .OR. FLOGRR(J,K))
       END DO
     END DO
-#endif
     !
-#ifdef W3_MPI
     NRQGO  = 0
     NRQGO2 = 0
     IT0    = NSPEC
     IROOT  = NAPFLD - 1
-#endif
     !
     !
-#ifdef W3_MPI
     IF ((FLOUT(1) .OR. FLOUT(7)).and.(.not. LPDLIB .or.       &
          (GTYPE .ne. UNGTYPE).or. .TRUE.)) THEN
-#endif
       !
       ! NRQMAX is the maximum number of output fields that require MPI communication,
       ! aimed to gather field values stored in each processor into one processor in
@@ -2416,7 +2350,6 @@ CONTAINS
       ! grid points because they are input fields, and therefore this MPI
       ! communication is not necessary and they do not contribute to NRQMAX.
       !
-#ifdef W3_MPI
       ! Calculation of NRQMAX splitted by output groups and field type
       !       scalar                2-comp   3-comp
       NRQMAX =   1                +    0  +    0  +  &  ! group 1
@@ -2440,24 +2373,18 @@ CONTAINS
            P2MSF(3) - P2MSF(2) + 1
       IF ( FLGRDALL( 6, 8) ) NRQMAX = NRQMAX + 2*NK
       IF ( FLGRDALL( 6,12) ) NRQMAX = NRQMAX + 2*NK
-#endif
       !
-#ifdef W3_MPI
       IF ( NRQMAX .GT. 0 ) THEN
         ALLOCATE ( OUTPTS(IMOD)%OUT1%IRQGO(NRQMAX) )
         ALLOCATE ( OUTPTS(IMOD)%OUT1%IRQGO2(NRQMAX*NAPROC) )
       END IF
       IRQGO  => OUTPTS(IMOD)%OUT1%IRQGO
       IRQGO2 => OUTPTS(IMOD)%OUT1%IRQGO2
-#endif
       !
       ! 1.a Sends of fields
       !
-#ifdef W3_MPI
       IH     = 0
-#endif
       !
-#ifdef W3_MPI
       IF ( IAPROC .LE. NAPROC ) THEN
         IT     = IT0
 #endif
@@ -2477,9 +2404,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 2, 1) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -2491,9 +2416,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 2, 2) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -2505,9 +2428,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 2, 3) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -2519,9 +2440,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 2, 4) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -2533,9 +2452,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 2, 5) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -2547,9 +2464,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 2, 6) .OR. FLGRDALL( 2,18) ) THEN
           ! TP output shares FP0 internal field with FP
           IH     = IH + 1
@@ -2562,9 +2477,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 2, 7) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -2576,9 +2489,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 2, 8) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -2590,9 +2501,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 2, 9) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -2604,9 +2513,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 2, 10) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -2618,9 +2525,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 2, 11) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -2632,9 +2537,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 2, 12) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -2646,9 +2549,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 2, 13) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -2660,9 +2561,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 2, 14) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -2674,9 +2573,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 2, 15) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -2688,9 +2585,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 2, 16) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -2702,9 +2597,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 2, 17) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -2716,9 +2609,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 2, 19) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -2730,9 +2621,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 3, 1) ) THEN
           DO IK=E3DF(2,1),E3DF(3,1)
             IH     = IH + 1
@@ -2746,9 +2635,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 3, 2) ) THEN
           DO IK=E3DF(2,2),E3DF(3,2)
             IH     = IH + 1
@@ -2762,9 +2649,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 3, 3) ) THEN
           DO IK=E3DF(2,3),E3DF(3,3)
             IH     = IH + 1
@@ -2778,9 +2663,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 3, 4) ) THEN
           DO IK=E3DF(2,4),E3DF(3,4)
             IH     = IH + 1
@@ -2794,9 +2677,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 3, 5) ) THEN
           DO IK=E3DF(2,5),E3DF(3,5)
             IH     = IH + 1
@@ -2810,9 +2691,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 4, 1) ) THEN
           DO K=0, NOSWLL
             IH     = IH + 1
@@ -2826,9 +2705,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 4, 2) ) THEN
           DO K=0, NOSWLL
             IH     = IH + 1
@@ -2842,9 +2719,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 4, 3) ) THEN
           DO K=0, NOSWLL
             IH     = IH + 1
@@ -2858,9 +2733,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 4, 4) ) THEN
           DO K=0, NOSWLL
             IH     = IH + 1
@@ -2874,9 +2747,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 4, 5) ) THEN
           DO K=0, NOSWLL
             IH     = IH + 1
@@ -2890,9 +2761,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 4, 6) ) THEN
           DO K=0, NOSWLL
             IH     = IH + 1
@@ -2906,9 +2775,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 4, 7) ) THEN
           DO K=0, NOSWLL
             IH     = IH + 1
@@ -2922,9 +2789,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 4, 8) ) THEN
           DO K=0, NOSWLL
             IH     = IH + 1
@@ -2938,9 +2803,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 4, 9) ) THEN
           DO K=0, NOSWLL
             IH     = IH + 1
@@ -2954,9 +2817,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 4,10) ) THEN
           DO K=0, NOSWLL
             IH     = IH + 1
@@ -2970,9 +2831,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 4,11) ) THEN
           DO K=0, NOSWLL
             IH     = IH + 1
@@ -2986,9 +2845,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 4,12) ) THEN
           DO K=0, NOSWLL
             IH     = IH + 1
@@ -3002,10 +2859,8 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 4,13) ) THEN
           DO K=0, NOSWLL
             IH     = IH + 1
@@ -3019,9 +2874,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 4,14) ) THEN
           DO K=0, NOSWLL
             IH     = IH + 1
@@ -3035,9 +2888,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 4,15) ) THEN
           DO K=0, NOSWLL
             IH     = IH + 1
@@ -3051,9 +2902,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 4,16) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3065,9 +2914,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 4,17) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3079,9 +2926,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 5, 1) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3111,9 +2956,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 5, 2) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3125,9 +2968,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 5, 3) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3139,9 +2980,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 5, 4) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3153,9 +2992,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 5, 5) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3176,9 +3013,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 5, 6) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3199,9 +3034,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 5, 7) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3213,9 +3046,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 5, 8) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3227,9 +3058,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 5, 9) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3241,9 +3070,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 5,10) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3255,9 +3082,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 5, 11) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3269,9 +3094,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 6, 1) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3301,9 +3124,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 6, 2) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3324,9 +3145,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 6, 3) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3338,9 +3157,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 6, 4) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3352,9 +3169,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 6, 5) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3375,9 +3190,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 6, 6) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3398,9 +3211,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 6, 7) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3421,9 +3232,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 6, 8) ) THEN
           DO IK=1,2*NK
             IH     = IH + 1
@@ -3437,9 +3246,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 6, 9) ) THEN
           DO K=P2MSF(2),P2MSF(3)
             IH     = IH + 1
@@ -3453,9 +3260,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 6,10) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3476,9 +3281,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 6,11) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3490,9 +3293,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 6, 12) ) THEN
           DO IK=1,2*NK
             IH     = IH + 1
@@ -3506,9 +3307,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 6, 13) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3529,9 +3328,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 7, 1) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3552,9 +3349,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 7, 2) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3575,9 +3370,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 7, 3) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3607,9 +3400,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 7, 4) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3621,9 +3412,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 7, 5) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3644,9 +3433,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 8, 1) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3667,9 +3454,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 8, 2) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3690,9 +3475,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 8, 3) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3704,9 +3487,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 8, 4) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3718,9 +3499,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 8, 5) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3732,9 +3511,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 9, 1) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3746,9 +3523,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 9, 2) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3760,9 +3535,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 9, 3) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3774,9 +3547,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 9, 4) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3788,9 +3559,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLGRDALL( 9, 5) ) THEN
           IH     = IH + 1
           IT     = IT + 1
@@ -3802,9 +3571,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         DO I=1, NOEXTR
           IF ( FLGRDALL(10, I) ) THEN
             IH     = IH + 1
@@ -3819,9 +3586,7 @@ CONTAINS
 #ifdef W3_MPI
           END IF
         END DO
-#endif
         !
-#ifdef W3_MPI
         NRQGO  = IH
 #endif
 #ifdef W3_MPIT
@@ -3831,32 +3596,24 @@ CONTAINS
         !
 #ifdef W3_MPI
       END IF
-#endif
       !
-#ifdef W3_MPI
       IF ( NRQGO .GT. NRQMAX ) THEN
         WRITE (NDSE,1010) NRQGO, NRQMAX
         CALL EXTCDE (10)
       END IF
-#endif
       !
-#ifdef W3_MPI
       IF ( IAPROC .EQ. NAPFLD ) THEN
-#endif
         !
         ! 1.b Setting up expanded arrays
         !
-#ifdef W3_MPI
         IF (NAPFLD .EQ. NAPRST) THEN
           CALL W3XDMA ( IMOD, NDSE, NDST, FLGRDARST )
         ELSE
           CALL W3XDMA ( IMOD, NDSE, NDST, FLGRDALL )
         ENDIF
-#endif
         !
         ! 1.c Receives of fields
         !
-#ifdef W3_MPI
         CALL W3XETA ( IMOD, NDSE, NDST )
 #endif
 #ifdef W3_MPIT
@@ -3865,15 +3622,11 @@ CONTAINS
         !
 #ifdef W3_MPI
         IH     = 0
-#endif
         !
-#ifdef W3_MPI
         DO I0=1, NAPROC
           IT     = IT0
           IFROM  = I0 - 1
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 1, 12) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -3885,9 +3638,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 2, 1) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -3899,9 +3650,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 2, 2) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -3913,9 +3662,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 2, 3) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -3927,9 +3674,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 2, 4) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -3941,9 +3686,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 2, 5) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -3955,9 +3698,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 2, 6) .OR. FLGRDALL( 2,18) ) THEN
             ! TP output shares FP0 internal field with FP
             IH     = IH + 1
@@ -3970,9 +3711,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 2, 7) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -3984,9 +3723,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 2, 8) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -3998,9 +3735,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 2, 9) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4012,9 +3747,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 2, 10) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4026,9 +3759,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 2, 11) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4040,9 +3771,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 2, 12) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4054,9 +3783,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 2, 13) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4068,9 +3795,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 2, 14) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4082,9 +3807,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 2, 15) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4096,9 +3819,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 2, 16) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4110,9 +3831,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 2, 17) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4124,9 +3843,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 2, 19) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4138,9 +3855,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 3, 1) ) THEN
             DO IK=E3DF(2,1),E3DF(3,1)
               IH     = IH + 1
@@ -4154,9 +3869,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 3, 2) ) THEN
             DO IK=E3DF(2,2),E3DF(3,2)
               IH     = IH + 1
@@ -4170,9 +3883,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 3, 3) ) THEN
             DO IK=E3DF(2,3),E3DF(3,3)
               IH     = IH + 1
@@ -4186,9 +3897,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 3, 4) ) THEN
             DO IK=E3DF(2,4),E3DF(3,4)
               IH     = IH + 1
@@ -4202,9 +3911,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 3, 5) ) THEN
             DO IK=E3DF(2,5),E3DF(3,5)
               IH     = IH + 1
@@ -4218,9 +3925,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 4, 1) ) THEN
             DO K=0, NOSWLL
               IH     = IH + 1
@@ -4234,9 +3939,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 4, 2) ) THEN
             DO K=0, NOSWLL
               IH     = IH + 1
@@ -4250,9 +3953,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 4, 3) ) THEN
             DO K=0, NOSWLL
               IH     = IH + 1
@@ -4266,9 +3967,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 4, 4) ) THEN
             DO K=0, NOSWLL
               IH     = IH + 1
@@ -4282,9 +3981,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 4, 5) ) THEN
             DO K=0, NOSWLL
               IH     = IH + 1
@@ -4298,9 +3995,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 4, 6) ) THEN
             DO K=0, NOSWLL
               IH     = IH + 1
@@ -4314,9 +4009,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 4, 7) ) THEN
             DO K=0, NOSWLL
               IH     = IH + 1
@@ -4330,9 +4023,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 4, 8) ) THEN
             DO K=0, NOSWLL
               IH     = IH + 1
@@ -4346,9 +4037,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 4, 9) ) THEN
             DO K=0, NOSWLL
               IH     = IH + 1
@@ -4362,9 +4051,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 4,10) ) THEN
             DO K=0, NOSWLL
               IH     = IH + 1
@@ -4378,9 +4065,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 4,11) ) THEN
             DO K=0, NOSWLL
               IH     = IH + 1
@@ -4394,9 +4079,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 4,12) ) THEN
             DO K=0, NOSWLL
               IH     = IH + 1
@@ -4410,9 +4093,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 4,13) ) THEN
             DO K=0, NOSWLL
               IH     = IH + 1
@@ -4426,9 +4107,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 4,14) ) THEN
             DO K=0, NOSWLL
               IH     = IH + 1
@@ -4442,9 +4121,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 4,15) ) THEN
             DO K=0, NOSWLL
               IH     = IH + 1
@@ -4458,9 +4135,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 4,16) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4472,9 +4147,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 4,17) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4486,9 +4159,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 5, 1) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4518,9 +4189,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 5, 2) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4532,9 +4201,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 5, 3) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4546,9 +4213,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 5, 4) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4560,9 +4225,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 5, 5) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4583,9 +4246,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 5, 6) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4606,9 +4267,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 5, 7) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4620,9 +4279,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 5, 8) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4634,9 +4291,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 5, 9) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4648,9 +4303,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 5,10) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4662,9 +4315,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 5,11) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4676,9 +4327,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 6, 1) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4708,9 +4357,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 6, 2) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4731,9 +4378,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 6, 3) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4745,9 +4390,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 6, 4) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4759,9 +4402,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 6, 5) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4782,9 +4423,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 6, 6) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4805,9 +4444,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 6, 7) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4828,9 +4465,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 6, 8) ) THEN
             DO IK=1,2*NK
               IH     = IH + 1
@@ -4844,9 +4479,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF (  FLGRDALL( 6, 9) ) THEN
             DO K=P2MSF(2),P2MSF(3)
               IH     = IH + 1
@@ -4860,9 +4493,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 6,10) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4883,9 +4514,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 6,11) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4897,9 +4526,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 6, 12) ) THEN
             DO IK=1,2*NK
               IH     = IH + 1
@@ -4913,9 +4540,7 @@ CONTAINS
 #ifdef W3_MPI
             END DO
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 6, 13) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4936,9 +4561,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 7, 1) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4959,9 +4582,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 7, 2) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -4982,9 +4603,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 7, 3) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -5014,9 +4633,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 7, 4) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -5028,9 +4645,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 7, 5) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -5051,9 +4666,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 8, 1) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -5074,9 +4687,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 8, 2) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -5097,9 +4708,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 8, 3) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -5111,9 +4720,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 8, 4) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -5125,9 +4732,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 8, 5) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -5139,9 +4744,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 9, 1) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -5153,9 +4756,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 9, 2) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -5167,9 +4768,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 9, 3) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -5181,9 +4780,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 9, 4) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -5195,9 +4792,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           IF ( FLGRDALL( 9, 5) ) THEN
             IH     = IH + 1
             IT     = IT + 1
@@ -5209,9 +4804,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
           DO I=1, NOEXTR
             !WRITE(740+IAPROC,*) 'SECOND : I=', I, ' / ', NOEXTR, ' val=', FLGRDALL(10, I)
             IF ( FLGRDALL(10, I) ) THEN
@@ -5227,13 +4820,9 @@ CONTAINS
 #ifdef W3_MPI
             END IF
           END DO
-#endif
           !
-#ifdef W3_MPI
         END DO
-#endif
         !
-#ifdef W3_MPI
         NRQGO2 = IH
 #endif
 #ifdef W3_MPIT
@@ -5243,33 +4832,23 @@ CONTAINS
         !
 #ifdef W3_MPI
         CALL W3SETA ( IMOD, NDSE, NDST )
-#endif
         !
-#ifdef W3_MPI
       END IF
-#endif
       !
-#ifdef W3_MPI
       IF ( NRQGO2 .GT. NRQMAX*NAPROC ) THEN
         WRITE (NDSE,1011) NRQGO2, NRQMAX*NAPROC
         CALL EXTCDE (11)
       END IF
-#endif
       !
-#ifdef W3_MPI
     END IF
-#endif
     !
     ! 2.  Set-up for W3IORS ---------------------------------------------- /
     ! 2.a General preparations
     !
-#ifdef W3_MPI
     NRQRS  = 0
     IH     = 0
     IROOT  = NAPRST - 1
-#endif
     !
-#ifdef W3_MPI
     IF ( FLOUT(4) .OR. FLOUT(8) ) THEN
       IF (OARST) THEN
         ALLOCATE ( OUTPTS(IMOD)%OUT4%IRQRS(34*NAPROC) )
@@ -5287,9 +4866,7 @@ CONTAINS
       !
 #ifdef W3_MPI
       IF ( IAPROC.NE.NAPRST .AND. IAPROC.LE.NAPROC ) THEN
-#endif
         !
-#ifdef W3_MPI
         IH     = IH + 1
         IT     = IT0 + 1
         CALL MPI_SEND_INIT (UST (IAPROC), 1, WW3_FIELD_VEC, &
@@ -5324,9 +4901,7 @@ CONTAINS
         DO I0=1, NAPROC
           IFROM  = I0 - 1
           IF ( I0 .NE. IAPROC ) THEN
-#endif
             !
-#ifdef W3_MPI
             IH     = IH + 1
             IT     = IT0 + 1
             CALL MPI_RECV_INIT (UST (I0),1,WW3_FIELD_VEC, &
@@ -5359,9 +4934,7 @@ CONTAINS
           END IF
         END DO
       END IF
-#endif
       !
-#ifdef W3_MPI
       IF (OARST) THEN
         IF ( FLOGRR( 1, 2) ) THEN
           IH     = IH + 1
@@ -5383,9 +4956,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 1, 12) ) THEN
           IH     = IH + 1
           IT     = IT0 + 6
@@ -5397,9 +4968,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 2, 1) ) THEN
           IH     = IH + 1
           IT     = IT0 + 7
@@ -5411,9 +4980,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 2, 2) ) THEN
           IH     = IH + 1
           IT     = IT0 + 8
@@ -5425,9 +4992,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 2, 4) ) THEN
           IH     = IH + 1
           IT     = IT0 + 9
@@ -5439,9 +5004,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         ENDIF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 2, 5) ) THEN
           IH     = IH + 1
           IT     = IT0 + 10
@@ -5453,9 +5016,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         ENDIF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 2, 6) ) THEN
           IH     = IH + 1
           IT     = IT0 + 11
@@ -5467,9 +5028,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 2, 7) ) THEN
           IH     = IH + 1
           IT     = IT0 + 12
@@ -5481,9 +5040,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 2, 19) ) THEN
           IH     = IH + 1
           IT     = IT0 + 13
@@ -5495,9 +5052,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 5, 2) ) THEN
           IH     = IH + 1
           IT     = IT0 + 14
@@ -5509,9 +5064,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         ENDIF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 5, 5) ) THEN
           IH     = IH + 1
           IT     = IT0 + 15
@@ -5532,9 +5085,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 5, 11) ) THEN
           IH     = IH + 1
           IT     = IT0 + 17
@@ -5546,9 +5097,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 6, 2) ) THEN
           IH     = IH + 1
           IT     = IT0 + 18
@@ -5569,9 +5118,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 6, 3) ) THEN
           IH     = IH + 1
           IT     = IT0 + 20
@@ -5583,9 +5130,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 6, 4) ) THEN
           IH     = IH + 1
           IT     = IT0 + 21
@@ -5597,9 +5142,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 6, 5) ) THEN
           IH     = IH + 1
           IT     = IT0 + 22
@@ -5620,9 +5163,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 6, 6) ) THEN
           IH     = IH + 1
           IT     = IT0 + 24
@@ -5643,9 +5184,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 6,10) ) THEN
           IH     = IH + 1
           IT     = IT0 + 26
@@ -5666,9 +5205,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 6,13) ) THEN
           IH     = IH + 1
           IT     = IT0 + 28
@@ -5689,9 +5226,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 7, 2) ) THEN
           IH     = IH + 1
           IT     = IT0 + 30
@@ -5712,9 +5247,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 7, 4) ) THEN
           IH     = IH + 1
           IT     = IT0 + 32
@@ -5726,9 +5259,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( FLOGRR( 7, 5) ) THEN
           IH     = IH + 1
           IT     = IT0 + 33
@@ -5749,15 +5280,11 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
-#ifdef W3_MPI
         IF ( IAPROC .EQ. NAPRST ) THEN
           IF (NAPRST .NE. NAPFLD) CALL W3XDMA ( IMOD, NDSE, NDST, FLOGRR )
           CALL W3XETA ( IMOD, NDSE, NDST )
-#endif
           !
-#ifdef W3_MPI
           DO I0=1, NAPROC
             IFROM  = I0 - 1
             IF ( FLOGRR( 1, 2) ) THEN
@@ -5780,9 +5307,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             END IF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 1, 12) ) THEN
               IH     = IH + 1
               IT     = IT0 + 6
@@ -5794,9 +5319,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             END IF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 2, 1) ) THEN
               IH     = IH + 1
               IT     = IT0 + 7
@@ -5808,9 +5331,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             END IF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 2, 2) ) THEN
               IH     = IH + 1
               IT     = IT0 + 8
@@ -5822,9 +5343,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             END IF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 2, 4) ) THEN
               IH     = IH + 1
               IT     = IT0 + 9
@@ -5836,9 +5355,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             ENDIF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 2, 5) ) THEN
               IH     = IH + 1
               IT     = IT0 + 10
@@ -5850,9 +5367,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             ENDIF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 2, 6) ) THEN
               IH     = IH + 1
               IT     = IT0 + 11
@@ -5864,9 +5379,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             END IF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 2, 7) ) THEN
               IH     = IH + 1
               IT     = IT0 + 12
@@ -5878,9 +5391,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             END IF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 2, 19) ) THEN
               IH     = IH + 1
               IT     = IT0 + 13
@@ -5892,9 +5403,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             END IF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 5, 2) ) THEN
               IH     = IH + 1
               IT     = IT0 + 14
@@ -5906,9 +5415,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             ENDIF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 5, 5) ) THEN
               IH     = IH + 1
               IT     = IT0 + 15
@@ -5929,9 +5436,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             END IF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 5,11) ) THEN
               IH     = IH + 1
               IT     = IT0 + 17
@@ -5943,9 +5448,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             END IF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 6, 2) ) THEN
               IH     = IH + 1
               IT     = IT0 + 18
@@ -5966,9 +5469,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             END IF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 6, 3) ) THEN
               IH     = IH + 1
               IT     = IT0 + 20
@@ -5980,9 +5481,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             END IF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 6, 4) ) THEN
               IH     = IH + 1
               IT     = IT0 + 21
@@ -5994,9 +5493,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             END IF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 6, 5) ) THEN
               IH     = IH + 1
               IT     = IT0 + 22
@@ -6017,9 +5514,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             END IF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 6, 6) ) THEN
               IH     = IH + 1
               IT     = IT0 + 24
@@ -6040,9 +5535,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             END IF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 6,10) ) THEN
               IH     = IH + 1
               IT     = IT0 + 26
@@ -6063,9 +5556,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             END IF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 6,13) ) THEN
               IH     = IH + 1
               IT     = IT0 + 28
@@ -6086,9 +5577,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             END IF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 7, 2) ) THEN
               IH     = IH + 1
               IT     = IT0 + 30
@@ -6109,9 +5598,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             END IF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 7, 4) ) THEN
               IH     = IH + 1
               IT     = IT0 + 32
@@ -6123,9 +5610,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             END IF
-#endif
             !
-#ifdef W3_MPI
             IF ( FLOGRR( 7, 5) ) THEN
               IH     = IH + 1
               IT     = IT0 + 33
@@ -6147,15 +5632,11 @@ CONTAINS
 #ifdef W3_MPI
             END IF
           END DO
-#endif
           !
-#ifdef W3_MPI
           CALL W3SETA ( IMOD, NDSE, NDST )
         END IF
       END IF
-#endif
       !
-#ifdef W3_MPI
       NRQRS  = IH
       IF (OARST) THEN
         IT0    = IT0 + 34
@@ -6173,9 +5654,7 @@ CONTAINS
       !
 #ifdef W3_MPI
       IF ( IOSTYP .GT. 0 ) THEN
-#endif
         !
-#ifdef W3_MPI
         NBLKRS = 10
         RSBLKS = MAX ( 5 , NSEALM/NBLKRS )
         IF ( NBLKRS*RSBLKS .LT. NSEALM ) RSBLKS = RSBLKS + 1
@@ -6187,19 +5666,13 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         IH     = 0
-#endif
         !
-#ifdef W3_MPI
         IF ((.NOT. LPDLIB).OR.(GTYPE .NE. UNGTYPE)) THEN
           IF ( IAPROC .NE. NAPRST ) THEN
-#endif
             !
-#ifdef W3_MPI
             ALLOCATE ( OUTPTS(IMOD)%OUT4%IRQRSS(NBLKRS) )
             IRQRSS => OUTPTS(IMOD)%OUT4%IRQRSS
-#endif
             !
-#ifdef W3_MPI
             DO IB=1, NBLKRS
               IH     = IH + 1
               IT     = IT0 + 3 + IB
@@ -6216,19 +5689,13 @@ CONTAINS
 #endif
 #ifdef W3_MPI
             END DO
-#endif
             !
-#ifdef W3_MPI
           ELSE
-#endif
             !
-#ifdef W3_MPI
             ALLOCATE                                       &
                  ( OUTPTS(IMOD)%OUT4%IRQRSS(NAPROC*NBLKRS) ,     &
                  OUTPTS(IMOD)%OUT4%VAAUX(NSPEC,2*RSBLKS,NAPROC) )
-#endif
             !
-#ifdef W3_MPI
             IRQRSS => OUTPTS(IMOD)%OUT4%IRQRSS
             VAAUX  => OUTPTS(IMOD)%OUT4%VAAUX
             DO IB=1, NBLKRS
@@ -6253,9 +5720,7 @@ CONTAINS
                 END IF
               END DO
             END DO
-#endif
             !
-#ifdef W3_MPI
           END IF
         END IF
 #endif
@@ -6266,13 +5731,9 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         IT0    = IT0 + NBLKRS
-#endif
         !
-#ifdef W3_MPI
       END IF
-#endif
       !
-#ifdef W3_MPI
     END IF
 #endif
     !
@@ -6284,9 +5745,7 @@ CONTAINS
     IH     = 0
     IT     = IT0
     IROOT  = NAPBPT - 1
-#endif
     !
-#ifdef W3_MPI
     IF ( FLOUT(5) ) THEN
       ALLOCATE ( OUTPTS(IMOD)%OUT5%IRQBP1(NBO2(NFBPO)),      &
            OUTPTS(IMOD)%OUT5%IRQBP2(NBO2(NFBPO)) )
@@ -6303,22 +5762,16 @@ CONTAINS
 #ifdef W3_MPI
       DO J=1, NFBPO
         DO I=NBO2(J-1)+1, NBO2(J)
-#endif
           !
-#ifdef W3_MPI
           IT     = IT + 1
-#endif
           !
           ! 3.b Residence processor of point
           !
-#ifdef W3_MPI
           ISEA   = ISBPO(I)
           CALL INIT_GET_JSEA_ISPROC(ISEA, JSEA, ISPROC)
-#endif
           !
           ! 3.c If stored locally, send data
           !
-#ifdef W3_MPI
           IF ( IAPROC .EQ. ISPROC ) THEN
             IH     = IH + 1
             CALL MPI_SEND_INIT (VA(1,JSEA),NSPEC,MPI_REAL, &
@@ -6329,9 +5782,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-#endif
           !
-#ifdef W3_MPI
         END DO
       END DO
 #endif
@@ -6351,9 +5802,7 @@ CONTAINS
       !
 #ifdef W3_MPI
       IF ( IAPROC .EQ. NAPBPT ) THEN
-#endif
         !
-#ifdef W3_MPI
         IH     = 0
         IT     = IT0
 #endif
@@ -6367,18 +5816,14 @@ CONTAINS
 #ifdef W3_MPI
         DO J=1, NFBPO
           DO I=NBO2(J-1)+1, NBO2(J)
-#endif
             !
             ! 3.f Residence processor of point
             !
-#ifdef W3_MPI
             ISEA   = ISBPO(I)
             CALL INIT_GET_JSEA_ISPROC(ISEA, JSEA, ISPROC)
-#endif
             !
             ! 3.g Receive in correct array
             !
-#ifdef W3_MPI
             IH     = IH + 1
             IT     = IT + 1
             ITARG  = ISPROC - 1
@@ -6392,9 +5837,7 @@ CONTAINS
 #ifdef W3_MPI
           END DO
         END DO
-#endif
         !
-#ifdef W3_MPI
         NRQBP2 = IH
 #endif
         !
@@ -6407,13 +5850,9 @@ CONTAINS
         !
 #ifdef W3_MPI
       END IF
-#endif
       !
-#ifdef W3_MPI
       IT0    = IT0 + NBO2(NFBPO)
-#endif
       !
-#ifdef W3_MPI
     END IF
 #endif
     !
@@ -6426,9 +5865,7 @@ CONTAINS
 #ifdef W3_MPI
     IH     = 0
     IROOT  = NAPTRK - 1
-#endif
     !
-#ifdef W3_MPI
     IF ( FLOUT(3) ) THEN
 #endif
       !
@@ -6487,9 +5924,7 @@ CONTAINS
           END IF
         END DO
       END IF
-#endif
       !
-#ifdef W3_MPI
       NRQTR  = IH
       IT0    = IT0 + 2
 #endif
@@ -6529,9 +5964,6 @@ CONTAINS
 9012 FORMAT ( ' +------+-------+------+------+--------------+')
 9013 FORMAT ( ' TEST W3MPIO: NRQGO :',2I10)
 9014 FORMAT ( ' TEST W3MPIO: NRQGO2:',2I10)
-#endif
-    !
-#ifdef W3_MPIT
 9020 FORMAT (/' TEST W3MPIO: COMM. CALLS FOR W3IORS (F)'/      &
          ' +------+------+------+------+--------------+'/       &
          ' |  IH  |  ID  | TARG |  TAG |   handle err |'/       &
@@ -6539,9 +5971,6 @@ CONTAINS
 9021 FORMAT ( ' |',I5,' | ',A4,' |',2(I5,' |'),I9,I4,' |')
 9022 FORMAT ( ' +------+------+------+------+--------------+')
 9023 FORMAT ( ' TEST W3MPIO: NRQRS :',I10)
-#endif
-    !
-#ifdef W3_MPIT
 9025 FORMAT (/' TEST W3MPIO: COMM. CALLS FOR W3IORS (S)'/      &
          '              BLOCK SIZE / BLOCKS : ',2I6/      &
          ' +------+------+------+------+--------------+---------+'/ &
@@ -6552,9 +5981,6 @@ CONTAINS
 9027 FORMAT (                                                  &
          ' +------+------+------+------+--------------+---------+')
 9028 FORMAT ( ' TEST W3MPIO: IHMAX :',I10)
-#endif
-    !
-#ifdef W3_MPIT
 9030 FORMAT (/' TEST W3MPIO: ',A,' CALLS FOR W3IOBC'/          &
          ' +------+------+---+------+------+--------------+'/   &
          ' |  IH  | IPT  | F | TARG |  TAG |   handle err |'/   &
@@ -6564,9 +5990,6 @@ CONTAINS
          ' +------+------+---+------+------+--------------+')
 9033 FORMAT ( ' TEST W3MPIO: NRQBC :',I10)
 9034 FORMAT ( ' TEST W3MPIO: TOTAL :',I10)
-#endif
-    !
-#ifdef W3_MPIT
 9040 FORMAT (/' TEST W3MPIO: COMMUNICATION CALLS FOR W3IOTR'/  &
          ' +------+------+------+------+--------------+'/       &
          ' |  IH  |  ID  | TARG |  TAG |   handle err |'/       &
@@ -6661,9 +6084,7 @@ CONTAINS
 #endif
 #ifdef W3_MPI
     USE W3SERVMD, ONLY: EXTCDE
-#endif
     !/
-#ifdef W3_MPI
     USE W3GDATMD, ONLY: NX, NY, NSPEC, MAPFS
     USE W3WDATMD, ONLY: VA
     USE W3ADATMD, ONLY: MPI_COMM_WAVE, SPPNT
@@ -6708,19 +6129,15 @@ CONTAINS
       WRITE (NDSE,1001)
       CALL EXTCDE (1)
     END IF
-#endif
     !
     ! 1.  Set-up for W3IOPE/O ( SENDs ) ---------------------------------- /
     !
-#ifdef W3_MPI
     NRQPO  = 0
     NRQPO2 = 0
     IH     = 0
     IT0    = IT0PNT
     IROOT  = NAPPNT - 1
-#endif
     !
-#ifdef W3_MPI
     ALLOCATE ( OUTPTS(IMOD)%OUT2%IRQPO1(4*NOPTS),              &
          OUTPTS(IMOD)%OUT2%IRQPO2(4*NOPTS) )
     IRQPO1 => OUTPTS(IMOD)%OUT2%IRQPO1
@@ -6740,14 +6157,10 @@ CONTAINS
         IX(K)=IPTINT(1,K,I)
         IY(K)=IPTINT(2,K,I)
       END DO
-#endif
       ! 1.b Loop over corner points
       !
-#ifdef W3_MPI
       DO J=1, 4
-#endif
         !
-#ifdef W3_MPI
         IT     = IT0 + (I-1)*4 + J
         IS(J)  = MAPFS (IY(J),IX(J))
         IF ( IS(J) .EQ. 0 ) THEN
@@ -6771,21 +6184,15 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-#endif
         !
         ! ... End of loop 1.b
         !
-#ifdef W3_MPI
       END DO
-#endif
       !
       ! ... End of loop 1.a
       !
-#ifdef W3_MPI
     END DO
-#endif
     !
-#ifdef W3_MPI
     NRQPO  = IH
 #endif
     !
@@ -6798,9 +6205,7 @@ CONTAINS
     !
 #ifdef W3_MPI
     IF ( IAPROC .EQ. NAPPNT ) THEN
-#endif
       !
-#ifdef W3_MPI
       IH     = 0
 #endif
       !
@@ -6816,13 +6221,9 @@ CONTAINS
           IX(K)=IPTINT(1,K,I)
           IY(K)=IPTINT(2,K,I)
         END DO
-#endif
         !
-#ifdef W3_MPI
         DO J=1, 4
-#endif
           !
-#ifdef W3_MPI
           IT     = IT0 + (I-1)*4 + J
           IS(J)  = MAPFS (IY(J),IX(J))
           IF ( IS(J) .EQ. 0 ) THEN
@@ -6849,15 +6250,11 @@ CONTAINS
           !
 #ifdef W3_MPI
         END DO
-#endif
         !
         ! ... End of loop 1.e
         !
-#ifdef W3_MPI
       END DO
-#endif
       !
-#ifdef W3_MPI
       NRQPO2 = NOPTS*4
 #endif
       !
