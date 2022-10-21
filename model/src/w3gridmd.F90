@@ -497,7 +497,7 @@ MODULE W3GRIDMD
   !     !/O2b   Print obstruction data.
   !     !/O2c   Print extended status map.
   !
-  !     !/XSTO  Extended tail Stokes drift of GEOMETOC Support Denmark
+  !     !/STVP  Extended tail Stokes drift of GEOMETOC Support Denmark
   !
   ! 10. Source code :
   !
@@ -647,6 +647,8 @@ MODULE W3GRIDMD
   ! STK_WN are the decays for Stokes drift partitions
   REAL                    :: STK_WN(25)
 
+  CHARACTER(LEN=4)        :: USXTT
+  REAL                    :: USXFM
   !
 #ifdef W3_LN1
   REAL                    :: CLIN, RFPM, RFHF
@@ -941,7 +943,7 @@ MODULE W3GRIDMD
   ! Poles of the output nested grids. May be a mix of rotated and standard
   REAL, DIMENSION(9)      :: BPLAT, BPLON
 #endif
-#ifdef W3_XSTO
+#ifdef W3_STVP
   !
   ! Extended tail Stokes drift profile
   INTEGER                 :: NDP
@@ -1115,6 +1117,7 @@ MODULE W3GRIDMD
        STH1MF, I1STH1M, I2STH1M,                &
        TH2MF, I1TH2M, I2TH2M,                   &
        STH2MF, I1STH2M, I2STH2M
+  NAMELIST /XSTP/ USXTT, USXFM
 #ifdef W3_IS1
   NAMELIST /SIS1/ ISC1, ISC2
 #endif
@@ -1138,9 +1141,9 @@ MODULE W3GRIDMD
   ! Poles of destination grids for boundary conditions output
   NAMELIST /ROTB/ BPLAT, BPLON
 #endif
-#ifdef W3_XSTO
+#ifdef W3_STVP
   ! Extended tail Stokes drift profile
-  NAMELIST /XSTO/ NDP, DSC, BP, TYP
+  NAMELIST /STVP/ NDP, DSC, BP
 #endif
   !/
   !/ ------------------------------------------------------------------- /
@@ -2742,6 +2745,20 @@ CONTAINS
     I1STH2M=1
     I2STH2M=NK
     !
+    ! Parametric spectral tails to add for integral parameters
+    ! Mean Stokes drift (projected on the mean direction)
+    USXTT='none' ! Tail type USXT (C*4)
+    ! Implemented values:
+    ! USXT='none': Cut-off at NK.
+    ! USXT='Pf-5': Spectrum of Stokes drift with a SIG^{-2} tail as for a
+    !              variance spectrum with a Phillips (1958) freq^{-5} tail
+    !              and a constant directional spread.
+#ifdef W3_STVP
+    ! USXT='DoEw': Donelan-Ewans 
+#endif
+    USXFM=10     ! Cut-off frequency USXF (Real) (Hz).
+    ! USXF>=10Hz means integration to infinity.
+    !
     FACBERG=1.
 #ifdef W3_IS0
     WRITE (NDSO,944)
@@ -2955,6 +2972,26 @@ CONTAINS
       WRITE(NDSO,4975) J,USSP_WN(J)
     ENDDO
     !
+    ! Parametric spectral tail to add for integral parameter fields
+    !
+    CALL READNL ( NDSS, 'XSTP', STATUS )
+    WRITE (NDSO,4850) STATUS
+    !
+    ! Stokes drift
+    USXT = USXTT
+    USXF = MAX ( USXFM, SIG(NK)/TPI )
+    WRITE (NDSO,4851) USXT
+    WRITE (NDSO,4852) USXF
+    IF ( USXT .NE. 'none' .AND. USXT .NE. 'Pf-5' &
+#ifdef W3_STVP
+         .AND. USXT .NE. 'DoEw'                  &
+#endif
+         ) THEN
+       WRITE(NDSE,1055) 'USXTT', USXT
+       CALL EXTCDE ( 41 )
+    ENDIF
+    IF ( USXF .GT. USXFM) WRITE (NDSO,4853) USXFM
+    !
     CALL READNL ( NDSS, 'MISC', STATUS )
     WRITE (NDSO,960) STATUS
     !
@@ -3104,24 +3141,24 @@ CONTAINS
          TRIM(CALTYPE) .NE. '365_day' ) GOTO 2003
     WRITE (NDST,1973) CALTYPE
     WRITE (NDSO,*)
-#ifdef W3_XSTO
+#ifdef W3_STVP
     !
     ! Extended spectral tail Stokes drift of Joint GeoMETOC Denmark
-    ! XSND: Number of depths for Stokes profile
-    ! XSDS: Depth scale specifying the largest depth for the profile,
-    !       XSDS = K * Z(XSND)
-    ! XSBP: Power of profile depth progression
-    ! XSTY: Tail type (C*4);  'DoEw': Donelan-Ewans, 
-    !                      or 'None': Spectrum truncated at SIG(NK) with no tail
+    ! SPND: Number of depths for Stokes profile
+    ! SPDS: Depth scale specifying the largest depth for the profile,
+    !       SPDS = K * Z(SPND)
+    ! SPBP: Power of profile depth progression
+    !! XSTY: Tail type (C*4);  'DoEw': Donelan-Ewans, 
+    !!                      or 'None': Spectrum truncated at SIG(NK) with no tail
     NDP = 7
     DSC = 2.0
     BP  = 2.0
-    TYP = 'DoEw'
-    CALL READNL ( NDSS, 'XSTO', STATUS )
-    XSND = NDP
-    XSDS = DSC
-    XSBP = BP
-    XSTY = TYP
+    ! TYP = 'DoEw'
+    CALL READNL ( NDSS, 'STVP', STATUS )
+    SPND = NDP
+    SPDS = DSC
+    SPBP = BP
+    ! XSTY = TYP
 #endif
     !
     ! 6.x Read values for FLD stress calculation
@@ -3319,6 +3356,8 @@ CONTAINS
            TH2MF, I1TH2M, I2TH2M,                   &
            STH2MF, I1STH2M, I2STH2M
       !
+      WRITE (NDSO,2853)    USXT, USXF    
+      !
 #ifdef W3_REF1
       WRITE(NDSO,2986) REFCOAST, REFFREQ, REFSLOPE, REFMAP,  &
            REFMAPD, REFSUBGRID , REFRMAX, REFFREQPOW,  &
@@ -3406,8 +3445,8 @@ CONTAINS
       WRITE(NDSO,4991) PLAT, PLON, UNROT
       WRITE(NDSO,4992) BPLAT, BPLON
 #endif
-#ifdef W3_XSTO
-      WRITE(NDSO,2988) XSND, XSDS, XSBP, XSTY
+#ifdef W3_STVP
+      WRITE(NDSO,2988) SPND, SPDS, SPBP !, XSTY
 #endif
       !
       WRITE (NDSO,918)
@@ -6710,6 +6749,11 @@ CONTAINS
 4974 FORMAT ( '       Partions of Uss             :',2I4)
 4975 FORMAT ( '       Partition wavenumber #',I2,'   : ',1F6.3)
 
+4850 FORMAT (/'  Spectral tail to add for integral parameters ', A/   &
+              ' --------------------------------------------------')
+4851 FORMAT ( ' Tail type for mean Stokes drift               :', A)
+4852 FORMAT ( ' High frequency cutoff (Hz) for Stokes drift   :', F6.3)
+4853 FORMAT ( ' Warning: USXF = SIG(NK)*2pi > USXFM =', F6.3)
     !
 4980 FORMAT (/'  Coastal / iceberg reflection  ',A/                   &
          ' --------------------------------------------------')
@@ -6774,6 +6818,8 @@ CONTAINS
          '        TH2MF =',I2,', I1TH2M =',I3,', I2TH2M =',I3,','/&
          '        STH2MF=',I2,', I1STH2M=',I3,', I2STH2M=',I3,' /')
     !
+2853  FORMAT ( '  &XSTP USXT = ',A4,' , USXF = ', F6.2 ,' /')
+    !
 2986 FORMAT ( '  &REF1 REFCOAST =',F5.2,', REFFREQ =',F5.2,', REFSLOPE =',F5.3, &
          ', REFMAP =',F4.1, ', REFMAPD =',F4.1, ', REFSUBGRID =',F5.2,','/ &
          '        REFRMAX=',F5.2,', REFFREQPOW =',F5.2,                    &
@@ -6787,9 +6833,9 @@ CONTAINS
 4992 FORMAT ( '  &ROTB BPLAT =',9(F6.1,",")/                        &
          '        BPLON =',9(F6.1,","),' /')
 #endif
-#ifdef W3_XSTO
-2988 FORMAT ( '  &XSTO XSND =',I3,' XSDS =',F5.2,' XSBP =',F5.2,     &
-               ' XSTY ="',A,'" /')
+#ifdef W3_STVP
+2988 FORMAT ( '  &STVP NDP =',I3,' DSC =',F5.2,' BP =',F5.2,' /')! ,     &
+    !     ' XSTY ="',A,'" /')
 #endif
 
 3000 FORMAT (/'  The spatial grid: '/                                &
@@ -7058,7 +7104,9 @@ CONTAINS
 1053 FORMAT (/' *** WAVEWATCH III ERROR IN W3GRID :'/                &
          '     WITH NAMELIST VALUE BPLAT == 90, BPLON MUST BE -180')
 #endif
-    !
+1055 FORMAT (/' *** WAVEWATCH III ERROR IN W3GRID :'/                &
+               '  Unknown value of namelist parameter', A8,' = ', A)
+!
 1040 FORMAT ( '       Space-time extremes DX      :',F10.2)
 1041 FORMAT ( '       Space-time extremes DX      :',F10.2)
 1042 FORMAT ( '       Space-time extremes DX-Y set to default 1000 m')
@@ -7372,14 +7420,16 @@ CONTAINS
               CASE('SIC5 ')
                 READ (NDS,NML=SIC5,END=801,ERR=802,IOSTAT=J)
 #endif
-#ifdef W3_XSTO
-              CASE('XSTO') 
-                READ (NDS,NML=XSTO,END=801,ERR=802,IOSTAT=J) 
+#ifdef W3_STVP
+              CASE('STVP') 
+                READ (NDS,NML=STVP,END=801,ERR=802,IOSTAT=J) 
 #endif
               CASE('UNST')
                 READ (NDS,NML=UNST,END=801,ERR=802,IOSTAT=J)
               CASE('OUTS')
                 READ (NDS,NML=OUTS,END=801,ERR=802,IOSTAT=J)
+              CASE('XSTP')
+                READ (NDS,NML=XSTP,END=801,ERR=802,IOSTAT=J)
               CASE('MISC')
                 READ (NDS,NML=MISC,END=801,ERR=802,IOSTAT=J)
               CASE DEFAULT

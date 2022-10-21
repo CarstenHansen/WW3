@@ -252,7 +252,7 @@ CONTAINS
     !     !/S    Enable subroutine tracing.
     !     !/T    Enable test output
     !
-    !     !/XSTO  Extended tail Stokes drift
+    !     !/STVP  Extended tail Stokes drift
     !
     ! 10. Source code :
     !
@@ -807,9 +807,9 @@ CONTAINS
       WRITE (NDSM) PoLat, PoLon, AnglD, FLAGUNR
 
 #endif
-#ifdef W3_XSTO
+#ifdef W3_STVP
       !  Add extended tail Stokes parameters to mod_def
-      WRITE (NDSM) XSND, XSDS, XSBP, XSTY
+      WRITE (NDSM) SPND, SPDS, SPBP
 #endif
       !!        WRITE(NDSM)                                                 &
       !!             COUG_2D, COUG_RAD3D, COUG_US3D
@@ -957,10 +957,10 @@ CONTAINS
       READ (NDSM) PoLat, PoLon, AnglD, FLAGUNR
 
 #endif
-#ifdef W3_XSTO
+#ifdef W3_STVP
       !
       !  Read extended tail Stokes parameters from mod_def
-      READ (NDSM) XSND, XSDS, XSBP, XSTY
+      READ (NDSM) SPND, SPDS, SPBP
 #endif
       !
     END IF
@@ -1018,13 +1018,15 @@ CONTAINS
       WRITE (NDSM)                                                &
            MAPWN, MAPTH, DTH, TH, ESIN, ECOS, ES2, ESC, EC2,      &
            XFR, FR1, SIG, SIG2, DSIP, DSII, DDEN, DDEN2, FTE,     &
-           FTF, FTWN, FTTR, FTWL, FACTI1, FACTI2, FACHFA, FACHFE
+           FTF, FTWN, FTTR, FTWL, FACTI1, FACTI2, FACHFA, FACHFE, &
+           USXT, USXF
     ELSE
       IF (.NOT.SINIT) CALL W3DIMS ( IGRD, NK, NTH, NDSE, NDST )
       READ (NDSM,END=801,ERR=802,IOSTAT=IERR)                     &
            MAPWN, MAPTH, DTH, TH, ESIN, ECOS, ES2, ESC, EC2,      &
            XFR, FR1, SIG, SIG2, DSIP, DSII, DDEN, DDEN2, FTE,     &
-           FTF, FTWN, FTTR, FTWL, FACTI1, FACTI2, FACHFA, FACHFE
+           FTF, FTWN, FTTR, FTWL, FACTI1, FACTI2, FACHFA, FACHFE, &
+           USXT, USXF
     END IF
 
     !

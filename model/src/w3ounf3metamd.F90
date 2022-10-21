@@ -196,7 +196,7 @@ MODULE W3OUNF3METAMD
   !/    23-Feb-2022 : Sub-fields and more than one        ( version X.XX )
   !/                  'fourth' dimension (in preparation, C. Hansen)    
   !/    23-Feb-2022 : Extra (subfield) components         ( version X.XX )
-  !/                  under switch XSTO (C.Hansen)
+  !/                  under switch STVP (C.Hansen)
   !/
   !/ ------------------------------------------------------------------- /
   !/
@@ -360,12 +360,12 @@ CONTAINS
     LOGICAL :: FLGNML
     INTEGER :: I, J, K, S, NOGMAX
 
-#ifdef W3_XSTO
-    ! Add 'XSP' to SPS
+#ifdef W3_STVP
+    ! Add 'SVP' to SPS
     ! C Hansen: TODO before PR: Let extended-tail-tus a separate parameter 'xts'
 #endif
     ! These fields have sub-fields
-    CHARACTER (LEN=6), DIMENSION(3) :: SPS = (/ 'P2S   ', 'BED   ', 'XSP   ' /)
+    CHARACTER (LEN=6), DIMENSION(3) :: SPS = (/ 'P2S   ', 'BED   ', 'SVP   ' /)
     ! Number of sub-fields for each element in SPS
     INTEGER, DIMENSION(3)           :: NSP = (/  2,        2,        3 /)
     ! Sub-field unique integer id.'s
@@ -2642,9 +2642,15 @@ CONTAINS
     !     the netCDF variable type is NF90_SHORT.
     !
     !/ ------------------------------------------------------------------- /
+#ifdef W3_STVP
+    USE W3IOGOMD, ONLY: W3FLDTOIJ
+#endif
     IMPLICIT NONE
     TYPE(META_T), POINTER :: META(:)
     INTEGER :: IFJ
+#ifdef W3_STVP
+    INTEGER :: IFI
+#endif
     !
     !----------GROUP 1 ----------------
     !
@@ -3876,10 +3882,10 @@ CONTAINS
     META(2)%VARNS=''
     META(2)%VARNG=''
     META(2)%VARNC='toc=sqrt(utoc**2+vtoc**2)'
-#ifdef W3_XSTO
+#ifdef W3_STVP
     ! IFI=6, IFJ=14
-    ! Parameter 'XSP'
-    CALL W3FLDTOIJ('XSP   ', IFI, IFJ, 1, 1, 1)
+    ! Parameter 'SVP'
+    CALL W3FLDTOIJ('SVP   ', IFI, IFJ, 1, 1, 1)
     !
     ! First sub-field svp:'Vertical profile of Stokes drift'
     META => GROUP(IFI)%FIELD(IFJ)%SUBFIELD(1)%META

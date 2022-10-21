@@ -406,9 +406,7 @@ $
 $ NDP: Number of depths (->NDEPTH)
 $ DSC: Depth scale specifying the largest depth Z(NDP)=DSC/(2pi/Tz)^2*GRAV
 $ BP:  Power for progressive profile depth intervals
-$ TYP: Tail type (C*4); 'DoEw': Donelan-Ewans
-$                       'None': Prognostic spectrum frequencies, only
-$ &XSTO NDP = 11, DSC = 1.0, BP = 2.0, TYP = 'DoEw' /
+$ &XSTO NDP = 11, DSC = 1.0, BP = 2.0 /
 $
 $ Miscellaneous ------------------------------------------------------ $
 $   Misc. parameters    : Namelist MISC

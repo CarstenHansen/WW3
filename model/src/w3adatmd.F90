@@ -459,9 +459,9 @@ MODULE W3ADATMD
          XTAUICE(:,:)
     REAL, POINTER         :: XP2SMS(:,:), XUS3D(:,:), XUSSP(:,:)
     !
-    ! UXSP(1,1),XUXSP(1,1) to be used under switch XSTO
-    REAL, POINTER         ::  UXSP(:,:)
-    REAL, POINTER         ::  XUXSP(:,:)
+    ! USVP(1,1),XUSVP(1,1) to be used under switch STVP
+    REAL, POINTER         ::  USVP(:,:)
+    REAL, POINTER         ::  XUSVP(:,:)
     !
     ! Output fields group 7)
     !
@@ -561,7 +561,7 @@ MODULE W3ADATMD
     INTEGER               :: ITIME, IPASS, IDLAST, NSEALM
     REAL, POINTER         :: ALPHA(:,:)
     LOGICAL               :: AINIT, AINIT2, FL_ALL, FLCOLD, FLIWND
-#ifdef W3_XSTO
+#ifdef W3_STVP
     !
    REAL                  :: M_X, M_Y, K_S
    REAL, POINTER         :: U_S(:), V_S(:), ZK_S(:)
@@ -689,13 +689,13 @@ MODULE W3ADATMD
   INTEGER, POINTER        :: ITIME, IPASS, IDLAST, NSEALM
   REAL, POINTER           :: ALPHA(:,:)
   LOGICAL, POINTER        :: AINIT, AINIT2, FL_ALL, FLCOLD, FLIWND
-#ifdef W3_XSTO
+#ifdef W3_STVP
   !
   REAL, POINTER           :: M_X, M_Y, K_S
   REAL, POINTER           :: U_S(:), V_S(:), ZK_S(:)
-  ! Declare UXSP(:,:)
+  ! Declare USVP(:,:)
 #endif
-  REAL, POINTER           :: UXSP(:,:)
+  REAL, POINTER           :: USVP(:,:)
 
 #ifdef W3_MEMCHECK
   type(MallInfo_t)        :: mallinfos
@@ -942,8 +942,8 @@ CONTAINS
     USE W3GDATMD, ONLY: NGRIDS, IGRID, W3SETG, NK, NX, NY, NSEA,    &
          NSEAL, NSPEC, NTH, E3DF, P2MSF, US3DF,      &
          USSPF, GTYPE, UNGTYPE
-#ifdef W3_XSTO
-    USE W3GDATMD, ONLY: XSND
+#ifdef W3_STVP
+    USE W3GDATMD, ONLY: SPND
     USE W3ODATMD, ONLY: NZO
 #endif
     USE W3ODATMD, ONLY: IAPROC, NAPROC, NTPROC, NAPFLD,             &
@@ -1289,29 +1289,29 @@ CONTAINS
     IF (  US3DF(1).GT.0 ) WADATS(IMOD)%US3D   = UNDEF
     IF (  USSPF(1).GT.0 ) WADATS(IMOD)%USSP   = UNDEF
 !
-#ifdef W3_XSTO
+#ifdef W3_STVP
     IF ( NZO .GT. 0 ) THEN
       WADATS(IMOD)%M_X  = UNDEF
       WADATS(IMOD)%M_Y  = UNDEF
       WADATS(IMOD)%K_S  = UNDEF
-      ALLOCATE ( WADATS(IMOD)%U_S(XSND), STAT=ISTAT )
+      ALLOCATE ( WADATS(IMOD)%U_S(SPND), STAT=ISTAT )
       CHECK_ALLOC_STATUS ( ISTAT )
-      ALLOCATE ( WADATS(IMOD)%V_S(XSND), STAT=ISTAT )
+      ALLOCATE ( WADATS(IMOD)%V_S(SPND), STAT=ISTAT )
       CHECK_ALLOC_STATUS ( ISTAT )
-      ALLOCATE ( WADATS(IMOD)%ZK_S(XSND), STAT=ISTAT )
+      ALLOCATE ( WADATS(IMOD)%ZK_S(SPND), STAT=ISTAT )
       CHECK_ALLOC_STATUS ( ISTAT )
-      ALLOCATE ( WADATS(IMOD)%UXSP(NSEALM,3+XSND*2), STAT=ISTAT )
+      ALLOCATE ( WADATS(IMOD)%USVP(NSEALM,3+SPND*2), STAT=ISTAT )
       CHECK_ALLOC_STATUS ( ISTAT )
       WADATS(IMOD)%U_S     = UNDEF
       WADATS(IMOD)%V_S     = UNDEF
       WADATS(IMOD)%ZK_S  = UNDEF
-      WADATS(IMOD)%UXSP    = UNDEF
+      WADATS(IMOD)%USVP    = UNDEF
     ELSE
 #endif
-      ALLOCATE ( WADATS(IMOD)%UXSP(1,1), STAT=ISTAT )
+      ALLOCATE ( WADATS(IMOD)%USVP(1,1), STAT=ISTAT )
       CHECK_ALLOC_STATUS ( ISTAT )
-      WADATS(IMOD)%UXSP    = UNDEF
-#ifdef W3_XSTO
+      WADATS(IMOD)%USVP    = UNDEF
+#ifdef W3_STVP
     END IF
 #endif
 
@@ -1646,8 +1646,8 @@ CONTAINS
     USE W3GDATMD, ONLY: NGRIDS, IGRID, W3SETG, NK, NX, NY, NSEA,    &
          NSEAL, NSPEC, NTH, E3DF, P2MSF, US3DF,      &
          USSPF, GTYPE, UNGTYPE
-#ifdef W3_XSTO
-    USE W3GDATMD, ONLY: XSND
+#ifdef W3_STVP
+    USE W3GDATMD, ONLY: SPND
     USE W3ODATMD, ONLY: NZO
 #endif
     USE W3ODATMD, ONLY: IAPROC, NAPROC, NTPROC, NAPFLD,             &
@@ -2265,22 +2265,22 @@ CONTAINS
       CHECK_ALLOC_STATUS ( ISTAT )
     END IF
 
-#ifdef W3_XSTO
+#ifdef W3_STVP
     !
     IF ( NZO .GT. 0 ) THEN
       ! TO TEST, CHA: IF ( OUTFLAGS( 6, 14) ) THEN
-      ALLOCATE ( WADATS(IMOD)%XUXSP(NXXX,3+2*NZO), STAT=ISTAT )
+      ALLOCATE ( WADATS(IMOD)%XUSVP(NXXX,3+2*NZO), STAT=ISTAT )
       CHECK_ALLOC_STATUS ( ISTAT )
     ELSE
-      ! XUXSP(1,1) will always exist
+      ! XUSVP(1,1) will always exist
 #endif
-      ALLOCATE ( WADATS(IMOD)%XUXSP(1,1), STAT=ISTAT )
+      ALLOCATE ( WADATS(IMOD)%XUSVP(1,1), STAT=ISTAT )
       CHECK_ALLOC_STATUS ( ISTAT )
-#ifdef W3_XSTO
+#ifdef W3_STVP
     END IF 
 #endif
     !
-    WADATS(IMOD)%XUXSP   = UNDEF
+    WADATS(IMOD)%XUSVP   = UNDEF
     !
     WADATS(IMOD)%XSXX    = UNDEF
     WADATS(IMOD)%XSYY    = UNDEF
@@ -3045,7 +3045,7 @@ CONTAINS
       IC3WN_R=> WADATS(IMOD)%IC3WN_R
       IC3WN_I=> WADATS(IMOD)%IC3WN_I
 #endif
-#ifdef W3_XSTO
+#ifdef W3_STVP
       !
       M_X => WADATS(IMOD)%M_X
       M_Y => WADATS(IMOD)%M_Y
@@ -3055,8 +3055,8 @@ CONTAINS
       V_S => WADATS(IMOD)%V_S
       ZK_S => WADATS(IMOD)%ZK_S
 #endif
-      ! Defined under switch XSTO but always store in out_grd.ww3: UXSP and XUXSP
-      UXSP => WADATS(IMOD)%UXSP
+      ! Defined under switch STVP but always store in out_grd.ww3: USVP and XUSVP
+      USVP => WADATS(IMOD)%USVP
       !
       IF ( FL_ALL ) THEN
         !
@@ -3390,9 +3390,9 @@ CONTAINS
       CFLKMAX =>  WADATS(IMOD)%XCFLKMAX
       !
       USERO  => WADATS(IMOD)%XUSERO
-#ifdef W3_XSTO
+#ifdef W3_STVP
       !
-      UXSP => WADATS(IMOD)%XUXSP
+      USVP => WADATS(IMOD)%XUSVP
 #endif
       !
     END IF

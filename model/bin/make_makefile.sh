@@ -439,7 +439,7 @@
          'W3OUNF3METAMD' ) modtest=w3ounf3metamd.o ;;
          'W3METAMD'     ) modtest=w3metamd.o ;;
          'W3GRIDMD'     ) modtest=w3gridmd.o ;;
-         'W3XSTOMD'     ) modtest=w3xstomd.o ;;
+         'W3STVPMD'     ) modtest=w3stvpmd.o ;;
          *              ) modfound=no ;;
       esac
 

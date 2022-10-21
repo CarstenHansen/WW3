@@ -438,7 +438,7 @@
        'smcg' ) cd $main_dir/src ; touch w3psmcmd.F90
                                    touch w3smcomd.F90 ;;
        'b4b'  ) cd $main_dir/src ; touch w3psmcmd.F90 ;; 
-       'xsto' ) cd $main_dir/src ; touch w3xstomd.F90
+       'stvp' ) cd $main_dir/src ; touch w3stvpmd.F90
                                    touch w3initmd.F90
                                    touch w3odatmd.F90
                                    touch w3gdatmd.F90

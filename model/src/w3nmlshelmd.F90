@@ -19,11 +19,12 @@ MODULE W3NMLSHELMD
   !/ ------------------------------------------------------------------- /
 
 #ifdef W3_XSTO
-  USE W3ODATMD, ONLY: OFCUT, OFCUT_COUNT
-  ! Declared in w3odatmd to avoid linking w3nmlshelmd with ww3_ounf
-  ! They have types similar to TYPE NML_DOMAIN_T etc., and are read from
-  ! the namelist by calling the subroutines READ_OFCUT_NML and REPORT_OFCUT_NML
-  ! Character OFCUT%FIELD, real OFCUT%FREQ, integer OFCUT_COUNT%N_FIELD
+  USE W3ODATMD, ONLY: VERBOSENESS
+  ! Declared in w3odatmd to avoid linking w3nmlshelmd with ww3_ounf.
+  ! It has a type similar to the *_T below, and is read from
+  ! the namelist by calling the subroutine READ_VERBOSENESS_NML().
+  ! Contains:
+  ! Integer VERBOSENESS%STVP for CALC_XSTOKES()
 #endif
   
   ! module defaults
@@ -165,6 +166,7 @@ MODULE W3NMLSHELMD
     REAL                        :: VALUE2
     REAL                        :: VALUE3
   END TYPE NML_HOMOG_INPUT_T
+  
   ! miscellaneous
   CHARACTER(256)                :: MSG
   INTEGER                       :: NDSN
@@ -333,6 +335,9 @@ CONTAINS
     ! read high frequency cut-off namelist
     CALL READ_OFCUT_NML (NDSI)
     IF ( IMPROC .EQ. NMPLOG ) CALL REPORT_OFCUT_NML ()
+    ! read verboseness of specific processes
+    CALL READ_VERBOSENESS_NML (NDSI)
+    IF ( IMPROC .EQ. NMPLOG ) CALL REPORT_VERBOSENESS_NML ()
 #endif    
     ! close namelist files
     CLOSE (NDSI)
@@ -1006,7 +1011,54 @@ CONTAINS
 
 
 #ifdef W3_XSTO
+!/ ------------------------------------------------------------------- /
 
+  SUBROUTINE READ_VERBOSENESS_NML (NDSI)
+
+!  1. Purpose :
+!
+!     Read namelist for verboseness of specific processes
+!    
+! 10. Source code :
+!
+!/ ------------------------------------------------------------------- /
+    USE WMMDATMD, ONLY: MDSE
+    USE W3SERVMD, ONLY: EXTCDE
+# ifdef W3_S
+    USE W3SERVMD, ONLY: STRACE
+# endif
+    IMPLICIT NONE
+
+    INTEGER, INTENT(IN)               :: NDSI
+
+    ! locals
+    INTEGER                           :: IERR
+    
+    NAMELIST /VERBOSENESS_NML/ VERBOSENESS
+
+# ifdef W3_S
+    INTEGER, SAVE                     :: IENT = 0
+# endif
+    
+# ifdef W3_S
+    CALL STRACE (IENT, 'READ_VERBOSENESS_NML')
+# endif
+    
+    IERR = 0
+    
+    REWIND (NDSI)
+    READ (NDSI, nml=VERBOSENESS_NML, iostat=IERR, iomsg=MSG)
+    IF (IERR.GT.0) THEN
+      WRITE (MDSE,'(A,/A)') &
+        'ERROR: READ_OFCUT_NML: namelist VERBOSENESS read error', &
+        'ERROR: '//TRIM(MSG)
+      CALL EXTCDE (8)
+    END IF
+
+    ! Implemented verbosenesses of processes
+    VERBOSENESS%STVP = 0 ! Mean Stokes drift vertical profile
+    
+  END SUBROUTINE READ_VERBOSENESS_NML
 
 
 !/ ------------------------------------------------------------------- /
@@ -1044,7 +1096,7 @@ CONTAINS
 # endif
     IERR = 0
 # ifdef W3_S
-    CALL STRACE (IENT, 'READ_DOMAIN_NML')
+    CALL STRACE (IENT, 'READ_OFCUT_NML')
 # endif
     READ (FIELDS_NOTAIL,*) NOTAIL_FIELDS
     
@@ -1653,8 +1705,33 @@ CONTAINS
 
 #ifdef W3_XSTO
 
+!/ ------------------------------------------------------------------- /
 
+  SUBROUTINE REPORT_VERBOSENESS_NML ()
 
+!/ ...
+! 10. Source code :
+!
+!/ ------------------------------------------------------------------- /
+    
+# ifdef W3_S
+    USE W3SERVMD, ONLY: STRACE
+# endif
+
+    IMPLICIT NONE
+# ifdef W3_S
+    INTEGER, SAVE                           :: IENT = 0
+    CALL STRACE (IENT, 'REPORT_VERBOSENESS_NML')
+# endif
+
+    WRITE (MSG,'(A)') 'VERBOSENESS % '
+    WRITE (NDSN,'(A)')
+    WRITE (NDSN,10) TRIM(MSG), 'STVP       = ', VERBOSENESS%STVP
+    
+ 10  FORMAT (A,2X,A,A)
+
+  END SUBROUTINE REPORT_VERBOSENESS_NML
+    
 !/ ------------------------------------------------------------------- /
 
   SUBROUTINE REPORT_OFCUT_NML ()

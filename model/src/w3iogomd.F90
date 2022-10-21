@@ -150,10 +150,10 @@ MODULE W3IOGOMD
 #ifdef W3_S
   USE W3SERVMD, ONLY : STRACE
 #endif
-#ifdef W3_XSTO
+#ifdef W3_STVP
   !/      
-  ! Definition of I, J for parameter 'XSP' in W3ODATMD:
-  USE W3ODATMD, ONLY: IXSP, JXSP
+  ! Definition of I, J for parameter 'SVP' in W3ODATMD:
+  USE W3ODATMD, ONLY: ISVP, JSVP
 #endif
   !/
   PUBLIC
@@ -238,8 +238,8 @@ CONTAINS
     USE CONSTANTS
     USE W3GDATMD, ONLY: E3DF, P2MSF, US3DF, USSPF
     USE W3ODATMD, ONLY: NOGRP, NGRPP
-#ifdef W3_XSTO
-    USE W3GDATMD, ONLY: XSND
+#ifdef W3_STVP
+    USE W3GDATMD, ONLY: SPND
     USE W3ODATMD, ONLY: NZO
 #endif
 #ifdef W3_S
@@ -259,7 +259,7 @@ CONTAINS
     !/ Local parameters
     !/
     INTEGER             :: I
-#ifdef W3_XSTO
+#ifdef W3_STVP
     INTEGER             :: J
 #endif
     CHARACTER(LEN=10)  :: VARNAME1(5),VARNAME2(5)
@@ -309,20 +309,20 @@ CONTAINS
       FLGRD(6,9)=.FALSE.
       FLGR2(6,9)=.FALSE.
     END IF
-#ifdef W3_XSTO
-    !  UXSP(JSEA,1:3+2*NZO) are set by CALC_XSTOKES(A) if
-    !  NZO = XSND (for full profile)
+#ifdef W3_STVP
+    !  USVP(JSEA,1:3+2*NZO) are set by CALC_STVP(A) if
+    !  NZO = SPND (for full profile)
     !  unless NZO is 0 (no Stokes profile output).
-    IF ( XSND .LE. 0 ) THEN
-      IF (FLGRD(IXSP,JXSP).OR.FLGR2(I,J)) THEN
-        WRITE(NDSEN,1009) 'XSP','XSTO'
+    IF ( SPND .LE. 0 ) THEN
+      IF (FLGRD(ISVP,JSVP).OR.FLGR2(I,J)) THEN
+        WRITE(NDSEN,1009) 'SVP','STVP'
       END IF
-      FLGRD(IXSP,JXSP)=.FALSE.
-      FLGR2(IXSP,JXSP)=.FALSE.
+      FLGRD(ISVP,JSVP)=.FALSE.
+      FLGR2(ISVP,JSVP)=.FALSE.
     END IF
     ! Set NZO for use in W3MPIO and W3DIMA
     NZO = 0
-    IF ( FLGRD(IXSP,JXSP) ) NZO = XSND
+    IF ( FLGRD(ISVP,JSVP) ) NZO = SPND
 #endif
     !
     FLGD(3) = .FALSE.
@@ -341,7 +341,7 @@ CONTAINS
          ' parameter ',A,' in OUTS namelist (in ww3_grid.inp)'   &
          ' with proper bounds' )
     !
-#ifdef W3_XSTO
+#ifdef W3_STVP
 1009 FORMAT (/' *** WAVEWATCH III WARNING  : '/                       &
          '     OUTPUT FIELD ',A,' not allowed: need to set',     &
          ' namelist group ',A,' (in ww3_grid.inp)'               &
@@ -1123,10 +1123,10 @@ CONTAINS
     CASE('TOC')
       I = 6
       J = 13
-#ifdef W3_XSTO
-    CASE('XSP')
-      I = IXSP
-      J = JXSP
+#ifdef W3_STVP
+    CASE('SVP')
+      I = ISVP
+      J = JSVP
 #endif
       !
       ! Group 7
@@ -1347,11 +1347,13 @@ CONTAINS
 #endif
     !
     USE W3PARALL, ONLY : INIT_GET_ISEA
-#ifdef W3_XSTO
-    ! Stokes drift with extended tail
+#ifdef W3_STVP
+    ! Stokes drift over NZO depths
     ! TODO: Consider use an inner #ifndef W3_POST here (switch with ww3_ounf)
     ! to avoid linking w3xstomd into ww3_ounf
-    USE W3XSTOMD, ONLY: CALC_XSTOKES
+    USE W3STVPMD, ONLY: CALC_STVP
+    USE W3ADATMD, ONLY: USVP
+    USE W3ODATMD, ONLY: NZO
 !
 #endif
     IMPLICIT NONE
@@ -1996,10 +1998,18 @@ CONTAINS
       SYY(JSEA) = SYY(JSEA) + FTE * ABYY(JSEA) / CG(NK,ISEA)
       SXY(JSEA) = SXY(JSEA) + FTE * ABXY(JSEA) / CG(NK,ISEA)
       !
-      ! Tail for surface stokes drift is commented out: very sensitive to tail power
+      ! Tail for surface Stokes drift: very sensitive to tail power
+      IF ( USXT .EQ. 'Pf-5' ) THEN
+        ! Assume the spectrum of mean Stokes drift has a SIG^{-2} tail
+        USSX(JSEA)  = USSX(JSEA) + 2*GRAV*ETUSCX(JSEA)/SIG(NK)
+        USSY(JSEA)  = USSY(JSEA) + 2*GRAV*ETUSCY(JSEA)/SIG(NK)
+        IF ( USXF .LT. 10.0 ) THEN
+          ! High-freq cut-off at SIG = USXF*TPI
+          USSX(JSEA) = USSX(JSEA) - 2*GRAV*ETUSCX(JSEA)/USXF/TPI
+          USSY(JSEA) = USSY(JSEA) - 2*GRAV*ETUSCY(JSEA)/USXF/TPI
+        END IF
+      END IF
       !
-      !       USSX(JSEA)  = USSX(JSEA) + 2*GRAV*ETUSCX(JSEA)/SIG(NK)
-      !       USSY(JSEA)  = USSY(JSEA) + 2*GRAV*ETUSCY(JSEA)/SIG(NK)
       UBS(JSEA) = UBS(JSEA) + FTWL * EBAND/GRAV
     END DO
     !
@@ -2368,12 +2378,20 @@ CONTAINS
       !
 
     END IF
-#ifdef W3_XSTO
-    !  Stokes drift with extended tail
-    !  UXSP(JSEA,1:3+2*NZO) is set by CALC_XSTOKES(A), where
-    !  NZO is either 0 (no Stokes profile output), or
-    !  NZO = XSND (profile over NZO depths).
-    IF (FLOLOC(IXSP,JXSP)) CALL CALC_XSTOKES(A)
+#ifdef W3_STVP
+    !  Stokes drift over NZO depths
+    !  USVP(JSEA,1:3+2*NZO) is set by CALC_STVP(A)
+    !  NZO is 0 if FLOLOC(ISVP,JSVP) is False (no Stokes profile output).
+    IF (FLOLOC(ISVP,JSVP)) THEN
+      CALL CALC_STVP(A)
+      IF ( USXT .EQ. 'DoEw' ) THEN
+        DO JSEA=1, NSEAL
+          ! Integral field with Donelan-Ewans tail as calculated in CALC_STVP
+          USSX(JSEA)  = USVP(JSEA,4)
+          USSY(JSEA)  = USVP(JSEA,4+NZO) 
+        END DO
+      END IF
+    END IF
 #endif
 
     IF (FLOLOC( 6, 8)) THEN
@@ -2553,8 +2571,8 @@ CONTAINS
          TH1M, STH1M, TH2M, STH2M, HSIG, PHICE, TAUICE,&
          STMAXE, STMAXD, HMAXE, HCMAXE, HMAXD, HCMAXD,&
          USSP, TAUOCX, TAUOCY
-#ifdef W3_XSTO
-    USE W3ADATMD, ONLY: UXSP
+#ifdef W3_STVP
+    USE W3ADATMD, ONLY: USVP
     USE W3ODATMD, ONLY: NZO
 #endif
     !/
@@ -2671,14 +2689,14 @@ CONTAINS
       IF ( WRITE ) THEN
         WRITE (NDSOG)                                           &
              IDSTR, VEROGR, GNAME, NOGRP, NGRPP, NSEA, NX, NY,     &
-#ifdef W3_XSTO
+#ifdef W3_STVP
              NZO,                                                  &
 #endif
              UNDEF, NOSWLL
       ELSE
         READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)                &
              IDTST, VERTST, TNAME, MOGRP, MGRPP, NSEA, NX, NY,     &
-#ifdef W3_XSTO
+#ifdef W3_STVP
              NZO,                                                  &
 #endif
              UNDEF, MOSWLL
@@ -2751,14 +2769,14 @@ CONTAINS
       IF ( WRITE ) THEN
         WRITE (NDSOG)                                           &
              IDSTR, VEROGR, GNAME, NOGRP, NGRPP, NSEA, NX, NY,     &
-#ifdef W3_XSTO
+#ifdef W3_STVP
              NZO,                                                  &
 #endif
              UNDEF, NOSWLL
       ELSE
         READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)                &
              IDTST, VERTST, TNAME, MOGRP, MGRPP, NSEA, NX, NY,     &
-#ifdef W3_XSTO
+#ifdef W3_STVP
              NZO,                                                  &
 #endif
              UNDEF, MOSWLL
@@ -2920,8 +2938,8 @@ CONTAINS
             TAUOCX(ISEA) = UNDEF
             TAUOCY(ISEA) = UNDEF
           END IF
-#ifdef W3_XSTO
-          IF ( FLOGRD( IXSP, JXSP) ) UXSP(ISEA,:) = UNDEF
+#ifdef W3_STVP
+          IF ( FLOGRD( ISVP, JSVP) ) USVP(ISEA,:) = UNDEF
 #endif
           !
           IF ( FLOGRD( 7, 1) ) THEN
@@ -2977,8 +2995,8 @@ CONTAINS
             TAUOY (ISEA) = UNDEF
           END IF
           IF ( FLOGRD( 6, 4) ) PHIOC (ISEA) = UNDEF
-#ifdef W3_XSTO
-          IF ( FLOGRD( IXSP, JXSP) ) UXSP(ISEA,:) = UNDEF
+#ifdef W3_STVP
+          IF ( FLOGRD( ISVP, JSVP) ) USVP(ISEA,:) = UNDEF
 #endif
           !
           IF ( FLOGRD( 7, 3) ) BEDFORMS(ISEA,:) = UNDEF
@@ -2990,10 +3008,10 @@ CONTAINS
       END DO
       !
     ELSE
-#ifdef W3_XSTO
+#ifdef W3_STVP
       ! NZO is required for use in W3MPIO and W3DIMA
-      IF ( FLOGRD(IXSP,JXSP) .AND. .NOT. NZO == XSND ) &
-        WRITE (NDSE,*) 'ERROR: NZO=',NZO,' should be equal to ',XSND
+      IF ( FLOGRD(ISVP,JSVP) .AND. .NOT. NZO == SPND ) &
+        WRITE (NDSE,*) 'ERROR: NZO=',NZO,' should be equal to ',SPND
 #endif
       IF (.NOT.DINIT) CALL W3DIMW ( IGRD, NDSE, NDST, .TRUE. )
       IF (.NOT.AINIT) CALL W3DIMA ( IGRD, NDSE, NDST, .TRUE. )
@@ -3253,9 +3271,9 @@ CONTAINS
             ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 13 ) THEN
               WRITE ( NDSOG ) TAUOCX(1:NSEA)
               WRITE ( NDSOG ) TAUOCY(1:NSEA)
-#ifdef W3_XSTO
-             ELSE IF ( IFI .EQ. IXSP .AND. IFJ .EQ. JXSP ) THEN
-              WRITE ( NDSOG ) UXSP(1:NSEA,1:3+XSND*2)
+#ifdef W3_STVP
+             ELSE IF ( IFI .EQ. ISVP .AND. IFJ .EQ. JSVP ) THEN
+              WRITE ( NDSOG ) USVP(1:NSEA,1:3+SPND*2)
 #endif
               !
               !     Section 7)
@@ -3598,10 +3616,10 @@ CONTAINS
                    TAUOCX(1:NSEA)
               READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)         &
                    TAUOCY(1:NSEA)
-#ifdef W3_XSTO
-            ELSE IF ( IFI .EQ. IXSP .AND. IFJ .EQ. JXSP ) THEN
+#ifdef W3_STVP
+            ELSE IF ( IFI .EQ. ISVP .AND. IFJ .EQ. JSVP ) THEN
               READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)    &
-                   UXSP(1:NSEA,1:3+XSND*2)
+                   USVP(1:NSEA,1:3+SPND*2)
 #endif
               !
               !     Section 7)
@@ -3676,7 +3694,6 @@ CONTAINS
             !
             ! End of test on WRITE/READ:
             !
->>>>>>> 18832182d99a574ebb0833babd4c9febd7544dda
           END IF
           !
           ! End of test on  FLOGRD(IFI,IFJ):

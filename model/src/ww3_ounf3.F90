@@ -67,7 +67,7 @@ PROGRAM W3OUNF3
   !/    02-Sep-2021 : Added coordinates attribute         ( version 7.12 )
   !/    28-Feb-2022 : New program ww3_ounf3: Sub-fields   ( version X.XX )
   !/                  and more than one 'third' dimension    
-  !/    28-Feb-2022 : XSTO option: Stokes drift profile   ( version X.XX )
+  !/    28-Feb-2022 : STVP option: Stokes drift profile   ( version X.XX )
   !/                  for extended spectral tail
   !/
   !/    Copyright 2009-2013 National Weather Service (NWS),
@@ -216,7 +216,7 @@ PROGRAM W3OUNF3
   !  9. Switches :
   !
   !     !/S     Enable subroutine tracing.
-  !     !/XSTO  Stokes drift profile for spectrum with extended tail
+  !     !/STVP  Stokes drift profile for spectrum with extended tail
   !
   ! 10. Source code :
   !
@@ -240,8 +240,8 @@ PROGRAM W3OUNF3
   !/
   USE W3GDATMD
   !/ USE W3GDATMD, ONLY: NK, NX, NY, NSEA, MAPSF, ...
-#ifdef W3_XSTO
-  USE W3GDATMD, ONLY: XSND, XSDS, XSBP
+#ifdef W3_STVP
+  USE W3GDATMD, ONLY: SPND, SPDS, SPBP
 #endif
   USE W3WDATMD, ONLY: TIME, WLV, ICE, ICEH, ICEF, BERG,            &
        UST, USTDIR, RHOAIR
@@ -264,8 +264,8 @@ PROGRAM W3OUNF3
        STMAXE, STMAXD, HMAXE, HCMAXE, HMAXD, HCMAXD,&
        P2SMS, EF, US3D, TH1M, STH1M, TH2M, STH2M,   &
        WN, USSP, WBT, WNMEAN
-#ifdef W3_XSTO
-  USE W3ADATMD, ONLY: UXSP
+#ifdef W3_STVP
+  USE W3ADATMD, ONLY: USVP
 #endif
   USE W3ODATMD, ONLY: NDSO, NDSE, SCREEN, NOGRP, NGRPP, IDOUT,     &
        UNDEF, FLOGRD, FNMPRE, NOSWLL, NOGE
@@ -1009,8 +1009,8 @@ CONTAINS
 #ifdef W3_T
     USE W3ODATMD, ONLY : NDST
 #endif
-#ifdef W3_XSTO
-    USE W3ODATMD, ONLY : NZO ! May alternatively get IXSP, JXSP from here
+#ifdef W3_STVP
+    USE W3ODATMD, ONLY : NZO ! May alternatively get ISVP, JSVP from here
     USE W3IOGOMD, ONLY : W3FLDTOIJ
 #endif
     USE NETCDF
@@ -1032,8 +1032,8 @@ CONTAINS
     !/ ------------------------------------------------------------------- /
     !/ Local parameters
     !/
-#ifdef W3_XSTO
-    INTEGER                ::  IXSP, JXSP
+#ifdef W3_STVP
+    INTEGER                ::  ISVP, JSVP
 #endif
     INTEGER                 :: IFI, IFJ, MFILL, I, J, ISEA, IX, IY,  &
          I1, J1, IPART, INDEXIPART
@@ -1058,7 +1058,7 @@ CONTAINS
          MXY(:,:), MAPOUT(:,:)
     !
     REAL                    :: CABS, UABS, MFILLR
-#ifdef W3_XSTO
+#ifdef W3_STVP
     INTEGER                 :: IZ
     REAL                    :: XZK
 #endif
@@ -1134,10 +1134,10 @@ CONTAINS
         IF ( FLG2D(3,IFJ)  ) N3 = NK
       END DO
     END IF
-#ifdef W3_XSTO
-      CALL W3FLDTOIJ('XSP   ', IXSP, JXSP, 1, 1, 1)
+#ifdef W3_STVP
+      CALL W3FLDTOIJ('SVP   ', ISVP, JSVP, 1, 1, 1)
       ! If a vertical Stokes profile dimension 'zk' is requested,
-      IF ( FLG2D(IXSP, JXSP) ) N3 = max(N3,NZO) ! size(UXSP,2) == 3 + 2*NZO
+      IF ( FLG2D(ISVP, JSVP) ) N3 = max(N3,NZO) ! size(USVP,2) == 3 + 2*NZO
 #endif
 
     ! Allocate output storage. This is required with the introduction
@@ -2007,8 +2007,8 @@ CONTAINS
             ENDIF ! SMCGRD
             NFIELD=2
             !
-#ifdef W3_XSTO
-          ELSE IF ( IFI .EQ. IXSP .AND. IFJ .EQ. JXSP ) THEN
+#ifdef W3_STVP
+          ELSE IF ( IFI .EQ. ISVP .AND. IFJ .EQ. JSVP ) THEN
             ! The three subfields (NFS=3) are joined in the netCDF file
             NFS = 3 ! Number of subfields loop over IFS=1,NFS
             ISUB = IFS
@@ -2023,10 +2023,10 @@ CONTAINS
               DO IK = 4,NZO+3
 # ifdef W3_RTD
                 ! Rotate x,y vector back to standard pole
-                IF ( FLAGUNR ) CALL W3XYRTN(NSEA, UXSP(:,IK), UXSP(:,NZO+IK), AnglD)
+                IF ( FLAGUNR ) CALL W3XYRTN(NSEA, USVP(:,IK), USVP(:,NZO+IK), AnglD)
 # endif
-                CALL S2GRID( UXSP(1:NSEA,IK), XX )
-                CALL S2GRID( UXSP(1:NSEA,NZO+IK), XY )
+                CALL S2GRID( USVP(1:NSEA,IK), XX )
+                CALL S2GRID( USVP(1:NSEA,NZO+IK), XY )
                 XXK(:,:,IK-3)=XX
                 XYK(:,:,IK-3)=XY
               END DO
@@ -2039,12 +2039,12 @@ CONTAINS
               !       accuracy of order O(1e-3), and a value of FSC larger
               !       than about 0.0005.
               IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
-              CALL S2GRID( UXSP(1:NSEA,1), X1 )
+              CALL S2GRID( USVP(1:NSEA,1), X1 )
               !
             ELSE IF ( IFS .EQ. 3 ) THEN
               ! Vertically integrated Stokes drift == wave pseudo momentum
               ! This variable is nearly the same as TUS, the
-              ! 'total Stokes transport', but possibly with an XSTO extended tail
+              ! 'total Stokes transport', but possibly with an STVP extended tail
               NFIELD=2
               ! NOTE: The magnitude of wave pseudo momentum may span from O(1e-3)
               !       to O(1e+2). Thus it should not be scaled to a 16-bit integer
@@ -2052,11 +2052,11 @@ CONTAINS
               !
 # ifdef W3_RTD
               ! Rotate x,y vector back to standard pole
-              IF ( FLAGUNR ) CALL W3XYRTN(NSEA, UXSP(1:NSEA,2), &
-                                          UXSP(1:NSEA,3), AnglD)
+              IF ( FLAGUNR ) CALL W3XYRTN(NSEA, USVP(1:NSEA,2), &
+                                          USVP(1:NSEA,3), AnglD)
 # endif
-              CALL S2GRID( UXSP(1:NSEA,2), XX )
-              CALL S2GRID( UXSP(1:NSEA,3), XY )
+              CALL S2GRID( USVP(1:NSEA,2), XX )
+              CALL S2GRID( USVP(1:NSEA,3), XY )
               END IF ! IFS .EQ. 3
 #endif
             ! RMS of bottom displacement amplitude
@@ -2447,22 +2447,22 @@ CONTAINS
               ELSE
                  DIM3VAR(:) = SIG(I1F:I2F)*TPIINV
               END IF
-#ifdef W3_XSTO
+#ifdef W3_STVP
             ELSE IF ( TRIM(DIM3NAME) .EQ. 'zk' ) THEN
               ! May assert that for 'zk': NZO == I2F-I1F+1
               ! Set values of the dimensionless depths
               ! The dimensionless depths are distributed like
               ! expA((i-1)^b)-1:
-              ! DIM3VAR(IZ)  = XSDS*(XZK**((IZ-1.)**XSBP) - 1.)
+              ! DIM3VAR(IZ)  = SPDS*(XZK**((IZ-1.)**SPBP) - 1.)
               ! The exponential base XZK is defined so that the deepest
-              ! point is DIM3VAR(XSND) = XSDS
-              XZK = 2.**((XSND*1.-1.)**(-XSBP))
+              ! point is DIM3VAR(SPND) = SPDS
+              XZK = 2.**((SPND*1.-1.)**(-SPBP))
               ! First calculate XZK**(IZ-1) for IZ = 1,NZO
               do IZ = 1,NZO
-                DIM3VAR(IZ) = XZK**((IZ*1.-1.)**XSBP)
+                DIM3VAR(IZ) = XZK**((IZ*1.-1.)**SPBP)
               end do
               ! Then subtract 1 and multiply with the scale
-              DIM3VAR(:) = XSDS*(DIM3VAR(:) - 1.)
+              DIM3VAR(:) = SPDS*(DIM3VAR(:) - 1.)
 #endif
               ! The netCDF attributes of DIM3VAR are specified in the
               ! subroutine W3NCDEF3
@@ -3581,7 +3581,7 @@ CONTAINS
       CALL CHECK_ERR(IRET)
       IRET=NF90_PUT_ATT(NCID,VARID3,'axis','Hz')
       CALL CHECK_ERR(IRET)
-#ifdef W3_XSTO
+#ifdef W3_STVP
     ! profile depth below surface
     !
     ELSE IF ( TRIM(DIMNAME) .EQ. 'zk' ) THEN

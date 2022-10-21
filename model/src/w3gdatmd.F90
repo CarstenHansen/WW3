@@ -664,18 +664,18 @@ MODULE W3GDATMD
     LOGICAL               :: FLAGUNR
 #endif
 
-#ifdef W3_XSTO
+#ifdef W3_STVP
     ! Namelist parameters for extended tail Stokes drift of Joint GeoMETOC DK
-    ! XSND: Number of depths for Stokes profile U_S(1:XSND), V_S(1:XSND)
-    ! XSDS: Depth scale specifying the largest depth Z(XSND) for the profile,
-    !       Z(XSND) = XSDS / K , where K is a wavenumber scale based on e.g T02  
-    ! XSBP: Power of profile depth progression
-    ! XSTY: Tail par. type. 'DoEw': Donelan-Ewans, 'None': Truncated spectrum
+    ! SPND: Number of depths for Stokes profile U_S(1:SPND), V_S(1:SPND)
+    ! SPDS: Depth scale specifying the largest depth Z(SPND) for the profile,
+    !       Z(SPND) = SPDS / K , where K is a wavenumber scale based on e.g T02  
+    ! SPBP: Power of profile depth progression
+    !! XSTY: Tail par. type. 'DoEw': Donelan-Ewans, 'None': Truncated spectrum
 
-    INTEGER               :: XSND
-    REAL                  :: XSDS       
-    REAL                  :: XSBP       
-    CHARACTER(LEN=4)      :: XSTY
+    INTEGER               :: SPND
+    REAL                  :: SPDS       
+    REAL                  :: SPBP       
+    !!CHARACTER(LEN=4)      :: XSTY
 
 #endif
     REAL   , POINTER :: ZB(:)     ! BOTTOM GRID, DEFINED ON ISEA
@@ -711,6 +711,9 @@ MODULE W3GDATMD
 #endif
     INTEGER          :: E3DF(3,5), P2MSF(3), US3DF(3), USSPF(2) ! freq. indices for 3D output
     REAL             :: USSP_WN(25) !Max set to 25 decay scales.
+    !
+    CHARACTER(LEN=4) :: USXT ! Spectral tail to add for Stokes drift
+    REAL             :: USXF ! High frequency cutoff (Hz) for Stokes drift
     !
     TYPE(T_GSU) :: GSU ! Grid search utility object
     !
@@ -1090,6 +1093,8 @@ MODULE W3GDATMD
   INTEGER, POINTER        :: NX, NY, NSEA, NSEAL, TRFLAG
   INTEGER, POINTER        :: E3DF(:,:), P2MSF(:), US3DF(:), USSPF(:)
   REAL,    POINTER        :: USSP_WN(:)
+  CHARACTER(LEN=4), POINTER :: USXT
+  REAL,    POINTER          :: USXF
 #ifdef W3_REF1
   REAL,    POINTER        :: REFLC(:,:)
   INTEGER, POINTER        :: REFLD(:,:)
@@ -1183,12 +1188,12 @@ MODULE W3GDATMD
   REAL, POINTER         :: AnglD(:)
   LOGICAL, POINTER      :: FLAGUNR
 #endif
-#ifdef W3_XSTO
+#ifdef W3_STVP
 ! Namelist parameters for extended tail Stokes drift
-  INTEGER, POINTER           :: XSND
-  REAL, POINTER              :: XSDS
-  REAL, POINTER              :: XSBP
-  CHARACTER(LEN=4), POINTER  :: XSTY
+  INTEGER, POINTER           :: SPND
+  REAL, POINTER              :: SPDS
+  REAL, POINTER              :: SPBP
+  ! CHARACTER(LEN=4), POINTER  :: XSTY
 #endif
   REAL   , POINTER :: ZB(:)
   REAL   , POINTER :: CLATS(:)
@@ -2292,6 +2297,8 @@ CONTAINS
     US3DF  => GRIDS(IMOD)%US3DF
     USSPF  => GRIDS(IMOD)%USSPF
     USSP_WN => GRIDS(IMOD)%USSP_WN
+    USXT   => GRIDS(IMOD)%USXT
+    USXF   => GRIDS(IMOD)%USXF
     FFACBERG => GRIDS(IMOD)%FFACBERG
 #ifdef W3_REF1
     REFLC  => GRIDS(IMOD)%REFLC
@@ -2341,11 +2348,11 @@ CONTAINS
     PoLon  => GRIDS(IMOD)%PoLon
     FLAGUNR  => GRIDS(IMOD)%FLAGUNR
 #endif
-#ifdef W3_XSTO
-    XSND  => GRIDS(IMOD)%XSND
-    XSDS  => GRIDS(IMOD)%XSDS
-    XSBP  => GRIDS(IMOD)%XSBP
-    XSTY  => GRIDS(IMOD)%XSTY
+#ifdef W3_STVP
+    SPND  => GRIDS(IMOD)%SPND
+    SPDS  => GRIDS(IMOD)%SPDS
+    SPBP  => GRIDS(IMOD)%SPBP
+    ! XSTY  => GRIDS(IMOD)%XSTY
     !
 #endif
     FICEN  => GRIDS(IMOD)%FICEN

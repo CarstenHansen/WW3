@@ -41,7 +41,7 @@ check_switches()
               wind windx wcor rwind curr currx mgwind mgprop mggse \
               subsec tdyn dss0 pdif tide refrx ig rotag nnt mprf \
               cou oasis agcm ogcm igcm trknc setup pdlib memck uost rstwind b4b \
-              xsto
+              stvp
   do
 
 # 1.a.1 Group switches by category
@@ -312,11 +312,11 @@ check_switches()
                ID='bit-for-bit reproducability'
                TS='B4B'
                OK='B4B' ;;
-#sort:xsto:
-      xsto   ) TY='upto1'
+#sort:stvp:
+      stvp   ) TY='upto1'
                ID='Extended tail Stokes drift'
-               TS='XSTO'
-               OK='XSTO' ;;
+               TS='STVP'
+               OK='STVP' ;;
    esac
 
 # 1.a.2 Check to make sure the correct amount of switches identified per category
@@ -438,7 +438,7 @@ check_switches()
       setup  ) setup=$sw ;;
       uost   ) uost=$sw ;;
       b4b    ) b4b=$sw ;;
-      xsto   ) xsto=$sw ;;
+      stvp   ) stvp=$sw ;;
               *    ) ;;
     esac
   done
@@ -589,8 +589,8 @@ switch_files()
    UOST) uostmd="w3uostmd"
   esac
 
-  case $xsto in
-   XSTO) xstomd="w3xstomd"
+  case $stvp in
+   STVP) stvpmd="w3stvpmd"
   esac
 
   case $stress in
@@ -842,7 +842,7 @@ create_file_list()
             sourcet="$pdlibcode $setupcode w3triamd w3srcemd $dsx $flx $ln $st $nl $bt $ic"
             sourcet="$sourcet $is $db $tr $bs $refcode $igcode w3parall $uostmd"
                  IO="w3iogrmd w3iogomd w3iopomd w3iotrmd w3iorsmd w3iobcmd $oasismd $agcmmd $ogcmmd $igcmmd"
-                 IO="$IO w3iosfmd w3partmd $xstomd"
+                 IO="$IO w3iosfmd w3partmd $stvpmd"
                 aux="constants w3servmd w3timemd $tidecode w3arrymd w3dispmd w3cspcmd w3gsrumd"
                 aux="$aux w3nmlshelmd $pdlibyow" ;;
       ww3_multi|ww3_multi_esmf)
@@ -858,7 +858,7 @@ create_file_list()
                prop="$pr $smcm"
             sourcet="$pdlibcode $pdlibyow $setupcode w3parall w3triamd w3srcemd $dsx $flx $ln $st $nl $bt $ic $is $db $tr $bs $refcode $igcode $uostmd"
                  IO='w3iogrmd w3iogomd w3iopomd wmiopomd'
-                 IO="$IO w3iotrmd w3iorsmd w3iobcmd w3iosfmd w3partmd $oasismd $agcmmd $ogcmmd $igcmmd $xstomd"
+                 IO="$IO w3iotrmd w3iorsmd w3iobcmd w3iosfmd w3partmd $oasismd $agcmmd $ogcmmd $igcmmd $stvpmd"
                 aux="constants $tidecode w3servmd w3timemd w3arrymd w3dispmd w3cspcmd w3gsrumd $mprfaux"
                 aux="$aux  wmunitmd w3nmlmultimd"
                 if [ "$scrip" = 'SCRIP' ]
@@ -904,7 +904,7 @@ create_file_list()
                data="wmmdatmd $memcode w3gdatmd w3wdatmd w3adatmd w3idatmd w3odatmd"
                prop=
             sourcet="$pdlibcode $pdlibyow $db $bt $setupcode w3parall w3triamd $stx $flx $nlx $btx  $is $uostmd"
-                 IO="w3iogrmd w3iogomd w3iorsmd w3iopomd $xstomd"
+                 IO="w3iogrmd w3iogomd w3iorsmd w3iopomd $stvpmd"
                 aux="constants w3servmd w3timemd w3arrymd w3dispmd w3gsrumd"
                 aux="$aux w3nmlounfmd $smco w3ounfmetamd w3metamd" ;;
       ww3_ounf3)
@@ -912,7 +912,7 @@ create_file_list()
                data="wmmdatmd $memcode w3gdatmd w3wdatmd w3adatmd w3idatmd w3odatmd"
                prop=
             sourcet="$pdlibcode $pdlibyow $db $bt $setupcode w3parall w3triamd $stx $flx $nlx $btx  $is $uostmd"
-                 IO="w3iogrmd w3iogomd w3iorsmd w3iopomd $xstomd"
+                 IO="w3iogrmd w3iogomd w3iorsmd w3iopomd $stvpmd"
                 aux="constants w3servmd w3timemd w3arrymd w3dispmd w3gsrumd"
                 aux="$aux w3nmlounfmd $smco w3ounf3metamd w3metamd" ;;
       ww3_outp)

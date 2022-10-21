@@ -404,8 +404,8 @@ CONTAINS
          OUTPTS, FNMPRE, IX0, IXN, IXS, IY0, IYN,    &
          IYS, FLFORM, IOSTYP, UNIPTS, UPPROC, NOTYPE,&
          FLOGR2, NOGRP, NGRPP, FLOGD, FLOG2
-#ifdef W3_XSTO
-    USE W3ODATMD, ONLY: XSVB
+#ifdef W3_STVP
+    USE W3ODATMD, ONLY: VERBOSENESS
 #endif
 #ifdef W3_NL5
     USE W3ODATMD, ONLY: TOSNL5
@@ -709,11 +709,11 @@ CONTAINS
     IF ( OUTPTS(IMOD)%IAPROC .EQ. OUTPTS(IMOD)%NAPLOG )             &
          OPEN (MDS(1),FILE=FNMPRE(:J)//LFILE(:IFL),ERR=888,IOSTAT=IERR)
     !
-#ifdef W3_XSTO
+#ifdef W3_STVP
     IF ( MDS(3).NE.MDS(1) .AND. MDS(3).NE.MDS(4) ) THEN
-      IF ( TSTOUT .OR. XSVB .GT. 0 ) THEN
+      IF ( TSTOUT .OR. VERBOSENESS%STVP .GT. 0 ) THEN
         INQUIRE (MDS(3),OPENED=OPENED)
-        ! Under XSTO, if W3_DIST, let Stokes verbose output to testNNN.FEXT
+        ! Under STVP, if W3_DIST, let Stokes verbose output to testNNN.FEXT
 # ifdef W3_DIST
         IF ( OPENED ) THEN
           CLOSE (MDS(3))
@@ -2255,7 +2255,7 @@ CONTAINS
 #endif
     !/
     USE W3GDATMD, ONLY: NSEA
-#ifdef W3_XSTO
+#ifdef W3_STVP
     USE W3ODATMD, ONLY: NZO
 #endif
     USE W3ADATMD, ONLY: NSEALM
@@ -2283,8 +2283,8 @@ CONTAINS
          STMAXE, STMAXD, HMAXE, HCMAXE, HMAXD,  &
          HCMAXD, QP, PTHP0, PQP, PPE, PGW, PSW, &
          PTM1, PT1, PT2, PEP, WBT, CX, CY,      &
-# ifdef W3_XSTO
-         UXSP,                                  &
+# ifdef W3_STVP
+         USVP,                                  &
 # endif
          TAUOCX, TAUOCY, WNMEAN
 #endif
@@ -2332,7 +2332,7 @@ CONTAINS
 #ifdef W3_S
     INTEGER, SAVE           :: IENT
 #endif
-#ifdef W3_XSTO
+#ifdef W3_STVP
     INTEGER                 :: NZ2
 #endif
 #ifdef W3_MPI
@@ -2364,7 +2364,7 @@ CONTAINS
     IT0    = NSPEC
     IROOT  = NAPFLD - 1
     !
-# ifdef W3_XSTO
+# ifdef W3_STVP
     NZ2 = 0
     IF ( NZO .GT. 0 ) NZ2=3+2*NZO
 # endif
@@ -2406,7 +2406,7 @@ CONTAINS
            P2MSF(3) - P2MSF(2) + 1
       IF ( FLGRDALL( 6, 8) ) NRQMAX = NRQMAX + 2*NK
       IF ( FLGRDALL( 6,12) ) NRQMAX = NRQMAX + 2*NK
-# ifdef W3_XSTO
+# ifdef W3_STVP
       !
       IF ( NZ2 .GT. 0 ) NRQMAX = NRQMAX + NZ2 ! FLGRDALL( 6, 14)
 # endif
@@ -3365,15 +3365,15 @@ CONTAINS
 #endif
 #ifdef W3_MPI
         END IF
-# ifdef W3_XSTO
+# ifdef W3_STVP
         ! FLGRDALL( 6, 14) <==> NZ2 > 0
         DO K=1,NZ2
           IH     = IH + 1
           IT     = IT + 1
-          CALL MPI_SEND_INIT (UXSP(1,K),NSEALM , MPI_REAL, IROOT,  &
+          CALL MPI_SEND_INIT (USVP(1,K),NSEALM , MPI_REAL, IROOT,  &
                                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
 #  ifdef W3_MPIT
-          WRITE (NDST,9011) IH, 'UXSP ', IROOT, IT, IRQGO(IH), IERR
+          WRITE (NDST,9011) IH, 'USVP ', IROOT, IT, IRQGO(IH), IERR
 #  endif
         END DO
 # endif
@@ -4612,15 +4612,15 @@ CONTAINS
 #endif
 #ifdef W3_MPI
           END IF
-# ifdef W3_XSTO      
+# ifdef W3_STVP      
           ! FLGRDALL( 6, 14) <==> NZ2 > 0
           DO K=1, NZ2
             IH     = IH + 1
             IT     = IT + 1
-            CALL MPI_RECV_INIT (UXSP(I0,K),1,WW3_FIELD_VEC, IFROM, IT, &
+            CALL MPI_RECV_INIT (USVP(I0,K),1,WW3_FIELD_VEC, IFROM, IT, &
                                MPI_COMM_WAVE, IRQGO2(IH), IERR )
 #  ifdef W3_MPIT
-             WRITE (NDST,9011) IH, 'UXSP ', IFROM, IT, IRQGO2(IH), IERR
+             WRITE (NDST,9011) IH, 'USVP ', IFROM, IT, IRQGO2(IH), IERR
 #  endif
           END DO
 # endif

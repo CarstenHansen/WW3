@@ -137,8 +137,7 @@ MODULE W3ODATMD
   !      OUT6      TYPE  Public   Data structure of type OTYPE6 with
   !                               suppl. data for output type 6.
   !      OFILES   I.A.  Public   Output in one or several files.
-#ifdef W3_XSTO
-  !      XSVB      Int.  Public   Verboseness of CALC_XSTOKES()
+#ifdef W3_STVP
   !      NZO       Int.  Public   Number of output profile depths
   !      OFCUT     TYPE  Public   Physical low-pass frequency for a field
 #endif
@@ -340,6 +339,11 @@ MODULE W3ODATMD
   LOGICAL                 :: UNIPTS = .FALSE., UPPROC = .FALSE.
   !/
   !/ Set NOGE and IDOUT identifiers in W3NOUT
+#ifdef W3_STVP
+  ! Values of IFI, IFJ for parameter 'SVP'.
+  ! When changed, also change indices in 'NOGE(6)', 'IDOUT( 6,14)' below
+  INTEGER                 :: ISVP=6, JSVP=14
+#endif
   !/
   !/ Data structures
   !/
@@ -446,8 +450,8 @@ MODULE W3ODATMD
          TBPI0(2), TBPIN(2), NDS(13), OFILES(7)
     REAL                  :: DTOUT(8)
     LOGICAL               :: FLOUT(8)
-#ifdef W3_XSTO
-    INTEGER               :: XSVB, NZO
+#ifdef W3_STVP
+    INTEGER               :: NZO
 #endif
     TYPE(OTYPE1)          :: OUT1
     TYPE(OTYPE2)          :: OUT2
@@ -456,6 +460,21 @@ MODULE W3ODATMD
     TYPE(OTYPE5)          :: OUT5
     TYPE(OTYPE6)          :: OUT6
   END TYPE OUTPUT
+
+#ifdef W3_STVP
+  ! Verboseness of specific processes (CALC_STVP() for the moment)
+  ! Parameters for ww3_shel are declared here in order not to link w3nmlshelmd
+  ! with the program ww3_ounf
+  TYPE NML_VERBOSENESS_T
+    INTEGER               :: STVP
+  END TYPE NML_VERBOSENESS_T  
+#endif
+  
+#ifdef W3_STVP
+  TYPE(NML_VERBOSENESS_T), PUBLIC  :: VERBOSENESS
+  INTEGER, POINTER        :: NZO  
+#endif
+  
   !/
   !/ Data storage
   !/
@@ -695,8 +714,8 @@ CONTAINS
       !
       OUTPTS(I)%NOSWLL = -1
       !
-#ifdef W3_XSTO
-      OUTPTS(I)%XSVB = 1
+#ifdef W3_STVP
+      ! OUTPTS(I)%XSVB = 1
       OUTPTS(I)%NZO = -1
 #endif
       OUTPTS(I)%TBPI0 = (-1,0)
@@ -870,8 +889,8 @@ CONTAINS
     ! 6) Wave-ocean layer
     !
     NOGE(6) = 13
-#ifdef W3_XSTO
-! Definition of I, J for parameter 'XSP' in IXSP=6,JXSP=14 above.
+#ifdef W3_STVP
+    ! Same as the values of IFI, IFJ for parameter 'SVP', ISVP=6, JSVP=14 above.
     NOGE(6) = 14
 #endif
     !
@@ -888,7 +907,7 @@ CONTAINS
     IDOUT( 6,11)  = 'Wave-ice energy flux'
     IDOUT( 6,12)  = 'Split Surface Stokes'
     IDOUT( 6,13)  = 'Tot wav-ocn mom flux'
-#ifdef W3_XSTO
+#ifdef W3_STVP
     IDOUT( 6,14)  = 'Stokes drift profile'
 #endif
     !
@@ -1671,8 +1690,8 @@ CONTAINS
     !
     NOSWLL => OUTPTS(IMOD)%NOSWLL
     !
-#ifdef W3_XSTO
-    XSVB  => OUTPTS(IMOD)%XSVB
+#ifdef W3_STVP
+    ! XSVB  => OUTPTS(IMOD)%XSVB
     NZO  => OUTPTS(IMOD)%NZO
     !
 #endif
