@@ -752,7 +752,7 @@ CONTAINS
 9020 FORMAT (' TEST W3IOSF : SENDING ICPRT FROM',I3,' TO',I3,     &
          ' WITH SIZE :',I6)
 #endif
-#ifdef W3_MPIT
+#ifdef W3_T
 9021 FORMAT (' TEST W3IOSF : SENDING DTPRT FROM',I3,' TO',I3,     &
          ' WITH SIZE :',I6)
 #endif
@@ -760,7 +760,7 @@ CONTAINS
 9030 FORMAT (' TEST W3IOSF : RECEIVING ICPRT FROM',I3,            &
          ' WITH SIZE :',I6)
 #endif
-#ifdef W3_MPIT
+#ifdef W3_T
 9031 FORMAT (' TEST W3IOSF : RECEIVING DTPRT FROM',I3,            &
          ' WITH SIZE :',I6)
 #endif
