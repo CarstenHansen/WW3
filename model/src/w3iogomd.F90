@@ -331,9 +331,9 @@ CONTAINS
     NZO = 0
     IF ( FLGRD(ISVP,JSVP) ) NZO = SPND
 # ifdef W3_MFIT
-    ! For FLGRD(10,NOEXTR+1), if not FLGRD(IXSP,JXSP), only the surface
-    ! U_S and integral variables Kz,M will be written to UXSP(1:NSEA,1:5)
-    IF ( FLGRD(10,NOEXTR+1) .AND. .NOT. FLGRD(IXSP,JXSP) ) NZO = 1
+    ! For FLGRD(10,NOEXTR+1), if not FLGRD(ISVP,JSVP), only the surface
+    ! U_S and integral variables Kz,M will be written to USVP(1:NSEA,1:5)
+    IF ( FLGRD(10,NOEXTR+1) .AND. .NOT. FLGRD(ISVP,JSVP) ) NZO = 1
     !  For profile fit, also XSMF(JSEA,1:7) are set by CALC_MFIT()
 # endif
 #endif
@@ -2421,7 +2421,7 @@ CONTAINS
     END IF
 # ifdef W3_MFIT
     IF ( FLOLOC(10,NOEXTR+1) ) THEN
-      IF ( .NOT. FLOLOC(ISVP,JXSV) ) CALL CALC_STVP(A)
+      IF ( .NOT. FLOLOC(ISVP,JSVP) ) CALL CALC_STVP(A)
       CALL CALC_MFIT()
     END IF
 # endif
@@ -2443,7 +2443,6 @@ CONTAINS
     !
     ! Formats
     !
->>>>>>> 03a0a5ab71853b7401d68317d989adba39535de1
 #ifdef W3_T
 9050 FORMAT (' TEST W3OUTG : ISEA, IX, IY, HS, L, Tm, THm, THs',     &
          ', FP0, THP0')
@@ -3056,7 +3055,7 @@ CONTAINS
         WRITE (NDSE,*) 'ERROR: NZO=',NZO,' should be equal to ',SPND
 #endif
 #ifdef W3_MFIT
-      IF ( FLOGRD(10,NOEXTR+1) .AND. .NOT.FLOGRD(IXSP,JXSP) .AND. .NOT.NZO==1 ) &
+      IF ( FLOGRD(10,NOEXTR+1) .AND. .NOT.FLOGRD(ISVP,JSVP) .AND. .NOT.NZO==1 ) &
         WRITE (NDSE,*) 'ERROR: NZO=',NZO,' should be equal to 1'
 #endif
       IF (.NOT.DINIT) CALL W3DIMW ( IGRD, NDSE, NDST, .TRUE. )

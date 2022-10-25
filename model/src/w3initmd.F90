@@ -2424,7 +2424,608 @@ CONTAINS
         ALLOCATE ( OUTPTS(IMOD)%OUT1%IRQGO(NRQMAX) )
         ALLOCATE ( OUTPTS(IMOD)%OUT1%IRQGO2(NRQMAX*NAPROC) )
       END IF
-      IRQGO  => OUTPTS(IMOD)%OUT1%IRQGO        END IF
+      IRQGO  => OUTPTS(IMOD)%OUT1%IRQGO
+      IRQGO2 => OUTPTS(IMOD)%OUT1%IRQGO2
+      !
+      ! 1.a Sends of fields
+      !
+      IH     = 0
+      !
+      IF ( IAPROC .LE. NAPROC ) THEN
+        IT     = IT0
+#endif
+#ifdef W3_MPIT
+        WRITE (NDST,9010) '(SEND)'
+#endif
+        !
+#ifdef W3_MPI
+        IF ( FLGRDALL( 1, 12) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (ICEF (IAPROC), 1, WW3_FIELD_VEC,    &
+               IROOT, IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 1/09', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 2, 1) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (HS   (1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 2/01', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 2, 2) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (WLM  (1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 2/02', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 2, 3) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (T02  (1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 2/03', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 2, 4) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (T0M1  (1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 2/04', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 2, 5) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (T01  (1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 2/05', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 2, 6) .OR. FLGRDALL( 2,18) ) THEN
+          ! TP output shares FP0 internal field with FP
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (FP0  (1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 2/06', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 2, 7) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (THM  (1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 2/07', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 2, 8) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (THS  (1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 2/09', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 2, 9) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (THP0 (1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 2/09', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 2, 10) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (HSIG (1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 2/10', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 2, 11) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (STMAXE (1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 2/11', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 2, 12) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (STMAXD (1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 2/12', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 2, 13) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (HMAXE (1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 2/13', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 2, 14) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (HCMAXE (1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 2/14', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 2, 15) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (HMAXD (1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 2/15', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 2, 16) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (HCMAXD (1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 2/16', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 2, 17) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (WBT  (1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 2/17', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 2, 19) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (WNMEAN(1),NSEALM , MPI_REAL, IROOT,   &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 2/19', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 3, 1) ) THEN
+          DO IK=E3DF(2,1),E3DF(3,1)
+            IH     = IH + 1
+            IT     = IT + 1
+            CALL MPI_SEND_INIT (EF(1,IK),NSEALM , MPI_REAL, IROOT, &
+                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+            WRITE (NDST,9011) IH, 'EF', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          END DO
+        END IF
+        !
+        IF ( FLGRDALL( 3, 2) ) THEN
+          DO IK=E3DF(2,2),E3DF(3,2)
+            IH     = IH + 1
+            IT     = IT + 1
+            CALL MPI_SEND_INIT (TH1M(1,IK),NSEALM , MPI_REAL, IROOT, &
+                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+            WRITE (NDST,9011) IH, 'TH1M', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          END DO
+        END IF
+        !
+        IF ( FLGRDALL( 3, 3) ) THEN
+          DO IK=E3DF(2,3),E3DF(3,3)
+            IH     = IH + 1
+            IT     = IT + 1
+            CALL MPI_SEND_INIT (STH1M(1,IK),NSEALM , MPI_REAL, IROOT, &
+                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+            WRITE (NDST,9011) IH, 'STH1M', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          END DO
+        END IF
+        !
+        IF ( FLGRDALL( 3, 4) ) THEN
+          DO IK=E3DF(2,4),E3DF(3,4)
+            IH     = IH + 1
+            IT     = IT + 1
+            CALL MPI_SEND_INIT (TH2M(1,IK),NSEALM , MPI_REAL, IROOT, &
+                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+            WRITE (NDST,9011) IH, 'TH2M', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          END DO
+        END IF
+        !
+        IF ( FLGRDALL( 3, 5) ) THEN
+          DO IK=E3DF(2,5),E3DF(3,5)
+            IH     = IH + 1
+            IT     = IT + 1
+            CALL MPI_SEND_INIT (STH2M(1,IK),NSEALM , MPI_REAL, IROOT, &
+                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+            WRITE (NDST,9011) IH, 'STH2M', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          END DO
+        END IF
+        !
+        IF ( FLGRDALL( 4, 1) ) THEN
+          DO K=0, NOSWLL
+            IH     = IH + 1
+            IT     = IT + 1
+            CALL MPI_SEND_INIT (PHS(1,K),NSEALM , MPI_REAL, IROOT,    &
+                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+            WRITE (NDST,9011) IH, ' 4/01', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          END DO
+        END IF
+        !
+        IF ( FLGRDALL( 4, 2) ) THEN
+          DO K=0, NOSWLL
+            IH     = IH + 1
+            IT     = IT + 1
+            CALL MPI_SEND_INIT (PTP(1,K),NSEALM , MPI_REAL, IROOT,    &
+                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+            WRITE (NDST,9011) IH, ' 4/02', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          END DO
+        END IF
+        !
+        IF ( FLGRDALL( 4, 3) ) THEN
+          DO K=0, NOSWLL
+            IH     = IH + 1
+            IT     = IT + 1
+            CALL MPI_SEND_INIT (PLP(1,K),NSEALM , MPI_REAL, IROOT,    &
+                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+            WRITE (NDST,9011) IH, ' 4/03', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          END DO
+        END IF
+        !
+        IF ( FLGRDALL( 4, 4) ) THEN
+          DO K=0, NOSWLL
+            IH     = IH + 1
+            IT     = IT + 1
+            CALL MPI_SEND_INIT (PDIR(1,K),NSEALM , MPI_REAL, IROOT,    &
+                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+            WRITE (NDST,9011) IH, ' 4/04', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          END DO
+        END IF
+        !
+        IF ( FLGRDALL( 4, 5) ) THEN
+          DO K=0, NOSWLL
+            IH     = IH + 1
+            IT     = IT + 1
+            CALL MPI_SEND_INIT (PSI(1,K),NSEALM , MPI_REAL, IROOT,    &
+                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+            WRITE (NDST,9011) IH, ' 4/05', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          END DO
+        END IF
+        !
+        IF ( FLGRDALL( 4, 6) ) THEN
+          DO K=0, NOSWLL
+            IH     = IH + 1
+            IT     = IT + 1
+            CALL MPI_SEND_INIT (PWS(1,K),NSEALM , MPI_REAL, IROOT,    &
+                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+            WRITE (NDST,9011) IH, ' 4/06', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          END DO
+        END IF
+        !
+        IF ( FLGRDALL( 4, 7) ) THEN
+          DO K=0, NOSWLL
+            IH     = IH + 1
+            IT     = IT + 1
+            CALL MPI_SEND_INIT (PTHP0(1,K),NSEALM , MPI_REAL, IROOT,    &
+                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+            WRITE (NDST,9011) IH, ' 4/07', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          END DO
+        END IF
+        !
+        IF ( FLGRDALL( 4, 8) ) THEN
+          DO K=0, NOSWLL
+            IH     = IH + 1
+            IT     = IT + 1
+            CALL MPI_SEND_INIT (PQP (1,K),NSEALM , MPI_REAL, IROOT,    &
+                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+            WRITE (NDST,9011) IH, ' 4/08', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          END DO
+        END IF
+        !
+        IF ( FLGRDALL( 4, 9) ) THEN
+          DO K=0, NOSWLL
+            IH     = IH + 1
+            IT     = IT + 1
+            CALL MPI_SEND_INIT (PPE (1,K),NSEALM , MPI_REAL, IROOT,    &
+                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+            WRITE (NDST,9011) IH, ' 4/09', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          END DO
+        END IF
+        !
+        IF ( FLGRDALL( 4,10) ) THEN
+          DO K=0, NOSWLL
+            IH     = IH + 1
+            IT     = IT + 1
+            CALL MPI_SEND_INIT (PGW (1,K),NSEALM , MPI_REAL, IROOT,    &
+                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+            WRITE (NDST,9011) IH, ' 4/10', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          END DO
+        END IF
+        !
+        IF ( FLGRDALL( 4,11) ) THEN
+          DO K=0, NOSWLL
+            IH     = IH + 1
+            IT     = IT + 1
+            CALL MPI_SEND_INIT (PSW (1,K),NSEALM , MPI_REAL, IROOT,    &
+                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+            WRITE (NDST,9011) IH, ' 4/11', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          END DO
+        END IF
+        !
+        IF ( FLGRDALL( 4,12) ) THEN
+          DO K=0, NOSWLL
+            IH     = IH + 1
+            IT     = IT + 1
+            CALL MPI_SEND_INIT (PTM1(1,K),NSEALM , MPI_REAL, IROOT,   &
+                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+            WRITE (NDST,9011) IH, ' 4/12', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          END DO
+        END IF
+        !
+        !
+        IF ( FLGRDALL( 4,13) ) THEN
+          DO K=0, NOSWLL
+            IH     = IH + 1
+            IT     = IT + 1
+            CALL MPI_SEND_INIT (PT1 (1,K),NSEALM , MPI_REAL, IROOT,    &
+                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+            WRITE (NDST,9011) IH, ' 4/13', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          END DO
+        END IF
+        !
+        IF ( FLGRDALL( 4,14) ) THEN
+          DO K=0, NOSWLL
+            IH     = IH + 1
+            IT     = IT + 1
+            CALL MPI_SEND_INIT (PT2 (1,K),NSEALM , MPI_REAL, IROOT,    &
+                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+            WRITE (NDST,9011) IH, ' 4/14', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          END DO
+        END IF
+        !
+        IF ( FLGRDALL( 4,15) ) THEN
+          DO K=0, NOSWLL
+            IH     = IH + 1
+            IT     = IT + 1
+            CALL MPI_SEND_INIT (PEP (1,K),NSEALM , MPI_REAL, IROOT,    &
+                 IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+            WRITE (NDST,9011) IH, ' 4/15', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          END DO
+        END IF
+        !
+        IF ( FLGRDALL( 4,16) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (PWST (1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 4/16', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 4,17) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (PNR  (1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 4/17', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 5, 1) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (UST   (IAPROC), 1, WW3_FIELD_VEC,      &
+               IROOT, IT, MPI_COMM_WAVE, IRQGO(IH), IERR )
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 5/01', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (USTDIR(IAPROC), 1, WW3_FIELD_VEC,       &
+               IROOT, IT, MPI_COMM_WAVE, IRQGO(IH), IERR )
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 5/01', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (ASF   (IAPROC), 1, WW3_FIELD_VEC,       &
+               IROOT, IT, MPI_COMM_WAVE, IRQGO(IH), IERR )
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 5/01', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 5, 2) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (CHARN(1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 5/02', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
+        !
+        IF ( FLGRDALL( 5, 3) ) THEN
+          IH     = IH + 1
+          IT     = IT + 1
+          CALL MPI_SEND_INIT (CGE  (1),NSEALM , MPI_REAL, IROOT,    &
+               IT, MPI_COMM_WAVE, IRQGO(IH), IERR)
+#endif
+#ifdef W3_MPIT
+          WRITE (NDST,9011) IH, ' 5/03', IROOT, IT, IRQGO(IH), IERR
+#endif
+#ifdef W3_MPI
+        END IF
         !
         IF ( FLGRDALL( 5, 4) ) THEN
           IH     = IH + 1

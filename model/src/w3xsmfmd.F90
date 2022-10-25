@@ -48,11 +48,11 @@
 !/                  integrated pseudo-momentum.
 !/
 !/    22-Dec-2017 : Adoption to WW3 version 5.16
-!/                  + Call XSTOKES() from W3OUTG(), outside the loop over JSEA
+!/                  + Call STVP() from W3OUTG(), outside the loop over JSEA
 !/
 !/    19-Aug-2019 : Adoption to WW3 version 7.XX
 !/                  + Mattsson-Hansen fitting is separated to module 'W3XSMFMD'
-!/                  + Namelist group &XSTO
+!/                  + Namelist group &STVP
 !/                  + Clearifying the in-code documentation
 !/                  + Dimensionless parameters in calculations, e.g. M -> Kz M
 !/                  + Replace Gradshteyn and Ryzhik with Numerical Recipes
@@ -88,7 +88,7 @@
 !  U_S(Z) is determined as a best fit to the total model profile U_mod(Z)
 !  constructed as a sum of a prognostic and a diagonostic (tail) contribution.
 !  These profiles have been derived from the model spectra + spectral tail
-!  using the module XSTOMD and subroutine CALL_XSTOKES(). NDEPTH discrete depths
+!  using the module STVPMD and subroutine CALL_STVP(). NDEPTH discrete depths
 !  have been given in an array Z_S(1:NDEPTH).
 !
 !  Also calculated are a scatter index of the profile fit, and a measure of
@@ -97,16 +97,16 @@
 !  All calculations are performed in parallel and the results are gathered
 !  to the process that writes the output  variable XSMH.
 ! 
-!  From the array UXSP (see w3xstomd.ftn) at least the following 5 values are
+!  From the array USVP (see w3stvpmd.ftn) at least the following 5 values are
 !  stored to out_grd.ww3 to be used in conversion to NetCDF (ww3_ounf) .
 !
-!    UXSP(JSEA,1)      = Kz     ! g Kz tanh( Kz D) = (2pi/T02)^2 [ 1/m ]
+!    USVP(JSEA,1)      = Kz     ! g Kz tanh( Kz D) = (2pi/T02)^2 [ 1/m ]
 !
-!    UXSP(JSEA,2)      = M_X    ! (M_X, M_Y) is the integral pseudo-momentum
-!    UXSP(JSEA,3)      = M_Y    ! per unit surface area, divided by density.
+!    USVP(JSEA,2)      = M_X    ! (M_X, M_Y) is the integral pseudo-momentum
+!    USVP(JSEA,3)      = M_Y    ! per unit surface area, divided by density.
 !                               ! [ m^2/s ]        
-!    UXSP(JSEA,4)      = U0_X   ! Surface Stokes drift [ m/s ]
-!    UXSP(JSEA,4+XSND) = U0_Y 
+!    USVP(JSEA,4)      = U0_X   ! Surface Stokes drift [ m/s ]
+!    USVP(JSEA,4+SPND) = U0_Y 
 !
 !  Via the array USEROXSMH we store other seven fitting parameters
 !
@@ -131,12 +131,12 @@
 !     $      TYP='DoEw': Donelan-Ewans extension to infinite freq.,
 !     $      TYP='DE20': Donelan-Ewans truncated at 2.0 Hz,
 !     $      TYP='None': Prognostic spectrum truncated with no extension
-!     &XSTO NDP = 31, DSC = 3.0, TYP = 'DE20' /
+!     &STVP NDP = 31, DSC = 3.0, TYP = 'DE20' /
 !
-!  b) In w3initmd.ftn: Call XSTOKES_INIT() (module W3XSTOMD):
+!  b) In w3initmd.ftn: Call STVP_INIT() (module W3STVPMD):
 !     Allocation of StkProg(1:NDEPTH,I), StkDiag(1:NDEPTH,I), Z_Stk(1:NDEPTH)
 !
-!  c) In w3iogomd.ftn: Call the subroutine XSTOKES() (module W3XSTOMD): At each
+!  c) In w3iogomd.ftn: Call the subroutine STVP() (module W3STVPMD): At each
 !     WW3 output time step, calculation of the Stokes drift profile
 !
 !  d) Call the subroutine Stokes_MHfit () (present module W3XSMFMD):
@@ -227,51 +227,55 @@
 !
 !  4. Implementation in WW3:
 !
-!  Code lines are added to WW3 under the two compile switches '!/XSTO' and
-!  '!/MFIT'. First, follow the implementations as described in w3xstomd.ftn.
+!  Code lines are added to WW3 under the two compile switches 'W3_STVP' and
+!  'W3_MFIT'. First, follow the implementations as described in w3stvpmd.ftn.
 !
 !  a) w3odatmd.ftn
 !
-!     Real arrays UXSP(JSEA,1:4), UXSP(JSEA,4+XSND) and XSMH(JSEA,1:6) 
+!     Real arrays USVP(JSEA,1:4), USVP(JSEA,4+SPND) and XSMH(JSEA,1:6) 
 !     contain the 11 Stokes fitting parameters for the sea point
-!     JSEA. UXSP and XSMH are structures for later communication to the job
+!     JSEA. USVP and XSMH are structures for later communication to the job
 !     that performs field output and belong to the module w3adatmd.ftn.
 !
 !     In subroutine W3NOUT(), specify the MHfit parameter names
 !           NOGE(10) = NOEXTR+1
-!     !/MFIT      IDOUT(10, NOEXTR+1)  = 'Stokes profile fit  '
+!     #ifdef W3_MFIT
+!         IDOUT(10, NOEXTR+1)  = 'Stokes profile fit  '
 !
 !  b) w3iogomd.ftn
 !
 !     b1) SUBROUTINE W3READFLGRD, and W3FLGRDFLAG
 !        
 !     b2) In subroutine W3FLGRDUPDT
-!     !/XSTO      ! Set NZO for use in W3DIMA, W3DIMX
-!     !/XSTO      NZO = 0
-!     !/XSTO      IF ( FLGRD(IXSP,JXSP) ) NZO = XSND
-!     !/MFIT      ! For FLGRD(10,NOEXTR+1), if FLGRD( IXSP, JXSP) is False, only
-!     !/MFIT      ! the surface and integral variables are in UXSP(1:NSEA,1:5)
-!     !/MFIT      IF ( FLGRD(10,NOEXTR+1) .AND. .NOT. FLGRD(IXSP, JXSP) ) NZO = 1
+!     #ifdef W3_STVP
+!        ! Set NZO for use in W3DIMA, W3DIMX
+!         NZO = 0
+!         IF ( FLGRD(ISVP,JSVP) ) NZO = SPND
+!     #ifdef W3_MFIT
+!         ! For FLGRD(10,NOEXTR+1), if FLGRD( ISVP, JSVP) is False, only
+!         ! the surface and integral variables are in USVP(1:NSEA,1:5)
+!         IF ( FLGRD(10,NOEXTR+1) .AND. .NOT. FLGRD(ISVP, JSVP) ) NZO = 1
 !        
 !     b3) In subroutine W3OUTG:
 !     Declare use of CALC_MFIT()
-!     !/MFIT      USE W3XSMFMD, ONLY: CALC_MFIT
+!     #ifdef W3_MFIT
+!         USE W3XSMFMD, ONLY: CALC_MFIT
 !     (...)
 !       !
-!       !/XSTO! UXSP(JSEA,1:3+2*XSND) is set by CALC_XSTOKES(A). Thereafter,
+!       !/STVP! USVP(JSEA,1:3+2*SPND) is set by CALC_STVP(A). Thereafter,
 !       !/MFIT! XSMH(JSEA,1:7) is determined by CALC_MFIT(A)
-!       !/MFIT! The combined CALC_XSTOKES(A); CALC_MFIT() are called
+!       !/MFIT! The combined CALC_STVP(A); CALC_MFIT() are called
 !       !/MFIT! outside and after the present loop
 !
-!     b4) Later in  W3OUTG() just following CALL CALC_XSTOKES():
-!     !/XSTO ! Stokes drift with extended tail
-!     !/XSTO       IF ( FLOLOC(IXSP,JXSP)        &
+!     b4) Later in  W3OUTG() just following CALL CALC_STVP():
+!     !/STVP ! Stokes drift with extended tail
+!     !/STVP       IF ( FLOLOC(ISVP,JSVP)        &
 !     !/MFIT            .OR.  FLOLOC(10,NOEXTR+1)  &
-!     !/XSTO                         ) THEN
-!     !/XSTO           CALL CALC_XSTOKES(A)
-!     !/XSTO         END IF
+!     !/STVP                         ) THEN
+!     !/STVP           CALL CALC_STVP(A)
+!     !/STVP         END IF
 !     !/MFIT       IF ( FLOLOC(10,NOEXTR+1) ) CALL CALC_MFIT()
-!     !/XSTO!
+!     !/STVP!
 !        
 !  c) In ww3_ounf.ftn:
 !     Define the relevant NetCDF variable names etc.
@@ -280,15 +284,15 @@
 !     described in the WW3 manual chpt. 5.5
 !
 !     d1) make_makefile.sh:
-!       for type in ...  xsto xsmf; do
+!       for type in ...  stvp xsmf; do
 !       (...)        
 !       case $type in ...
 !         (...)        
-!     #sort:xsto:
-!         xsto ) TY='upto1'
+!     #sort:stvp:
+!         stvp ) TY='upto1'
 !                ID='Extended tail Stokes drift'
-!                TS='XSTO'
-!                OK='XSTO' ;;
+!                TS='STVP'
+!                OK='STVP' ;;
 !     #sort:xsmf:
 !         xsmf ) TY='upto1'
 !                ID='Stokes drift MHfit'
@@ -299,15 +303,15 @@
 !       case $prog in
 !         (...)
 !         ww3_shel) (...)
-!                  IO="$IO w3xstomd w3xsmfmd"
+!                  IO="$IO w3stvpmd w3xsmfmd"
 !         (...)
 !         ww3_multi|ww3_multi_esmf)
 !                   (...)
-!                   IO="$IO w3xstomd w3xsmfmd"
+!                   IO="$IO w3stvpmd w3xsmfmd"
 !       (...)        
 !       case $mod in
 !          (...)
-!          'W3XSTOMD'     ) modtest=w3xstomd.o ;;
+!          'W3STVPMD'     ) modtest=w3stvpmd.o ;;
 !          'W3XSMFMD'     ) modtest=w3xsmfmd.o ;;
 !
 !     d2) w3_new:
@@ -316,14 +320,14 @@
 !       do
 !         case $key in
 !           (...)
-!           'xsto' ) cd $main_dir/ftn ; touch w3xstomd.ftn
+!           'stvp' ) cd $main_dir/ftn ; touch w3stvpmd.ftn
 !                                       touch w3initmd.ftn
 !                                       touch w3odatmd.ftn
 !                                       touch w3gdatmd.ftn
 !                                       touch w3iogomd.ftn
 !                                       touch w3iogrmd.ftn
 !                                       touch ww3_grid.ftn ;;
-!           'mfit' ) cd $main_dir/ftn ; touch w3xstomd.ftn
+!           'mfit' ) cd $main_dir/ftn ; touch w3stvpmd.ftn
 !                                       touch w3xsmfmd.ftn
 !                                       touch w3odatmd.ftn
 !                                       touch w3gdatmd.ftn
@@ -370,12 +374,12 @@
 !
       USE W3SERVMD, ONLY: EXTCDE
       USE W3ADATMD, ONLY: XSMH
-      USE W3ODATMD, ONLY: NDSO, NDSE, NDST, IAPROC, NAPROC, NAPOUT
-      USE W3GDATMD, ONLY: XSND, XSDS, NSEAL, NK, NTH, SIG, DMIN
+! VERBOSENESS%STVP: Verbose level [0..4] of STVP output to NDSV. In WW3_shel.nml
+      USE W3ODATMD, ONLY: NDSO, NDSE, NDST, IAPROC, NAPROC, NAPOUT, VERBOSENESS
+      USE W3GDATMD, ONLY: SPND, SPDS, NSEAL, NK, NTH, SIG, DMIN
       ! Stokes drift profile data      
-      USE W3ADATMD, ONLY: DW, UXSP, ZK_S
-      ! XSVB: Verboseness level [0..4] of XSTO output to NDST or NDSO 
-      USE W3ODATMD, ONLY: XSVB, NZO
+      USE W3ADATMD, ONLY: DW, USVP, ZK_S
+      USE W3ODATMD, ONLY: NZO
 
       PRIVATE
 !/
@@ -394,7 +398,7 @@
       ! Look-up parameters to determine profile coefficients AM, PM
 
       real, allocatable           :: DZK_S(:), log_KZ(:)
-      integer                     :: XSNDeep, XSNUpper, Zdi, NA = 0
+      integer                     :: SPNDeep, XSNUpper, Zdi, NA = 0
       real                        :: delAMlu
       
       real, allocatable           :: AMdlu(:,:)
@@ -440,7 +444,7 @@
 !/                  +-------------------------------------+
 !/
 !/      
-!/    Remarks: This subroutine can be called after CALC_XSTOKES
+!/    Remarks: This subroutine can be called after CALC_STVP
 !/             Call CALC_MFIT only under switch MFIT
 !/
       USE W3GDATMD, ONLY: MAPSF, MAPSTA ! module scope:,NSEAL
@@ -484,9 +488,9 @@
 !
         IF ( MAPSTA(IY,IX) .GT. 0 ) &
           call Stokes_MHfit(JSEA)
-          ! If under MPI only UXSP(JSEA,1:5) is communicated to XUXSP for output
-          if ( NZO < XSND ) &
-               UXSP(JSEA,4+NZO:3+2*NZO) = UXSP(JSEA,4+XSND:3+XSND+NZO)
+          ! If under MPI only USVP(JSEA,1:5) is communicated to XUSVP for output
+          if ( NZO < SPND ) &
+               USVP(JSEA,4+NZO:3+2*NZO) = USVP(JSEA,4+SPND:3+SPND+NZO)
          END DO
       
       IF ( xsmf_verbose .GT. 0 ) WRITE (NDSV, 912), 'Stokes fits done'
@@ -524,11 +528,11 @@
            WRITE (NDSV, *), JSEA, '  Fit the MHfit profile'
       
 
-      K_S = UXSP(JSEA,1)
-      M_X = UXSP(JSEA,2)
-      M_Y = UXSP(JSEA,3)
-      U_S => UXSP(JSEA,4:3+XSND)
-      V_S => UXSP(JSEA,4+XSND:3+XSND*2)
+      K_S = USVP(JSEA,1)
+      M_X = USVP(JSEA,2)
+      M_Y = USVP(JSEA,3)
+      U_S => USVP(JSEA,4:3+SPND)
+      V_S => USVP(JSEA,4+SPND:3+SPND*2)
       
       ! Feed with number of fitting cycles in MH_fit
       ! A minimum of 1 cycle + a half cycle is required:
@@ -539,8 +543,8 @@
       
       call MH_fit(JSEA, AM, PM, AMd, PMd, UsD, VsD, SIC)
 
-      UXSP(JSEA,2)  = M_X
-      UXSP(JSEA,3)  = M_Y
+      USVP(JSEA,2)  = M_X
+      USVP(JSEA,3)  = M_Y
 
       XSMH(JSEA,1)  = UsD     ! Surface drift of 'deep' part.
       XSMH(JSEA,2)  = VsD     ! Primary part drift is UsP=U_S-UsD.
@@ -579,18 +583,19 @@
       integer                     :: numi, iA, li, iKD, unfilled_zeros
       
       ! Set verboseness and file id. of output messages
+      xsmf_verbose = VERBOSENESS%STVP
       NDSV = NDST
-      if ( XSVB .gt. 0 ) then
+      ! Highly verbose output only with test output
+      if ( xsmf_verbose .gt. 0 ) then
         INQUIRE (NDSV,OPENED=OPENED)
         IF ( .NOT. OPENED ) THEN
-          XSVB = 0
+          xsmf_verbose = 0
           if ( IAPROC == NAPOUT) then
             NDSV = NDSO
-            XSVB = 1
+            xsmf_verbose = VERBOSENESS%STVP           
             end if
           end if
         end if
-      xsmf_verbose = XSVB            
 
 #ifdef W3_T
       xsmf_verbose = xsmf_verbose+1
@@ -698,32 +703,32 @@
       
       ! To look-up, given IPd, use function AMd_lookup(KsD, IPd)
          
-      if ( .not. allocated(DZK_S) ) allocate( DZK_S(XSND), stat=iret )
+      if ( .not. allocated(DZK_S) ) allocate( DZK_S(SPND), stat=iret )
 
       ! DZK_S = K_S * approximate thicknesses (m) of each layer
-      ! In w3xstomd, the dimensionless profile depths have been defined as
+      ! In w3stvpmd, the dimensionless profile depths have been defined as
       ! ZK_S(IZ)  = XKZ**(IZ-1) - 1., where
-      XKZ = (1. + XSDS)**(1./(XSND-1.))
+      XKZ = (1. + SPDS)**(1./(SPND-1.))
 
       ! The uppermost layer at the surface has approximately half thickness.
       DZK_S(1) = (XKZ - 1.) * 0.5
-      DZK_S(2:XSND) = (ZK_S(2:XSND) + 1.) * (XKZ - 1./XKZ) * 0.5     
+      DZK_S(2:SPND) = (ZK_S(2:SPND) + 1.) * (XKZ - 1./XKZ) * 0.5     
 
       ! Max depth for fitting the 'upper' partition
-      XSNUpper = min(XSND, int(log(2.5)/log(XKZ)) + 1)
+      XSNUpper = min(SPND, int(log(2.5)/log(XKZ)) + 1)
       
       ! ! Min depth for fitting the 'deep' partition
-      XSNDeep = XSND
-      if ( .not. allocated(log_KZ) ) allocate( log_KZ(XSNDeep), stat=iret )
-      log_KZ(2:XSND) = log(ZK_S(2:XSND))
-      do IZ = XSND+1, XSNDeep
+      SPNDeep = SPND
+      if ( .not. allocated(log_KZ) ) allocate( log_KZ(SPNDeep), stat=iret )
+      log_KZ(2:SPND) = log(ZK_S(2:SPND))
+      do IZ = SPND+1, SPNDeep
         log_KZ(IZ) = log(XKZ**(IZ-1) - 1.)
         end do
       ! Dummy value at surface
       log_KZ(1) = 0.
 
       ! Max depth index for initial deep fit is for KZ = 1.0
-      Zdi = min(int(log(2.5)/log(XKZ)) + 1, XSND - 3)
+      Zdi = min(int(log(2.5)/log(XKZ)) + 1, SPND - 3)
 
       end subroutine MHfit_init
       
@@ -796,16 +801,16 @@
       KsD  = K_S * MAX ( DMIN, DW(ISEA) )
 
       ! lenSt: Number of depths of the discrete profile above the sea bed
-      lenSt = XSND ! Configured value if all above the sea bed     
-      do IZ = XSND,1,-1
+      lenSt = SPND ! Configured value if all above the sea bed     
+      do IZ = SPND,1,-1
         if ( ZK_S(IZ) > KsD ) cycle
         lenSt = IZ
         exit
         end do
       
-      if ( .not. allocated(Umr) )  allocate( Umr(XSND), stat=ii )
+      if ( .not. allocated(Umr) )  allocate( Umr(SPND), stat=ii )
       if ( .not. allocated(mask) ) then
-        allocate( mask(XSND), stat=ii )
+        allocate( mask(SPND), stat=ii )
         mask = 0
         end if
       
@@ -865,8 +870,8 @@
         return
         end if
       
-      if ( .not. allocated(Pd) )   allocate( Pd(XSND), stat=ii )
-      if ( .not. allocated(Pp) )   allocate( Pp(XSND), stat=ii )
+      if ( .not. allocated(Pd) )   allocate( Pd(SPND), stat=ii )
+      if ( .not. allocated(Pp) )   allocate( Pp(SPND), stat=ii )
       
       ! Smallest drift values allowed in the improved estimates
       ! of (AM, PM, AMd) in the iteration steps below
@@ -1175,21 +1180,21 @@
       real                        :: log_Up, log_AM, log_Um_min, logAM0, amx, amn
       integer                     :: ii
 
-      integer                     :: XSNDe, numDe
+      integer                     :: SPNDe, numDe
 
-      if ( .not. allocated(loglog_ref) ) allocate( loglog_ref(XSNDeep), stat=ii )
-      if ( .not. allocated(log_Um) )     allocate( log_Um(XSNDeep), stat=ii )
-      if ( .not. allocated(fqc) )     allocate( fqc(XSNDeep), stat=ii )
+      if ( .not. allocated(loglog_ref) ) allocate( loglog_ref(SPNDeep), stat=ii )
+      if ( .not. allocated(log_Um) )     allocate( log_Um(SPNDeep), stat=ii )
+      if ( .not. allocated(fqc) )     allocate( fqc(SPNDeep), stat=ii )
 
       numDe = numD
-      XSNDe = XSND
+      SPNDe = SPND
       if ( index(fit_kind,'deep') > 0 ) then
         ! Extend the profile to fit if it is shorter than XKZ**(log(3.)/log(XKZ))
-        XSNDe = XSNDeep
-        if (numD == XSND) numDe = XSNDe
+        SPNDe = SPNDeep
+        if (numD == SPND) numDe = SPNDe
       else if ( index(fit_kind,'upper') > 0 ) then
         ! Limit the profile to fit if it is deeper than XKZ**(log(1.5)/log(XKZ))
-        XSNDe = min(XSNUpper,XSND)
+        SPNDe = min(XSNUpper,SPND)
         numDe = min(XSNUpper,numDe)
       end if
       
@@ -1209,7 +1214,7 @@
       if ( present(P0) ) PM = P0 ! Best fit of log_AM, only, given PM=P0
       
       logAM0 = log(AM)
-      loglog_ref(2:XSNDe) = logAM0 + PM * log_KZ(2:XSNDe)
+      loglog_ref(2:SPNDe) = logAM0 + PM * log_KZ(2:SPNDe)
       
       log_Um_min = -log(Um_min/Um(1))
 
@@ -1222,11 +1227,11 @@
         fqc = 1
         end where
       
-      ! Set dummy values at the surface and below the sea floor (numD+1:XSND)
+      ! Set dummy values at the surface and below the sea floor (numD+1:SPND)
       ! (not to be used in lin_reg)
       loglog_ref(1) = loglog_ref(2) - 1.
       log_Um(1) = exp(loglog_ref(1))
-      log_Um(numDe+1:XSNDe) = exp(loglog_ref(numDe))
+      log_Um(numDe+1:SPNDe) = exp(loglog_ref(numDe))
       
       ! First, avoid the smallest (possibly negative) values of log_Um: 
       where ( log_Um < log_Um(1) )
@@ -1238,7 +1243,7 @@
       log_Um(2:numD) = log( log_Um(2:numD) )
       ! Dummy values at the surface and below the sea floor
       log_Um(1) = loglog_ref(1)
-      log_Um(numD+1:XSNDe) = loglog_ref(numD+1:XSNDe)
+      log_Um(numD+1:SPNDe) = loglog_ref(numD+1:SPNDe)
       
       ! Avoid depths where Um is not decreasing like 'in the vicinity of'
       ! the reference shape Um(1) * exp(-AM * KZ**PM)
@@ -1485,7 +1490,7 @@
       real                              :: tmp
       integer                           :: ii
       
-      if ( .not. allocated(Um) )  allocate( Um(XSND), stat=ii )      
+      if ( .not. allocated(Um) )  allocate( Um(SPND), stat=ii )      
  
       Um(2:lenSt) = ( U_S(2:lenSt) - real(Up) * Pp(2:lenSt)     &
                        - real(Ud) * Pd(2:lenSt) )
@@ -1568,7 +1573,7 @@
 
       integer :: KD_num, ii, lenArr, nxy
 
-      if ( .not. allocated(x) ) allocate(x(XSNDeep), stat=ii)
+      if ( .not. allocated(x) ) allocate(x(SPNDeep), stat=ii)
       
       nxy = size(yy)
       

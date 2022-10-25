@@ -2295,7 +2295,6 @@ CONTAINS
       CHECK_ALLOC_STATUS ( ISTAT )
     ELSE
       ! XUSVP(1,1) will always exist
->>>>>>> 03a0a5ab71853b7401d68317d989adba39535de1
 #endif
       ALLOCATE ( WADATS(IMOD)%XUSVP(1,1), STAT=ISTAT )
       CHECK_ALLOC_STATUS ( ISTAT )
