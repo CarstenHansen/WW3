@@ -24,7 +24,7 @@ MODULE W3NMLSHELMD
   ! It has a type similar to the *_T below, and is read from
   ! the namelist by calling the subroutine READ_VERBOSENESS_NML().
   ! Contains:
-  ! Integer VERBOSENESS%STVP for CALC_STVPKES()
+  ! Integer VERBOSENESS%STVP for CALC_STVP()
 #endif
   
   ! module defaults
