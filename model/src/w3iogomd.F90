@@ -1350,7 +1350,7 @@ CONTAINS
 #ifdef W3_STVP
     ! Stokes drift over NZO depths
     ! TODO: Consider use an inner #ifndef W3_POST here (switch with ww3_ounf)
-    ! to avoid linking w3xstomd into ww3_ounf
+    ! to avoid linking w3stvpmd into ww3_ounf
     USE W3STVPMD, ONLY: CALC_STVP
     USE W3ADATMD, ONLY: USVP
     USE W3ODATMD, ONLY: NZO

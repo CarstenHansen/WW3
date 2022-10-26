@@ -314,7 +314,7 @@ check_switches()
                OK='B4B' ;;
 #sort:stvp:
       stvp   ) TY='upto1'
-               ID='Extended tail Stokes drift'
+               ID='Stokes drift vertical profile'
                TS='STVP'
                OK='STVP' ;;
    esac

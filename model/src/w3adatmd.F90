@@ -196,6 +196,7 @@ MODULE W3ADATMD
   !      CFLXYMAX  R.A.  Public   Max. CFL number for spatial advection.
   !      CFLTHMAX  R.A.  Public   Max. CFL number for refraction.
   !      CFLKMAX   R.A.  Public   Max. CFL number for wavenumber shift.
+  !      USVP      R.A.  Public   Stokes drift vertical profile
   !
   !    Orphans, commented out here, now automatic arrays in W3WAVE, ....
   !
