@@ -201,6 +201,10 @@ CONTAINS
     !     !/T0    Point info test output.
     !     !/T1    Wave heights at input/output points.
     !
+    ! ! Begin FCOO local
+    !     !/BD    2'nd b.c. file 'nestb.ww3' (DNK GEOMETOC Support)
+    ! ! End FCOO local
+    !
     ! 10. Source code :
     !
     !/ ------------------------------------------------------------------- /
@@ -235,6 +239,11 @@ CONTAINS
          IPBPO, ISBPO, XBPO, YBPO, RDBPO,            &
          ABPI0, ABPIN, ABPOS, FLBPI, FILER, FILEW,   &
          FILED, SPCONV, FNMPRE
+    ! Begin FCOO local
+    ! A 2'nd boundary file for a strait region may exist, 'nestb.ww3'.
+    ! Check NDS to set its file id NDSC
+    USE W3ODATMD, ONLY: NDS
+    ! End FCOO local
     USE W3GSRUMD
     !
     USE W3SERVMD, ONLY: EXTCDE
@@ -263,6 +272,20 @@ CONTAINS
     !/
     INTEGER                 :: IFILE, IERR, I, J, IX, IY, ISEA,     &
          IP, ISP, NPTS, ISOUT, IS, IGRD
+    ! Begin FCOO local
+    ! A 2'nd boundary file for a strait region may exist named 'nestb.ww3'
+    ! Number of spectra to interpolate to from each boundary file.
+    INTEGER                 :: NBIA, NBIB
+    ! NDSC: Id. of 2'nd boundary file
+    ! NBI2B: Number of spectra in 2'nd boundary file.
+    INTEGER, SAVE           :: NDSC, NBI2B
+    LOGICAL, SAVE           :: BDYB
+    ! Dimension parameters for the 2'nd b.c.
+    ! They must equal the parameters for the 1'st b.c. file
+    ! END FCOO local
+    INTEGER                 :: TIME2B(2)
+    INTEGER                 :: NKIB, NTHIB
+    REAL                    :: XFRIB, FR1IB, TH1IB
 #ifdef W3_T1
     INTEGER               :: IK, ITH
 #endif
@@ -329,6 +352,22 @@ CONTAINS
       OPEN (NDSB,FILE=FNMPRE(:J)//FILEN(:5+I),form='UNFORMATTED', convert=file_endian, &
            ERR=801,IOSTAT=IERR,STATUS='OLD')
     END IF
+    !
+    ! Begin FCOO local
+    ! CHA 20181005: Inquire existance of 2'nd boundary file
+    WRITE (FILEN,'(A6,A)') 'nestb.', FILEXT(:I)
+    INQUIRE(FILE=FNMPRE(:J)//FILEN(:6+I), EXIST=BDYB)
+    IF ( BDYB ) THEN
+      ! Check that NDSC is not in NDS(:)
+      NDSC = NDSB + 10
+      DO WHILE ( ANY( NDS == NDSC ) )
+        NDSC = NDSC + 9
+        WRITE (NDST, *) '    WARNING in w3iobc: NDSC ->', NDSC
+      END DO
+      OPEN (NDSC,FILE=FNMPRE(:J)//FILEN(:6+I),FORM='UNFORMATTED', &
+          ERR=801,IOSTAT=IERR,STATUS='OLD')
+    END IF
+    ! End FCOO local
     !
     IF ( INXOUT.EQ.'WRITE' .AND. FILEW ) THEN
       DO IFILE=1, NFBPO
@@ -438,6 +477,41 @@ CONTAINS
              WRITE (NDSE,902) VERTST, VERBPTBC
         CALL EXTCDE ( 11 )
       END IF
+      ! Begin FCOO local
+      ! If a 2'nd boundary conditions data set exists
+      IF ( BDYB ) THEN
+        NBIA = NBI
+        ! The spectra of the two b.c. data must have identical dimensions
+        READ (NDSC,ERR=803,IOSTAT=IERR)                             &
+              IDTST, VERTST, NKIB, NTHIB, XFRIB, FR1IB, TH1IB, NBIB
+!
+#ifdef W3_T
+        WRITE (NDST,9002) 1, NDSB, IDTST, VERTST, NBI
+#endif
+
+        IF ( NKIB .NE. NKI .OR. NTHIB .NE. NTHI .OR. XFRIB .NE. XFRI &
+             .OR. FR1IB .NE. FR1I .OR. TH1IB .NE. TH1I ) THEN
+          IF ( IAPROC .EQ. NAPERR )                               &
+            WRITE (NDSE,903) NKI,NTHI,XFRI,FR1I,TH1I,NKIB,NTHIB,XFRIB,FR1IB,TH1IB
+          CALL EXTCDE ( 311 )
+        END IF
+        IF ( IDTST .NE. IDSTRBC ) THEN
+          IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,901) IDTST, IDSTRBC
+          CALL EXTCDE ( 10 )
+        END IF
+        IF ( VERTST .NE. VERBPTBC ) THEN
+          IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,902) VERTST, VERBPTBC
+          CALL EXTCDE ( 411 )
+        END IF            
+      END IF
+      ! For the 2'nd boundary file: Prepare allocation of arrays
+      IF ( BDYB ) THEN
+        NBI = NBIA + NBIB
+#ifdef W3_T
+        WRITE (NDST,*) 'Number of b.c. positions:', NBIA, '+', NBIB
+#endif
+      END IF        
+      ! End FCOO local
       !
       ! Determines if the spectrum in nest file needs to be converted
       !
@@ -446,13 +520,32 @@ CONTAINS
            ABS(FR1I/FR1-1.).GT.0.01 .OR.                      &
            ABS(TH1I-TH(1)).GT.0.01*DTH
       !
+      ! Allocation of b.c. arrays:
       CALL W3DMO5 ( IGRD, NDSE, NDST, 1 )
       !
+      ! Begin FCOO local
+      IF ( BDYB ) NBI = NBIA
+      ! End FCOO local
       READ (NDSB,ERR=803,IOSTAT=IERR)                             &
            (XBPI(I),I=1,NBI), (YBPI(I),I=1,NBI),                   &
            ((IPBPI(I,J),I=1,NBI),J=1,4),                           &
            ((RDBPI(I,J),I=1,NBI),J=1,4)
       !
+      ! Begin FCOO local
+      IF ( BDYB ) THEN
+        NBI = NBIA + NBIB
+        READ (NDSC,ERR=803,IOSTAT=IERR)                             &
+             (XBPI(I),I=NBIA+1,NBI), (YBPI(I),I=NBIA+1,NBI),         &
+             ((IPBPI(I,J),I=NBIA+1,NBI),J=1,4),                      &
+             ((RDBPI(I,J),I=NBIA+1,NBI),J=1,4)
+#ifdef W3_T
+        WRITE (NDST,*) 'First boundary lon,lat index:', XBPI(1), YBPI(1)
+        WRITE (NDST,*) 'Last b.d. lon,lat index:', XBPI(NBI), YBPI(NBI)
+        WRITE (NDST,*) 'Read index and weights for outer spectra'
+#endif
+      END IF
+      !
+      ! End FCOO local
 #ifdef W3_RTD
       ! All boundary conditions position arrays XBPI, YBPI are defined
       ! in standard lat/lon coordinates. If Polat = 90. (and Polon = -180.),
@@ -548,6 +641,32 @@ CONTAINS
       !
       READ (NDSB,END=810,ERR=810) TIME2, NBI2
       BACKSPACE (NDSB)
+      ! Begin FCOO local
+      ! If 2'nd boundary file exists
+      IF ( BDYB ) THEN
+#ifdef W3_T
+        WRITE (NDST,*) NBI2, 'spectra to read from file', NDSB
+#endif
+        READ (NDSC,END=810,ERR=810) TIME2B, NBI2B
+#ifdef W3_T
+        WRITE (NDST,*) NBI2B, 'spectra to read from file', NDSC
+#endif
+        IF ( TIME2B(1) .NE. TIME2(1) .OR. TIME2B(2) .NE. TIME2(2) ) THEN
+          WRITE (NDSE,*) "Time mismatch between the two bdy files"
+          CALL EXTCDE ( 20 )
+        END IF
+        !
+        ! 2'nd boundary file, add NBI2 to spectra index
+        WHERE ( IPBPI(NBIA+1:NBI,:) > 0 )
+          IPBPI(NBIA+1:NBI,:) = IPBPI(NBIA+1:NBI,:) + NBI2
+        END WHERE
+        !
+        BACKSPACE (NDSC)
+        NBI2 = NBI2 + NBI2B
+      ELSE
+        NBI2B = 0
+      END IF          
+      ! End FCOO local          
 #ifdef W3_T
       WRITE (NDST,9012) NDSB, TIME2, NBI2
 #endif
@@ -589,6 +708,16 @@ CONTAINS
 #ifdef W3_T
       WRITE (NDST,9011) NDSB, TIME2, NBI2
 #endif
+      ! Begin FCOO local
+      NBI2B = 0   
+      ! If 2'nd boundary file exists
+      IF ( BDYB ) THEN
+        READ (NDSC,END=810,ERR=810) TIME2B, NBI2B
+#ifdef W3_T
+        WRITE (NDST,9011) NDSC, TIME2B, NBI2B
+#endif
+      END IF
+    ! End FCOO local
     END IF
     !
     ! Spectra ------------------------------------------------------------ *
@@ -662,20 +791,47 @@ CONTAINS
     !
     IF ( INXOUT .EQ. 'READ' ) THEN
       !
+#ifdef W3_T
+      ! FCOO local
+      IF ( BDYB ) WRITE (NDST,*) 'Read', NBI2B, &
+           'bdy spectra from 2nd file id', NDSC
+#endif
       IF ( .NOT. SPCONV ) THEN
         DO IP=1, NBI2
           READ (NDSB,ERR=803,IOSTAT=IERR) ABPIN(:,IP)
         END DO
+        ! Begin FCOO local
+        ! If 2'nd boundary exists
+        IF ( BDYB ) THEN
+          DO IP=NBI2+1, NBI2+NBI2B
+            READ (NDSC,ERR=803,IOSTAT=IERR) ABPIN(:,IP)
+          END DO
+          NBI2 = NBI2 + NBI2B
+        END IF
+        ! End FCOO local
       ELSE
         !
         ! In this case the spectral resolution is not compatible and
         ! the spectrum TMPSPC in nest file must be re-gridded into ABPIN to fit the model run
         ! spectral conversion is done by W3CSPC in w3cspcmd.ftn
-        !
-        ALLOCATE ( TMPSPC(NKI*NTHI,NBI2) )
+        !        
+        ! FCOO local: add NBI2B
+        ALLOCATE ( TMPSPC(NKI*NTHI,NBI2+NBI2B) )
         DO IP=1, NBI2
           READ (NDSB,ERR=803,IOSTAT=IERR) TMPSPC(:,IP)
         END DO
+        ! Begin FCOO local
+        ! If 2'nd boundary exists
+        IF ( BDYB ) THEN
+#ifdef W3_T
+          WRITE (NDST,*) 'Regrid', NBI2B, 'bdy spectra from file id', NDSC
+#endif
+          DO IP=NBI2+1, NBI2+NBI2B
+            READ (NDSC,ERR=803,IOSTAT=IERR) TMPSPC(:,IP)
+          END DO              
+          NBI2 = NBI2 + NBI2B
+        END IF
+        ! End FCOO local
         CALL W3CSPC ( TMPSPC     ,    NKI, NTHI, XFRI, FR1I, TH1I, &
              ABPIN(:,1:NBI2),NK,  NTH,  XFR,  FR1,  TH(1),&
              NBI2, NDST, NDSE, FACHFE )
@@ -772,7 +928,11 @@ CONTAINS
 902 FORMAT (/' *** WAVEWATCH III ERROR IN W3IOBC :'/                &
          '     ILLEGAL VEROGR, READ : ',A/                      &
          '                   CHECK : ',A/)
-    !
+! FCOO local
+903 FORMAT (/' *** WAVEWATCH III ERROR IN W3IOBC :'/            &
+             '     Two bdy spectra differ, A : ',2I3,3F6.3/     &
+             '                             B : ',2I3,3F6.3/)
+!
 909 FORMAT (/' *** WAVEWATCH III ERROR IN W3IOBC :'/                &
          '     POINT',2I4,' NOT ACTIVE SEA POINT (',I1,')')
 910 FORMAT (/' *** WAVEWATCH III ERROR IN W3IOBC :'/                &

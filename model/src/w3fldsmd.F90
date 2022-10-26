@@ -1307,9 +1307,25 @@ CONTAINS
         !
         DTTST  = DSEC21 ( T0 , TFN )
 
+        
         ! Exit if the time is the first time and the field is not interpolated in time
-
-        IF ( .NOT.FLINTERP .AND. FLFRST .AND. DTTST .EQ. 0. ) EXIT
+        ! Modified in FCOO local branch:
+        ! IF ( .NOT.FLINTERP .AND. FLFRST .AND. DTTST .EQ. 0. ) EXIT
+        ! Begin FCOO local branch
+        ! The exit is avoided at FCOO because it would cause a discontinuity
+        ! at the hotstart time (at 'the first time'). Experiments with model
+        ! runs with no ice compared to runs with ice conc. == zero shows that
+        ! the results *differ*. This is not what we desire.
+        ! If an input time step was equal to the model hotstart time, and
+        ! the field is ice or water level, W3FLDG would return TTT=TIME0.
+        IF ( .NOT.FLINTERP .AND. FLFRST .AND. DTTST .EQ. 0. ) THEN
+          ! Issue a warning
+          IF (IAPROC.EQ.NAPERR ) &
+              WRITE (NDSE,*)' WARNING: An input timestep ', TTT,      &
+                  'is equal to model start time for input type', J,   &
+                  ' (ice or water level). Ignore that input step.'
+        END IF
+        ! End FCOO local branch
 
         ! Exit if the time of the input field is larger than the current time
 
