@@ -2256,9 +2256,6 @@ CONTAINS
     !
 #ifdef W3_OMPG
     !$OMP END PARALLEL DO
-#endif
-    !
-#ifdef W3_OMPG
     !$OMP PARALLEL DO PRIVATE(JSEA,ISEA,IX,IY)
 #endif
     !

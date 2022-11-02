@@ -1484,9 +1484,6 @@ CONTAINS
     INTEGER                 :: I, NLOW
 #ifdef W3_S
     INTEGER, SAVE           :: IENT = 0
-#endif
-    !/
-#ifdef W3_S
     CALL STRACE (IENT, 'W3NMOD')
 #endif
     !
@@ -1566,9 +1563,6 @@ CONTAINS
        , MARC, MBAC, MSPEC                &
 #endif
        )
-#ifdef W3_SMC
-    !!Li    A few dimensional numbers for SMC grid.
-#endif
     !/
     !/                  +-----------------------------------+
     !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -1669,9 +1663,6 @@ CONTAINS
 #endif
 #ifdef W3_S
     INTEGER, SAVE           :: IENT = 0
-#endif
-    !/
-#ifdef W3_S
     CALL STRACE (IENT, 'W3DIMX')
 #endif
     !
@@ -1767,9 +1758,6 @@ CONTAINS
          GRIDS(IMOD)%IJKUFc5(MUFc),     &
          GRIDS(IMOD)%IJKUFc6(MUFc),     &
          STAT=ISTAT)
-#endif
-    !
-#ifdef W3_SMC
     !! Arctic part related variables, declare minimum 1 element.
     IARC = MARC
     IF( MARC .LE. 1 ) IARC = 1
@@ -1783,9 +1771,6 @@ CONTAINS
          GRIDS(IMOD)%ISMCBP(IBSMC),      &
          STAT=ISTAT                      )
     CHECK_ALLOC_STATUS ( ISTAT )
-#endif
-    !
-#ifdef W3_SMC
     !! All SMC grid related varialbes are initialised in case SMC
     !! switch is selected but SMCTYPE is not used.  JGLi08Mar2021
     GRIDS(IMOD)%NLvCel(:) = 0
@@ -1814,14 +1799,10 @@ CONTAINS
          GRIDS(IMOD)%REFPARS(10), &
          STAT=ISTAT               )
     CHECK_ALLOC_STATUS ( ISTAT )
-#endif
     !
-#ifdef W3_REF1
     GRIDS(IMOD)%RREF(:)=.FALSE.
     GRIDS(IMOD)%REFPARS(:)=0.
-#endif
     !
-#ifdef W3_REF1
     ! Memory footprint can be reduced by defining REFLC and REFLD only over nodes
     ! where reflection can occur.
     ALLOCATE ( GRIDS(IMOD)%REFLC(4,0:NSEA), &
@@ -2012,9 +1993,6 @@ CONTAINS
 #endif
 #ifdef W3_S
     INTEGER, SAVE           :: IENT = 0
-#endif
-    !/
-#ifdef W3_S
     CALL STRACE (IENT, 'W3DIMS')
 #endif
     !
@@ -2242,9 +2220,6 @@ CONTAINS
     !/
 #ifdef W3_S
     INTEGER, SAVE           :: IENT = 0
-#endif
-    !/
-#ifdef W3_S
     CALL STRACE (IENT, 'W3SETG')
 #endif
     !
@@ -2291,9 +2266,6 @@ CONTAINS
     NVFc   => GRIDS(IMOD)%NVFc
     NRLv   => GRIDS(IMOD)%NRLv
     MRFct  => GRIDS(IMOD)%MRFct
-#endif
-    !
-#ifdef W3_SMC
     NGLO   => GRIDS(IMOD)%NGLO
     NARC   => GRIDS(IMOD)%NARC
     NBGL   => GRIDS(IMOD)%NBGL
@@ -2310,12 +2282,10 @@ CONTAINS
     USXF   => GRIDS(IMOD)%USXF
     OXT   => GRIDS(IMOD)%OXT
     OXF   => GRIDS(IMOD)%OXF
+    FFACBERG => GRIDS(IMOD)%FFACBERG
 #ifdef W3_REF1
     REFLC  => GRIDS(IMOD)%REFLC
     REFLD  => GRIDS(IMOD)%REFLD
-#endif
-    FFACBERG => GRIDS(IMOD)%FFACBERG
-#ifdef W3_REF1
     RREF   => GRIDS(IMOD)%RREF
     REFPARS=> GRIDS(IMOD)%REFPARS
 #endif
@@ -2479,10 +2449,6 @@ CONTAINS
       IJKVFc6 => GRIDS(IMOD)%IJKVFc6
       IJKUFc5 => GRIDS(IMOD)%IJKUFc5
       IJKUFc6 => GRIDS(IMOD)%IJKUFc6
-
-#endif
-      !
-#ifdef W3_SMC
       ICLBAC => GRIDS(IMOD)%ICLBAC
       ANGARC => GRIDS(IMOD)%ANGARC
       SPCBAC => GRIDS(IMOD)%SPCBAC
@@ -2961,9 +2927,6 @@ CONTAINS
     REAL   , ALLOCATABLE :: COSA(:,:)
 #ifdef W3_S
     INTEGER, SAVE      :: IENT = 0
-#endif
-    !/
-#ifdef W3_S
     CALL STRACE (IENT, 'W3GNTX')
 #endif
     !
@@ -3193,9 +3156,6 @@ CONTAINS
     !/
 #ifdef W3_S
     INTEGER, SAVE           :: IENT = 0
-#endif
-    !/
-#ifdef W3_S
     CALL STRACE (IENT, 'W3DIMUG')
 #endif
     !
@@ -3383,9 +3343,7 @@ CONTAINS
     IF (REFPARS(2).GT.0) RREF(2)=.TRUE.
     IF (REFPARS(3).GT.0) RREF(3)=.TRUE.
     IF (REFPARS(4).GT.0) RREF(4)=.TRUE.
-#endif
     !
-#ifdef W3_REF1
     DO IY=2, NY-1
       DO IX=2, NX-1
         IF (REFPARS(1).GT.0) RREF(1)=.TRUE.
@@ -3494,14 +3452,6 @@ CONTAINS
               IF (J.GT.0) THEN
                 IF (J.GT.1) REFLD(2,MAPFS(IY,IX))= 1
                 THAVG=ATAN2(SINAVG,COSAVG)
-#endif
-#if defined(TEST_W3GDATMD) || defined(TEST_W3GDATMD_W3SETREF)
-#ifdef W3_REF1
-                !WRITE (6,*) 'COASTAL REFLECTION:',IX,IY,   &
-                !SINAVG,COSAVG,THAVG/TPI,NINT(THAVG/TPI*NTH),MOD(NTH+NINT(THAVG/TPI*NTH),NTH)
-#endif
-#endif
-#ifdef W3_REF1
                 REFLD(1,MAPFS(IY,IX))=1+MOD(NTH+NINT(THAVG/TPI*NTH),NTH)
               ELSE
 
