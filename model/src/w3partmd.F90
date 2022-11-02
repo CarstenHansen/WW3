@@ -1381,7 +1381,19 @@ CONTAINS
       SUME1(IP) = SUME1(IP) + SUMF (NK,IP) * SIG(NK) * FTEII * (0.3333 / 0.25)
       SUME2(IP) = SUME2(IP) + SUMF (NK,IP) * SIG(NK)**2 * FTEII * (0.5 / 0.25)
       SUMEM1(IP) = SUMEM1(IP) + SUMF (NK,IP) / SIG(NK) * FTEII * (0.2 / 0.25)
-      SUMQP(IP) = SUMQP(IP) + SUMF (NK,IP) * FTEII
+      ! SUMQP(IP) = SUMQP(IP) + SUMF (NK,IP) * FTEII
+      ! C Hansen: The line above was a bug.
+      ! The omnidirectional spectral tail decaying as freq^-5 is written
+      ! S(SIG) = B SIG^{-5}
+      ! At NK the spectrum is S(SIG(NK)) = SUMF(NK) * DTH / TPI
+      ! The tail contribution to SUMQP is derived from matching at NK:
+      ! SUMQP_tail = int_SIG(NK)^inf SIG S(SIG)^2 DSIG / DTH * TPI
+      !            = int_SIG(NK)^inf B^2 SIG^-9 DSIG / DTH * TPI
+      !            = 1/8 B^2 SIG(NK)^-8 / DTH * TPI
+      !            = 1/8 SUMF(NK)^2 SIG(NK)^10 (DTH/TPI)^2 SIG(NK)^-8 / DTH * TPI
+      !            = 1/8 SUMF(NK)^2 SIG(NK)^2 DTH/TPI
+      ! With FTE = 0.25 * SIG(NK)^2 * DTH (subroutine W3GRID), we have:
+      SUMQP(IP) = SUMQP(IP) + SUMF(NK,IP)**2 * FTE * 0.5 / TPI
       SUMEW(IP) = SUMEW(IP) + SUMFW(NK,IP) * FTEII
       SUMEX(IP) = SUMEX(IP) + SUMFX(NK,IP) * FTEII
       SUMEY(IP) = SUMEY(IP) + SUMFY(NK,IP) * FTEII

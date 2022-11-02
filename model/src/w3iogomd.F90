@@ -74,6 +74,8 @@ MODULE W3IOGOMD
   !/    22-Mar-2021 : Add extra coupling fields as output ( version 7.13 )
   !/    21-Jul-2022 : Correct FP0 calc for peak energy in ( version 7.14 )
   !/                  min/max freq band (B. Pouliot, CMC)
+  !/    02-Nov-2022 : Correct the calculations of Goda QP ( version 7.XX )
+  !/                  (C Hansen)
   !/
   !/    Copyright 2009-2014 National Weather Service (NWS),
   !/       National Oceanic and Atmospheric Administration.  All rights
@@ -1541,7 +1543,13 @@ CONTAINS
         EWN(JSEA)  = EWN(JSEA) + EBD(IK,JSEA) / WN(IK,ISEA)
         ETR(JSEA)  = ETR(JSEA) + EBD(IK,JSEA) / SIG(IK)
         ET1(JSEA)  = ET1(JSEA) + EBD(IK,JSEA) * SIG(IK)
-        EET1(JSEA) = EET1(JSEA)+ EBD(IK,JSEA)**2 * SIG(IK)
+        ! EET1(JSEA) = EET1(JSEA)+ EBD(IK,JSEA)**2 * SIG(IK)
+        ! C Hansen: The above numerator in Goda's peakedness was wrong
+        ! With S(SIG) the omnidirectional frequency spectrum, the numerator
+        ! is approximated numerically as:
+        ! EET1(JSEA) = EET1(JSEA) + SIG(IK) * S(SIG)^2  * DSII(IK)
+        ! With EBD(IK,JSEA) = S(SIG) * DSII(IK) we have:
+        EET1(JSEA) = EET1(JSEA) + EBD(IK,JSEA)**2 * SIG(IK) / DSII(IK)
         ET02(JSEA) = ET02(JSEA)+ EBD(IK,JSEA) * SIG(IK)**2
         ETX(JSEA)  = ETX(JSEA) + ABX(JSEA) * FACTOR
         ETY(JSEA)  = ETY(JSEA) + ABY(JSEA) * FACTOR
@@ -1938,7 +1946,17 @@ CONTAINS
       ETF(JSEA) = ETF(JSEA) + GRAV * FTTR * EBAND  ! this is the integral of CgE in deep water
       ETR(JSEA) = ETR(JSEA) + FTTR * EBAND
       ET1(JSEA) = ET1(JSEA) + FT1  * EBAND
-      EET1(JSEA)= ET1(JSEA) + FT1  * EBAND**2
+      ! EET1(JSEA)= ET1(JSEA) + FT1  * EBAND**2
+      ! C Hansen: The line above was a bug (with FT1 = SIG(NK)**3 * DTH / 3 )
+      ! Assume an omnidirectional tail decaying as freq^-5: S(SIG) = B SIG^{-5}
+      ! Then the tail to add is
+      ! EET1_tail = B^2 * SIG(NK)^{-8} / 8
+      ! Match the tail with the prognostic band at NK,
+      ! B SIG^{-5} = EBAND * DTH, then
+      ! EET1_tail = EBAND^2 * DTH^2 * SIG(NK)^2 / 8
+      ! With FTE = 0.25 * SIG(NK)^2 * DTH (subroutine W3GRID),
+      ! EET1_tail = EBAND^2 * FTE * DTH * 0.5:
+      EET1(JSEA)= EET1(JSEA)+ EBAND**2 * FTE * DTH * 0.5
       ET02(JSEA)= ET02(JSEA)+ EBAND* 0.5 * SIG(NK)**4 * DTH
       ETX(JSEA) = ETX(JSEA) + FTE * ABX(JSEA) / CG(NK,ISEA)
       ETY(JSEA) = ETY(JSEA) + FTE * ABY(JSEA) / CG(NK,ISEA)
@@ -1980,7 +1998,9 @@ CONTAINS
         END IF
 #endif
         IF ( ET(JSEA) .GT. 1.E-7 ) THEN
-          QP(JSEA) = ( 2. / ET(JSEA)**2 ) * EET1(JSEA) * TPIINV**2
+          ! QP(JSEA) = ( 2. / ET(JSEA)**2 ) * EET1(JSEA) * TPIINV**2
+          ! C Hansen: The line above was a bug (QP is dimensionless). Changed to:
+          QP(JSEA) = ( 2. / ET(JSEA)**2 ) * EET1(JSEA)
           WLM(JSEA) = EWN(JSEA) / ET(JSEA) * TPI
           T0M1(JSEA) = ETR(JSEA) / ET(JSEA) * TPI
           THS(JSEA) = RADE * SQRT ( MAX ( 0. , 2. * ( 1. - SQRT ( &
