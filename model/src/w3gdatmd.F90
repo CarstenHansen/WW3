@@ -698,8 +698,10 @@ MODULE W3GDATMD
     INTEGER          :: E3DF(3,5), P2MSF(3), US3DF(3), USSPF(2) ! freq. indices for 3D output
     REAL             :: USSP_WN(25) !Max set to 25 decay scales.
     !
-    CHARACTER(LEN=4) :: USXT ! Spectral tail to add for Stokes drift
-    REAL             :: USXF ! High frequency cutoff (Hz) for Stokes drift
+    ! Spectral tails to add for omnidirectional spectral moments or Stokes drift
+    CHARACTER(LEN=4) :: OXT, USXT
+    ! High frequency cutoff (Hz) for omnidir. spectral moments or Stokes drift
+    REAL             :: OXF, USXF
     !
     TYPE(T_GSU) :: GSU ! Grid search utility object
     !
@@ -1079,8 +1081,8 @@ MODULE W3GDATMD
   INTEGER, POINTER        :: NX, NY, NSEA, NSEAL, TRFLAG
   INTEGER, POINTER        :: E3DF(:,:), P2MSF(:), US3DF(:), USSPF(:)
   REAL,    POINTER        :: USSP_WN(:)
-  CHARACTER(LEN=4), POINTER :: USXT
-  REAL,    POINTER          :: USXF
+  CHARACTER(LEN=4), POINTER :: OXT, USXT
+  REAL,    POINTER          :: OXF, USXF
 #ifdef W3_REF1
   REAL,    POINTER        :: REFLC(:,:)
   INTEGER, POINTER        :: REFLD(:,:)
@@ -2306,6 +2308,8 @@ CONTAINS
     USSP_WN => GRIDS(IMOD)%USSP_WN
     USXT   => GRIDS(IMOD)%USXT
     USXF   => GRIDS(IMOD)%USXF
+    OXT   => GRIDS(IMOD)%OXT
+    OXF   => GRIDS(IMOD)%OXF
 #ifdef W3_REF1
     REFLC  => GRIDS(IMOD)%REFLC
     REFLD  => GRIDS(IMOD)%REFLD

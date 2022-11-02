@@ -1324,7 +1324,7 @@ CONTAINS
     ! 3.  Spectral integrals and preps
     ! 3.a Integrals
     !     NOTE: Factor DTH only used in Hs computation.
-    !
+    !    
     DO IK=1, NK
       DO ITH=1, NTH
         ISP    = IK + (ITH-1)*NK
@@ -1379,12 +1379,15 @@ CONTAINS
       !     the form used in w3iogomd and scaling should be
       !     based on the relationship between FTE and FT1, FTTR etc.
       !     as per w3iogomd and ww3_grid
+      !
       FTEII = FTE / (DTH * SIG(NK))
       SUME (IP) = SUME (IP) + SUMF (NK,IP) * FTEII
       SUME1(IP) = SUME1(IP) + SUMF (NK,IP) * SIG(NK) * FTEII * (0.3333 / 0.25)
       SUME2(IP) = SUME2(IP) + SUMF (NK,IP) * SIG(NK)**2 * FTEII * (0.5 / 0.25)
       SUMEM1(IP) = SUMEM1(IP) + SUMF (NK,IP) / SIG(NK) * FTEII * (0.2 / 0.25)
-      SUMQP(IP) = SUMQP(IP) + SUMF (NK,IP) * FTEII
+      ! SUMQP(IP) = SUMQP(IP) + SUMF (NK,IP) * FTEII
+      ! C Hansen: The line above was a bug (bug fix bf_qp). Changed to:
+      SUMQP(IP) = SUMQP(IP) + SUMF(NK,IP)**2 * FTE * 0.5 / TPI
       SUMEW(IP) = SUMEW(IP) + SUMFW(NK,IP) * FTEII
       SUMEX(IP) = SUMEX(IP) + SUMFX(NK,IP) * FTEII
       SUMEY(IP) = SUMEY(IP) + SUMFY(NK,IP) * FTEII

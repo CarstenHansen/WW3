@@ -643,8 +643,8 @@ MODULE W3GRIDMD
   ! STK_WN are the decays for Stokes drift partitions
   REAL                    :: STK_WN(25)
 
-  CHARACTER(LEN=4)        :: USXTT
-  REAL                    :: USXFM
+  CHARACTER(LEN=4)        :: OXTT, USXTT
+  REAL                    :: OXFM, USXFM
   !
 #ifdef W3_LN1
   REAL                    :: CLIN, RFPM, RFHF
@@ -1105,7 +1105,7 @@ MODULE W3GRIDMD
        STH1MF, I1STH1M, I2STH1M,                &
        TH2MF, I1TH2M, I2TH2M,                   &
        STH2MF, I1STH2M, I2STH2M
-  NAMELIST /XSTP/ USXTT, USXFM
+  NAMELIST /XSTP/ OXTT, OXFM, USXTT, USXFM
 #ifdef W3_IS1
   NAMELIST /SIS1/ ISC1, ISC2
 #endif
@@ -2757,14 +2757,19 @@ CONTAINS
 
     ! Parametric spectral tails to add for integral parameters
     ! Mean Stokes drift (projected on the mean direction)
-    USXTT='none' ! Tail type USXT (C*4)
+    USXTT = 'none' ! Tail type USXT (C*4)
+    ! Omnidirectional added tail
+    OXTT = 'Of-5'
     ! Implemented values:
-    ! USXT='none': Cut-off at NK.
+    ! USXT='none': Default cut-off at NK.
     ! USXT='Pf-5': Spectrum of Stokes drift with a SIG^{-2} tail as for a
     !              variance spectrum with a Phillips (1958) freq^{-5} tail
     !              and a constant directional spread.
-    USXFM=10     ! Cut-off frequency USXF (Real) (Hz).
-    ! USXF>=10Hz means integration to infinity.
+    ! OXT='Of-5': Default omnidirectional SIG^{-5} tail
+    ! OXT='Of-4': Omnidirectional SIG^{-4} tail
+    USXFM = 10.     ! Cut-off frequency USXF (Real) (Hz).
+    OXFM = 10.      ! Cut-off frequency OXF (Real) (Hz).
+    ! OXFM, USXFM>=10Hz means integration to infinity.
     !
     FACBERG=1.
 #ifdef W3_IS0
@@ -2994,13 +2999,23 @@ CONTAINS
     ! Stokes drift
     USXT = USXTT
     USXF = MAX ( USXFM, SIG(NK)/TPI )
-    WRITE (NDSO,4851) USXT
-    WRITE (NDSO,4852) USXF
+    WRITE (NDSO,4851) 'USXTT', USXT
+    WRITE (NDSO,4852) 'USXTT', USXF
     IF ( USXT .NE. 'none' .AND. USXT .NE. 'Pf-5' ) THEN
        WRITE(NDSE,1055) 'USXTT', USXT
        CALL EXTCDE ( 41 )
     ENDIF
-    IF ( USXF .GT. USXFM) WRITE (NDSO,4853) USXFM
+    IF ( USXF .GT. USXFM) WRITE (NDSO,4853) 'USXTT', USXFM
+    ! T02
+    OXT = OXTT
+    OXF = MAX ( OXFM, SIG(NK)/TPI )
+    WRITE (NDSO,4851) 'OXTT', OXT
+    WRITE (NDSO,4852) 'OXTT', OXF
+    IF ( OXT .NE. 'Of-5'  .AND. OXT .NE. 'Of-4') THEN
+       WRITE(NDSE,1055) 'OXTT', OXT
+       CALL EXTCDE ( 41 )
+    ENDIF
+    IF ( OXF .GT. OXFM) WRITE (NDSO,4853) 'OXTT', OXFM
     !
     CALL READNL ( NDSS, 'MISC', STATUS )
     WRITE (NDSO,960) STATUS
@@ -3348,6 +3363,7 @@ CONTAINS
            STH2MF, I1STH2M, I2STH2M
       !
       WRITE (NDSO,2853)    USXT, USXF    
+      WRITE (NDSO,2853)    OXT, OXF    
       !
 #ifdef W3_REF1
       WRITE(NDSO,2986) REFCOAST, REFFREQ, REFSLOPE, REFMAP,  &
@@ -6763,12 +6779,12 @@ CONTAINS
 4973 FORMAT ( '       Frequency spectrum          :',3I4)
 4974 FORMAT ( '       Partions of Uss             :',2I4)
 4975 FORMAT ( '       Partition wavenumber #',I2,'   : ',1F6.3)
-
+    !
 4850 FORMAT (/'  Spectral tail to add for integral parameters ', A/   &
               ' --------------------------------------------------')
-4851 FORMAT ( ' Tail type for mean Stokes drift               :', A)
-4852 FORMAT ( ' High frequency cutoff (Hz) for Stokes drift   :', F6.3)
-4853 FORMAT ( ' Warning: USXF = SIG(NK)*2pi > USXFM =', F6.3)
+4851 FORMAT ( ' Tail type for                  ',A8/, '   :', A)
+4852 FORMAT ( ' High frequency cutoff (Hz) for ',A8/, '   :', F6.3)
+4853 FORMAT ( ' Warning: Namelist ', A8/, '=', F6.3, 'raised to SIG(NK)*2pi')
     !
 4980 FORMAT (/'  Coastal / iceberg reflection  ',A/                   &
          ' --------------------------------------------------')

@@ -1354,7 +1354,9 @@ CONTAINS
          WL02X(NSEAL), WL02Y(NSEAL),          &
          ALPXT(NSEAL), ALPYT(NSEAL),          &
          ALPXY(NSEAL), SCREST(NSEAL)
-    REAL                       USSCO, FT1
+    REAL                    ::  USSCO
+    REAL                    :: FTE_5, FTWL_5, FTTR_5, FT1_5,  FT02_5,  &
+         FTE_4,  FTWL_4, FTTR_4, FT1_4, FT02_4
     REAL, SAVE              :: HSMIN = 0.01
     LOGICAL                 :: FLOLOC(NOGRP,NGRPP)
     !/
@@ -1372,7 +1374,6 @@ CONTAINS
     !
     FXPMC  = 0.66 * GRAV / 28.
     HSMIN  = HSMIN
-    FT1    =  0.3333 * SIG(NK)**2 * DTH * SIG(NK)
     !
     ! 1.  Initialize storage arrays -------------------------------------- *
     !
@@ -1541,7 +1542,9 @@ CONTAINS
         EWN(JSEA)  = EWN(JSEA) + EBD(IK,JSEA) / WN(IK,ISEA)
         ETR(JSEA)  = ETR(JSEA) + EBD(IK,JSEA) / SIG(IK)
         ET1(JSEA)  = ET1(JSEA) + EBD(IK,JSEA) * SIG(IK)
-        EET1(JSEA) = EET1(JSEA)+ EBD(IK,JSEA)**2 * SIG(IK)
+        ! EET1(JSEA) = EET1(JSEA)+ EBD(IK,JSEA)**2 * SIG(IK)
+        ! C Hansen: The line above was a bug (bug fix bf_qp). Changed to:
+        EET1(JSEA) = EET1(JSEA) + EBD(IK,JSEA)**2 * SIG(IK) / DSII(IK)
         ET02(JSEA) = ET02(JSEA)+ EBD(IK,JSEA) * SIG(IK)**2
         ETX(JSEA)  = ETX(JSEA) + ABX(JSEA) * FACTOR
         ETY(JSEA)  = ETY(JSEA) + ABY(JSEA) * FACTOR
@@ -1914,6 +1917,61 @@ CONTAINS
     !$OMP PARALLEL DO PRIVATE(JSEA,ISEA,EBAND)
 #endif
     !
+
+    ! 
+
+    ! Prepare factors for adding tail to omnidirectional spectra
+
+    ! For an omnidirectional spectrum that has a SIG^{-5} tail (default):
+    FT1_5    =  0.3333 * SIG(NK)**2 * DTH * SIG(NK)
+    FT02_5    = 0.5 * SIG(NK)**4 * DTH
+    ! ( FTE, FTWL, and FTTR are set in w3gridmd for the mod_def file: )    
+    
+    ! For an omnidirectional spectrum that has a SIG^{-4} tail
+    IF ( OXT .EQ. 'Of-4') THEN
+      ! Example, ET: int_SIG(NK)^inf A SIG^-4 DSIG = A SIG(NK)^-3 / 3.
+      FTE_4   = FTE  * 4./3.
+      FTWL_4  = FTWL * 6./5.
+      FTTR_4  = FTTR * 5./4.
+      FT1_4   = FT1_5  * 3./2.
+      FT02_4  = FT02_5 * 2.
+    ELSE
+      ! For a default SIG^{-5} tail
+      FTE_5 = FTE
+      FTWL_5 = FTWL
+      FTTR_5 = FTTR
+    END IF
+
+    IF ( OXF .LT. 10.0 ) THEN
+      ! Omni-directional high-freq cut-off at OXF
+      ! Cut-off inside the prognostic range is not implemented
+      IF ( OXF .LT. SIG(NK)/TPI ) OXF = SIG(NK)/TPI
+      
+      ! Example for an omnidirectional spectrum A SIG^-4 and cutoff XS=OXF*TPI:
+      ! ET_cutoff = int_XS^inf A SIG^-4 DSIG = A / ( OXF * TPI )^3 / 3
+      ! Match with EBAND at NK: A = EBAND * SIG(NK)^5 * DTH
+      ! => ET_cutoff = EBAND * SIG(NK)^5 / 3 * DTH / ( OXF * TPI )^3
+      !    ET_cutoff = EBAND * FTE_4 * SIG(NK)^3 / ( OXF * TPI )^3
+      ! Similarly for an omnidirectional spectrum B SIG^-5:
+      !    ET_cutoff = EBAND * FTE * SIG(NK)^3 / ( OXF * TPI )^3
+
+      ! For an omnidirectional spectrum that has a SIG^{-4} tail
+      IF ( OXT .EQ. 'Of-4') THEN
+        FTE_4   = FTE_4  * ( 1 - ( SIG(NK)/OXF/TPI )**3 )
+        FTWL_4  = FTWL_4 * ( 1 - ( OXF*TPI/SIG(NK) )**2 )
+        FTTR_4  = FTTR_4 * ( 1 -   OXF*TPI/SIG(NK)      )
+        FT1_4   = FT1_4  * ( 1 - ( SIG(NK)/OXF/TPI )**2 )
+        FT02_4  = FT02_4 * ( 1 -   SIG(NK)/OXF/TPI      )
+      ELSE
+        ! For a default SIG^{-5} tail
+        FTE_5   = FTE_5    * ( 1 - ( SIG(NK)/OXF/TPI )**3 )
+        FTWL_5  = FTWL_5   * ( 1 - ( OXF*TPI/SIG(NK) )**2 )
+        FTTR_5  = FTTR_5   * ( 1 -   OXF*TPI/SIG(NK)      )
+        FT1_5   = FT1_5    * ( 1 - ( SIG(NK)/OXF/TPI )**2 )
+        FT02_5  = FT02_5   * ( 1 -   SIG(NK)/OXF/TPI      )         
+      END IF
+    END IF
+      
     DO JSEA=1, NSEAL
       CALL INIT_GET_ISEA(ISEA, JSEA)
       !
@@ -1931,15 +1989,31 @@ CONTAINS
       !
       ! 3.b Add tail
       !     ( DTH * SIG absorbed in FTxx )
-
+      
       EBAND     = AB(JSEA) / CG(NK,ISEA)
-      ET (JSEA) = ET (JSEA) + FTE  * EBAND
-      EWN(JSEA) = EWN(JSEA) + FTWL * EBAND
-      ETF(JSEA) = ETF(JSEA) + GRAV * FTTR * EBAND  ! this is the integral of CgE in deep water
-      ETR(JSEA) = ETR(JSEA) + FTTR * EBAND
-      ET1(JSEA) = ET1(JSEA) + FT1  * EBAND
-      EET1(JSEA)= ET1(JSEA) + FT1  * EBAND**2
-      ET02(JSEA)= ET02(JSEA)+ EBAND* 0.5 * SIG(NK)**4 * DTH
+      IF ( OXT .EQ. 'Of-4' ) THEN
+        ! Assume the omnidirectional spectrum has a SIG^{-4} tail
+        ET (JSEA) = ET (JSEA) + FTE_4  * EBAND
+        EWN(JSEA) = EWN(JSEA) + FTWL_4 * EBAND
+        ETF(JSEA) = ETF(JSEA) + GRAV * FTTR_4 * EBAND
+        ETR(JSEA) = ETR(JSEA) + FTTR_4 * EBAND
+        ET1(JSEA) = ET1(JSEA) + FT1_4  * EBAND
+        ET02(JSEA) = ET1(JSEA) + FT02_4 * EBAND
+      ELSE
+        ! Assume the default SIG^{-5} tail
+        ET (JSEA) = ET (JSEA) + FTE_5  * EBAND
+        EWN(JSEA) = EWN(JSEA) + FTWL_5 * EBAND
+        ETF(JSEA) = ETF(JSEA) + GRAV * FTTR_5 * EBAND  ! this is the integral of CgE in deep water
+        ETR(JSEA) = ETR(JSEA) + FTTR_5 * EBAND
+        ET1(JSEA) = ET1(JSEA) + FT1_5  * EBAND
+        ET02(JSEA) = ET1(JSEA) + FT02_5 * EBAND
+      END IF
+
+      ! EET1(JSEA)= ET1(JSEA) + FT1  * EBAND**2
+      ! C Hansen: The line above was a bug (bug fix bf_qp)
+      ! For an omnidirectional tail decaying as freq^-5:
+      EET1(JSEA) = EET1(JSEA) + EBAND**2 * FTE * DTH * 0.5
+      
       ETX(JSEA) = ETX(JSEA) + FTE * ABX(JSEA) / CG(NK,ISEA)
       ETY(JSEA) = ETY(JSEA) + FTE * ABY(JSEA) / CG(NK,ISEA)
       SXX(JSEA) = SXX(JSEA) + FTE * ABXX(JSEA) / CG(NK,ISEA)
@@ -1947,7 +2021,7 @@ CONTAINS
       SXY(JSEA) = SXY(JSEA) + FTE * ABXY(JSEA) / CG(NK,ISEA)
       !
       ! Tail for surface Stokes drift: very sensitive to tail power
-      IF ( USXT .EQ. 'Pf-5' ) THEN
+      IF ( USXT .EQ. 'Pf-5' .AND. USXF .GT. SIG(NK)/TPI ) THEN
         ! Assume the spectrum of mean Stokes drift has a SIG^{-2} tail
         USSX(JSEA)  = USSX(JSEA) + 2*GRAV*ETUSCX(JSEA)/SIG(NK)
         USSY(JSEA)  = USSY(JSEA) + 2*GRAV*ETUSCY(JSEA)/SIG(NK)
@@ -1988,7 +2062,9 @@ CONTAINS
         END IF
 #endif
         IF ( ET(JSEA) .GT. 1.E-7 ) THEN
-          QP(JSEA) = ( 2. / ET(JSEA)**2 ) * EET1(JSEA) * TPIINV**2
+          ! QP(JSEA) = ( 2. / ET(JSEA)**2 ) * EET1(JSEA) * TPIINV**2
+          ! C Hansen: The line above was a bug (bug fix bf_qp). Changed to:
+          QP(JSEA) = ( 2. / ET(JSEA)**2 ) * EET1(JSEA)
           WLM(JSEA) = EWN(JSEA) / ET(JSEA) * TPI
           T0M1(JSEA) = ETR(JSEA) / ET(JSEA) * TPI
           THS(JSEA) = RADE * SQRT ( MAX ( 0. , 2. * ( 1. - SQRT ( &
