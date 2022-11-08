@@ -1,0 +1,24 @@
+$
+$ Added 20210101:
+   -23.110   65.253  'Flateyjard' $ Flateyjardufl
+$ 9 Iceland stations
+   -20.345   63.286  'Surtseyjar' $ Surtseyjardufl
+   -22.461   63.813  'Grindaviku' $ Grindavikurdufl
+   -22.877   64.052  'Gardskagad' $ Gardskagadufl
+   -15.189   64.197  'Hornafjard' $ Hornafjardardufl
+   -13.627   65.648  'Kogurdufl ' $ Kogurdufl
+   -24.778   65.698  'Blakksnes ' $ Blakksnes
+   -21.138   65.770  'Drangsnes ' $ Drangsnes
+   -18.192   66.292  'Grimseyjar' $ Grimseyjarsund
+   -23.367   66.438  'Straumnesd' $ Straumnesdufl
+$ Virtual Navigation stations
+   -37.0     60.3    'DanmaStr01'
+   -31.23    60.31   'DanmaStr02'
+   -44.0     59.5    'CapeFare_1'
+$ 12 nmi off Greenland Harbours 
+   -50.2     59.85   'Paamiut_1 '
+   -52.5     63.95   'Nuuk_1    '
+   -54.5     66.9    'Sisimiut_1'
+   -54.3     68.6    'Aasiaat_1 '
+   -37.6     65.25   'Tasiilaq_1'
+$

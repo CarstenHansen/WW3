@@ -15,8 +15,8 @@
 ! -------------------------------------------------------------------- !
 &SPECTRUM_NML
   SPECTRUM%XFR       =  1.1
-  SPECTRUM%FREQ1     =  0.030938
-  SPECTRUM%NK        =  31
+  SPECTRUM%FREQ1     =  0.0452967
+  SPECTRUM%NK        =  34
   SPECTRUM%NTH       =  36
 /
 
@@ -135,13 +135,13 @@
 !     GRID%DMIN             = 0.        ! abs. minimum water depth (m)
 ! -------------------------------------------------------------------- !
 &GRID_NML
-  GRID%NAME         =  'NWS9 (European N-W Shelf)'
-  GRID%NML          =  '../setup/namelists_NWS9.nml'
+  GRID%NAME         =  'BAL3 (Baltic Sea 3nmi)'
+  GRID%NML          =  '../setup/namelists_BAL3.nml'
   GRID%TYPE         =  'RECT'
   GRID%COORD        =  'SPHE'
   GRID%CLOS         =  'NONE'
   GRID%ZLIM         =  0.0
-  GRID%DMIN         =  2.5
+  GRID%DMIN         =  0.5
 /
 
 ! -------------------------------------------------------------------- !
@@ -171,13 +171,13 @@
 !     RECT%SF0              = 1.       ! scaling division factor for x0,y0 coord
 ! -------------------------------------------------------------------- !
 &RECT_NML
-  RECT%NX           =  99
-  RECT%NY           =  130
-  RECT%SX           =  250.
-  RECT%SY           =  150.
+  RECT%NX           =  247
+  RECT%NY           =  239
+  RECT%SX           =  83.33333
+  RECT%SY           =  50.
   RECT%SF           =  1000.
-  RECT%X0           =  -12.15278
-  RECT%Y0           =  46.491667
+  RECT%X0           =  9.51389
+  RECT%Y0           =  53.89167
   RECT%SF0          =  1.
 /
 
@@ -319,24 +319,6 @@
 !INBND_POINT(2) = 2 11 T
 !/
 !
-&INBND_COUNT_NML
-INBND_COUNT%N_POINT = 6     
-!
-!   Saint-Gilles-Croix-de-Vie - South-West grid corner -
-!   - North-West grid corner - Vega (Norge)
-!
-/
-&INBND_POINT_NML
-INBND_POINT(1) =    41     2 F  !    40     1   -2.1528   46.6417
-INBND_POINT(2) =     2     2 T  !     1     1  -11.9028   46.6417
-INBND_POINT(3) =     2     3 F  !     1     2  -11.9028   46.7917
-INBND_POINT(4) =     2   129 T  !     1   128  -11.9028   65.6917
-INBND_POINT(5) =     3   129 F  !     2   128  -11.6528   65.6917
-INBND_POINT(6) =    96   129 T  !    95   128   11.5972   65.6917
-/
-!
-
-
 ! -------------------------------------------------------------------- !
 ! Define the output boundary points via OUTBND_COUNT_NML and
 !                                       OUTBND_LINE_NML namelist
@@ -377,13 +359,8 @@ INBND_POINT(6) =    96   129 T  !    95   128   11.5972   65.6917
   OUTBND_COUNT%N_LINE   =  2
 /
 &OUTBND_LINE_NML
-! nest1: NS3 (North Sea 3nmi grid) or NSB3
-! North boundary Scotland to Norway
-!
-! North boundary Scotland to Norway
-  OUTBND_LINE(1)       =  -2.98611    58.641667  0.083333  0.0 103
-! English Channel boundary conditions S-N line to -3.98610667, 50.2416667
-  OUTBND_LINE(2)       =  -3.98610667 48.7416667 0.0       0.05 31
+! nest1: DKinner (1 nmi grid), Arkona basin part:
+  OUTBND_LINE(1)       =   13.3194   54.675  0.0 0.0166667  41
 /
 ! -------------------------------------------------------------------- !
 ! WAVEWATCH III - end of namelist                                      !

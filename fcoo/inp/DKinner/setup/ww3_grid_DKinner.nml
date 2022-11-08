@@ -15,7 +15,7 @@
 ! -------------------------------------------------------------------- !
 &SPECTRUM_NML
   SPECTRUM%XFR       =  1.1
-  SPECTRUM%FREQ1     =  0.030938
+  SPECTRUM%FREQ1     =  0.06029
   SPECTRUM%NK        =  31
   SPECTRUM%NTH       =  36
 /
@@ -71,9 +71,9 @@
 !     TIMESTEPS%DTMIN      = 0.         ! minimum source term time step (s)
 ! -------------------------------------------------------------------- !
 &TIMESTEPS_NML
-  TIMESTEPS%DTMAX        =  600.
-  TIMESTEPS%DTXY         =  300.
-  TIMESTEPS%DTKTH        =  300.
+  TIMESTEPS%DTMAX        =  200.
+  TIMESTEPS%DTXY         =  100.
+  TIMESTEPS%DTKTH        =  100.
   TIMESTEPS%DTMIN        =  10.
 /
 
@@ -135,13 +135,13 @@
 !     GRID%DMIN             = 0.        ! abs. minimum water depth (m)
 ! -------------------------------------------------------------------- !
 &GRID_NML
-  GRID%NAME         =  'NWS9 (European N-W Shelf)'
-  GRID%NML          =  '../setup/namelists_NWS9.nml'
+  GRID%NAME         =  'DKinner (Inner Danish 1nmi)'
+  GRID%NML          =  '../setup/namelists_DKinner.nml'
   GRID%TYPE         =  'RECT'
   GRID%COORD        =  'SPHE'
   GRID%CLOS         =  'NONE'
   GRID%ZLIM         =  0.0
-  GRID%DMIN         =  2.5
+  GRID%DMIN         =  0.5
 /
 
 ! -------------------------------------------------------------------- !
@@ -171,13 +171,13 @@
 !     RECT%SF0              = 1.       ! scaling division factor for x0,y0 coord
 ! -------------------------------------------------------------------- !
 &RECT_NML
-  RECT%NX           =  99
-  RECT%NY           =  130
-  RECT%SX           =  250.
-  RECT%SY           =  150.
+  RECT%NX           =  144
+  RECT%NY           =  154
+  RECT%SX           =  27.77778
+  RECT%SY           =  16.66667
   RECT%SF           =  1000.
-  RECT%X0           =  -12.15278
-  RECT%Y0           =  46.491667
+  RECT%X0           =  9.375
+  RECT%Y0           =  53.875
   RECT%SF0          =  1.
 /
 
@@ -311,32 +311,18 @@
 ! OR
 ! INBND_POINT(I) = 0 0 F ! included point
 ! -------------------------------------------------------------------- !
-!&INBND_COUNT_NML
-!INBND_COUNT%N_POINT = 2
-!/
-!&INBND_POINT_NML
-!INBND_POINT(1) = 2 2 F
-!INBND_POINT(2) = 2 11 T
-!/
-!
 &INBND_COUNT_NML
-INBND_COUNT%N_POINT = 6     
-!
-!   Saint-Gilles-Croix-de-Vie - South-West grid corner -
-!   - North-West grid corner - Vega (Norge)
-!
+  INBND_COUNT%N_POINT = 4
 /
 &INBND_POINT_NML
-INBND_POINT(1) =    41     2 F  !    40     1   -2.1528   46.6417
-INBND_POINT(2) =     2     2 T  !     1     1  -11.9028   46.6417
-INBND_POINT(3) =     2     3 F  !     1     2  -11.9028   46.7917
-INBND_POINT(4) =     2   129 T  !     1   128  -11.9028   65.6917
-INBND_POINT(5) =     3   129 F  !     2   128  -11.6528   65.6917
-INBND_POINT(6) =    96   129 T  !    95   128   11.5972   65.6917
+! Arkona basin
+  INBND_POINT(1) = 143   49 F
+  INBND_POINT(2) = 143   89 T
+! Kattegat
+  INBND_POINT(3) = 58  153 F
+  INBND_POINT(4) = 117  153 T
 /
 !
-
-
 ! -------------------------------------------------------------------- !
 ! Define the output boundary points via OUTBND_COUNT_NML and
 !                                       OUTBND_LINE_NML namelist
@@ -373,18 +359,6 @@ INBND_POINT(6) =    96   129 T  !    95   128   11.5972   65.6917
 ! OR
 !     OUTBND_LINE(I)        = 0. 0. 0. 0. 0   ! included lines
 ! -------------------------------------------------------------------- !
-&OUTBND_COUNT_NML
-  OUTBND_COUNT%N_LINE   =  2
-/
-&OUTBND_LINE_NML
-! nest1: NS3 (North Sea 3nmi grid) or NSB3
-! North boundary Scotland to Norway
-!
-! North boundary Scotland to Norway
-  OUTBND_LINE(1)       =  -2.98611    58.641667  0.083333  0.0 103
-! English Channel boundary conditions S-N line to -3.98610667, 50.2416667
-  OUTBND_LINE(2)       =  -3.98610667 48.7416667 0.0       0.05 31
-/
 ! -------------------------------------------------------------------- !
 ! WAVEWATCH III - end of namelist                                      !
 ! -------------------------------------------------------------------- !

@@ -1,4 +1,3 @@
-
 $ -------------------------------------------------------------------- $
 $ WAVEWATCH III NETCDF Point output post-processing                    $
 $--------------------------------------------------------------------- $
@@ -6,7 +5,7 @@ $ First output time (yyyymmdd hhmmss), increment of output (s),
 $ and (max) number of output times.
 $
 $  19850101 000000  3600.  1000
-    __SIMSTART__  1200.  800
+    __SIMSTART__  3600.  721
 $
 $ Points requested --------------------------------------------------- $
 $

@@ -66,6 +66,8 @@
 /
 
 
+
+
 ! -------------------------------------------------------------------- !
 ! Define the output types point parameters via OUTPUT_TYPE_NML namelist
 !
@@ -252,8 +254,10 @@
 !
 ! -------------------------------------------------------------------- !
 &OUTPUT_TYPE_NML
-  TYPE%FIELD%LIST = 'DPT WND ICE IC1 HS T02 T0M1 DIR SPR TUS USS SVP MFIT DTD FC'
+  TYPE%FIELD%LIST   = 'DPT WND ICE IC1 HS T02 T0M1 DIR SPR TUS USS SVP MFIT DTD FC'
 /
+! Add: 'DPT DTD FC CFX CFD CFK PTM10 PDIR PHS PNR PWS TWS'
+
 ! -------------------------------------------------------------------- !
 ! Define output dates via OUTPUT_DATE_NML namelist
 !
@@ -289,7 +293,7 @@
 ! -------------------------------------------------------------------- !
 &OUTPUT_DATE_NML
   DATE%FIELD%START         =  '__SIMSTART__'
-  DATE%FIELD%STRIDE        =  1200
+  DATE%FIELD%STRIDE        =  3600
   DATE%FIELD%STOP          =  '__SIMSTOP__'
   DATE%POINT%START         =  '__SIMSTART__'
   DATE%POINT%STRIDE        =  1200
@@ -301,6 +305,9 @@
   DATE%BOUNDARY%STRIDE     =  1200
   DATE%BOUNDARY%STOP       =  '__SIMSTOP__'
 /
+!  DATE%TRACK%START         =  '__SIMSTART__'
+!  DATE%TRACK%STRIDE        =  1200
+!  DATE%TRACK%STOP          =  '__SIMSTOP__'
 
 ! -------------------------------------------------------------------- !
 ! Define homogeneous input via HOMOG_COUNT_NML and HOMOG_INPUT_NML namelist

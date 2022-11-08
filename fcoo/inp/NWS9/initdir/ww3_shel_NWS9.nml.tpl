@@ -253,18 +253,8 @@
 !
 ! -------------------------------------------------------------------- !
 &OUTPUT_TYPE_NML
-  TYPE%FIELD%LIST     = 'DPT WND HS T02 T0M1 FP DIR SPR DP TUS USS XSP DTD FC CFX CFD CFK MFIT'
+  TYPE%FIELD%LIST     = 'DPT WND HS T02 T0M1 DIR SPR TUS USS SVP MFIT DTD FC'
 /
-
-&OFCUT_COUNT_NML
-  OFCUT_COUNT%N_FIELD = 1
-/
-
-&OFCUT_NML
-  OFCUT(1)%FIELD    = 'XSP'
-  OFCUT(1)%FREQ     = 2.0
-/
-
 ! -------------------------------------------------------------------- !
 ! Define output dates via OUTPUT_DATE_NML namelist
 !

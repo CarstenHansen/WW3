@@ -61,9 +61,11 @@
 ! -------------------------------------------------------------------- !
 &INPUT_NML
   INPUT%FORCING%WINDS = 'T'
-  INPUT%FORCING%ICE_CONC  = 'T'
-  INPUT%FORCING%ICE_PARAM1  = 'T'
+  INPUT%FORCING%ICE_CONC  = 'F'
+  INPUT%FORCING%ICE_PARAM1  = 'F'
 /
+
+
 
 
 ! -------------------------------------------------------------------- !
@@ -252,7 +254,7 @@
 !
 ! -------------------------------------------------------------------- !
 &OUTPUT_TYPE_NML
-  TYPE%FIELD%LIST = 'DPT WND ICE IC1 HS T02 T0M1 DIR SPR TUS USS SVP MFIT DTD FC'
+  TYPE%FIELD%LIST     = 'DPT WND HS T02 T0M1 FP DIR SPR TUS USS SVP MFIT DTD FC'
 /
 ! -------------------------------------------------------------------- !
 ! Define output dates via OUTPUT_DATE_NML namelist

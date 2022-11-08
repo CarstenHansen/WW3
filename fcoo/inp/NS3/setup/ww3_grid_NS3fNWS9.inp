@@ -1,0 +1,258 @@
+$ -------------------------------------------------------------------- $
+$ WAVEWATCH III Grid preprocessor input file                           $
+$ -------------------------------------------------------------------- $
+$ Grid name (C*30, in quotes)
+$
+  'GRID NS3 (North Sea)          '
+$
+$ Frequency increment factor and first frequency (Hz) ---------------- $
+$ number of frequencies (wavenumbers) and directions, relative offset
+$ of first direction in terms of the directional increment [-0.5,0.5].
+$
+$ Upper frequency is 0.79040
+   1.1  0.06029  28  24  0.
+$
+$ Set model flags ---------------------------------------------------- $
+$  - FLDRY         Dry run (input/output only, no calculation).
+$  - FLCX, FLCY    Activate X and Y component of propagation.
+$  - FLCTH, FLCK   Activate direction and wavenumber shifts.
+$  - FLSOU         Activate source terms.
+$
+   F T T T F T
+$
+$ Set time steps ----------------------------------------------------- $
+$ - Time step information (this information is always read)
+$     maximum global time step, maximum CFL time step for x-y and
+$     k-theta, minimum source term time step (all in seconds).
+$
+$ For f0=0.06029, set:
+    600. 300. 300. 30.
+$
+$ Start of namelist input section ------------------------------------ $
+$   Starting with WAVEWATCH III version 2.00, the tunable parameters
+$   for source terms, propagation schemes, and numerics are read using
+$   namelists. [...]
+$
+$ Rotated pole ------------------------------------------------------ $
+$   Pole  parameters    : Namelist ROTD
+$                           PLAT  : Rotated pole latitude
+$                           PLON  : Rotated pole longitude
+$                           UNROT : Logical, un-rotate directions to true north
+$
+$    These will be used to derive rotation angle corrections in the
+$    model. The corrections are used for rotation of boundary spectra 
+$    and for restoring conventional lat/lon orientation of the
+$    output spectra, mean direction or any related variables.
+$    The PLAT/LON example below is a standard setting for Met
+$    Office UK regional models.
+$
+$ &ROTD PLAT = 90.0, PLON = -180.0, UNROT = .FALSE. /
+$
+$ ! CHA at GMOC 20190412:
+$ Boundary conditions to nested, rotated pole grids (up to 9 nest[1-9].ww3)
+$   Pole  parameters    : Namelist ROTB
+$                           BPLAT(1:9)  : Dest. grid rotated pole latitude
+$                           BPLON(1:9)  : Rotated pole longitude
+$    Default (for I = 1:9):
+$ &ROTB BPLAT(1)=90., BPLON(1)=-180., BPLAT(2)=90., BPLON(2)=-180. /
+$    
+$ Output of 3D arrays------------------------------------------------- $
+$ Miscellaneous ------------------------------------------------------ $
+$   Misc. parameters    : Namelist MISC
+$                           CICE0  : Ice concentration cut-off.
+$                           CICEN  : Ice concentration cut-off.
+$                           PMOVE  : Power p in GSE aleviation for
+$                                    moving grids in Eq. (D.4).
+$                           XSEED  : Xseed in seeding alg. (!/SEED).
+$                           FLAGTR : Indicating presence and type of
+$                                    subgrid information :
+$                                     0 : No subgrid information.
+$                                     1 : Transparancies at cell boun-
+$                                         daries between grid points.
+$                                     2 : Transp. at cell centers.
+$                                     3 : Like 1 with cont. ice.
+$                                     4 : Like 2 with cont. ice.
+$ [ ... ]
+$ In the 'Out of the box' test setup we run with sub-grid obstacles
+$ and with continuous ice treatment.
+$
+  &MISC CICE0 = 0.25, CICEN = 0.75, FLAGTR = 4 /
+$  &FLX3 CDMAX = 3.5E-3 , CTYPE = 0 /
+$
+$ Mandatory string to identify end of namelist input section.
+$
+END OF NAMELISTS
+$
+$ Define grid -------------------------------------------------------- $
+$
+$ Five records containing :
+$
+$  1 Type of grid, coordinate system and type of closure: GSTRG, FLAGLL,
+$    CSTRG.  Grid closure can only be applied in spherical coordinates.
+$      GSTRG  : String indicating type of grid :
+$               'RECT'  : rectilinear
+$               'CURV'  : curvilinear  
+$               'UNST'  : unstructured (triangle-based)
+$      FLAGLL : Flag to indicate coordinate system :
+$               T  : Spherical (lon/lat in degrees)
+$               F  : Cartesian (meters)
+$      CSTRG  : String indicating the type of grid index space closure :
+$               'NONE'  : No closure is applied
+$               'SMPL'  : Simple grid closure : Grid is periodic in the
+$                       : i-index and wraps at i=NX+1. In other words,
+$                       : (NX+1,J) => (1,J). A grid with simple closure
+$                       : may be rectilinear or curvilinear.
+$               'TRPL'  : Tripole grid closure : Grid is periodic in the
+$                       : i-index and wraps at i=NX+1 and has closure at
+$                       : j=NY+1. In other words, (NX+1,J<=NY) => (1,J)
+$                       : and (I,NY+1) => (NX-I+1,NY). Tripole
+$                       : grid closure requires that NX be even. A grid
+$                       : with tripole closure must be curvilinear.
+$  2 NX, NY. As the outer grid lines are always defined as land
+$    points, the minimum size is 3x3.
+$
+$ Branch here based on grid type
+$
+$ IF ( RECTILINEAR GRID ) THEN
+$
+$  3 Grid increments SX, SY (degr.or m) and scaling (division) factor.
+$    If CSTRG='SMPL', then SX is set to 360/NX.
+$  4 Coordinates of (1,1) (degr.) and scaling (division) factor.
+$
+$ ELSE IF ( CURVILINEAR GRID ) THEN
+$ [ ... ]
+$ END IF
+$  5 Limiting bottom depth (m) to discriminate between land and sea
+$    points, minimum water depth (m) as allowed in model, unit number
+$    of file with bottom depths, scale factor for bottom depths (mult.),
+$    IDLA, IDFM, format for formatted read, FROM and filename.
+$      IDLA : Layout indicator :
+$                  1   : Read line-by-line bottom to top.
+$                  2   : Like 1, single read statement.
+$                  3   : Read line-by-line top to bottom.
+$                  4   : Like 3, single read statement.
+$      IDFM : format indicator :
+$                  1   : Free format.
+$                  2   : Fixed format with above format descriptor.
+$                  3   : Unformatted.
+$      FROM : file type parameter
+$               'UNIT' : open file by unit number only.
+$               'NAME' : open file by name and assign to unit.
+$
+$    If the above unit number equals 10, then the bottom depths are read from
+$    this file.  The depths must follow the above record.  No comment lines are
+$    allowed within the depth input. In the case of unstructured grids, the file 
+$    is expected to be a GMESH grid file containing node and element lists.
+$
+$ ------------------------------------------------------------------------
+     'RECT'  T  'NONE'
+   205          222
+   83.33333     50.          1000.
+  -4.06944      48.5416667      1.
+   0.0 0.50  11  -1. 1 1 '(...)' 'NAME' 'bathy.dat'
+$ [...]
+$
+$ If sub-grid information is available as indicated by FLAGTR above,
+$ additional input to define this is needed below. In such cases a
+$ field of fractional obstructions at or between grid points needs to
+$ be supplied.  First the location and format of the data is defined
+$ by (as above) :
+$  - Unit number of file (can be 10, and/or identical to bottom depth
+$    unit), scale factor for fractional obstruction, IDLA, IDFM,
+$    format for formatted read, FROM and filename
+$
+$
+   12 0.1  1 1 '(....)' 'NAME' 'obstruct.dat'
+$
+$ *** NOTE if this unit number is the same as the previous bottom
+$     depth unit number, it is assumed that this is the same file
+$     without further checks.                                      ***
+$ [...]
+$ *** NOTE size of fields is always NX * NY                        ***
+$
+$ Input boundary points and excluded points -------------------------- $
+$    The first line identifies where to get the map data, by unit number
+$    IDLA and IDFM, format for formatted read, FROM and filename
+$    if FROM = 'PART', then segmented data is read from below, else
+$    the data is read from file as with the other inputs (as INTEGER)
+$
+   10 3 1 '(....)' 'PART' 'mapsta.inp'
+$
+$ [...]
+$
+$ Input boundary points from segment data ( FROM = PART ) ------------ $
+$   An unlimited number of lines identifying points at which input
+$   boundary conditions are to be defined. If the actual input data is
+$   not defined in the actual wave model run, the initial conditions
+$   will be applied as constant boundary conditions. Each line contains:
+$     Discrete grid counters (IX,IY) of the active point and a
+$     connect flag. If this flag is true, and the present and previous
+$     point are on a grid line or diagonal, all intermediate points
+$     are also defined as boundary points.
+$
+$      2   2   F
+$      2  11   T
+$
+$ Scotland-Norway
+     14  203  F
+    116  203  T
+$ English Channel:
+     2    5  F 
+     2   35  T
+$
+$  Close list by defining point (0,0) (mandatory)
+$
+      0   0   F
+$
+$ Excluded grid points from segment data ( FROM != PART )
+$   First defined as lines, identical to the definition of the input
+$   boundary points, and closed the same way.
+$
+      0   0   F
+$
+$   Second, define a point in a closed body of sea points to remove
+$   the entire body of sea points. Also close by point (0,0)
+$
+      0   0
+$
+$ Sedimentary bottom map if namelist &SBT4 SEDMAPD50 = T
+$
+$     22  1. 1 1 '(f10.6)' 'NAME' 'SED.txt'
+$
+$ Output boundary points --------------------------------------------- $
+$ Output boundary points are defined as a number of straight lines,
+$ defined by its starting point (X0,Y0), increments (DX,DY) and number
+$ of points. A negative number of points starts a new output file.
+$ Note that this data is only generated if requested by the actual
+$ program. Example again for spherical grid in degrees. Note, these do
+$ not need to be defined for data transfer between grids in the multi
+$ grid driver.
+$
+$     1.75  1.50  0.25 -0.10     3
+$     2.25  1.50 -0.10  0.00    -6
+$     0.10  0.10  0.10  0.00   -10
+$
+$ Nest1: DKinner (old 1 nmi grid), Kattegat part:
+     10.958333 56.4083  0.0277778 0.  60
+$     13.3194   54.675  0. 0.0166667  41
+$ Nest2: DBJ1 (Harlesiel to Thyboroen) 
+$   8.18056+0.0277778 56.74167+1nm 7.68056 53.74167-1nm
+    7.6805555 53.725003  0.         0.0166667 -190 $ to 56.891
+    7.6805555 56.891667  0.02777778 0.          23 $ to  8.291
+$
+$ Nest3: SDK1 Skagerrak - DK 1nm
+     8.125000 56.591667 -0.02777778 0.         -12 $ to 7.7916666
+     7.791667 56.591667  0.         0.01666667  31 $ to 57.09167+1nm
+     7.791667 57.108333  0.02777778 0.01666667  48 $ to 9.125 57.9083333
+     9.125    57.908333  0.02777778 0.          56 $ to 10.68056
+    10.680555 57.908333  0.         0.01666667  59 $ to 58.89167
+    10.680555 58.891667 -0.02777778 0.          27 $ to 9.930555
+     9.930555 58.891667  0.         0.01666667   4 $ to 58.941667+1nm
+$
+$  Close list by defining line with 0 points (mandatory)
+$
+     0.    0.    0.    0.       0
+$
+$ -------------------------------------------------------------------- $
+$ End of input file                                                    $
+$ -------------------------------------------------------------------- $
