@@ -135,8 +135,8 @@
 !     GRID%DMIN             = 0.        ! abs. minimum water depth (m)
 ! -------------------------------------------------------------------- !
 &GRID_NML
-  GRID%NAME         =  'BAL3 (Baltic Sea 3nmi)'
-  GRID%NML          =  '../setup/namelists_BAL3.nml'
+  GRID%NAME         =  'NS3 (North Sea - Kattegat)'
+  GRID%NML          =  'namelists_NS3.nml'
   GRID%TYPE         =  'RECT'
   GRID%COORD        =  'SPHE'
   GRID%CLOS         =  'NONE'
@@ -171,13 +171,13 @@
 !     RECT%SF0              = 1.       ! scaling division factor for x0,y0 coord
 ! -------------------------------------------------------------------- !
 &RECT_NML
-  RECT%NX           =  247
-  RECT%NY           =  239
+  RECT%NX           =  205
+  RECT%NY           =  222
   RECT%SX           =  83.33333
   RECT%SY           =  50.
   RECT%SF           =  1000.
-  RECT%X0           =  9.51389
-  RECT%Y0           =  53.89167
+  RECT%X0           =  -4.06944
+  RECT%Y0           =  48.5416667
   RECT%SF0          =  1.
 /
 
@@ -319,6 +319,22 @@
 !INBND_POINT(2) = 2 11 T
 !/
 !
+&INBND_COUNT_NML
+INBND_COUNT%N_POINT = 6     
+!
+!   Saint-Gilles-Croix-de-Vie - South-West grid corner -
+!   - North-West grid corner - Vega (Norge)
+!
+/
+&INBND_POINT_NML
+INBND_POINT(1) =    14  203 F  ! Scotland-Norway
+INBND_POINT(2) =   116  203 T  !
+INBND_POINT(3) =     2    5 F  ! English Channel
+INBND_POINT(4) =     2   35 T  !
+/
+!
+
+
 ! -------------------------------------------------------------------- !
 ! Define the output boundary points via OUTBND_COUNT_NML and
 !                                       OUTBND_LINE_NML namelist
@@ -356,11 +372,22 @@
 !     OUTBND_LINE(I)        = 0. 0. 0. 0. 0   ! included lines
 ! -------------------------------------------------------------------- !
 &OUTBND_COUNT_NML
-  OUTBND_COUNT%N_LINE   =  2
+  OUTBND_COUNT%N_LINE   =  9
 /
 &OUTBND_LINE_NML
-! nest1: DKinner (1 nmi grid), Arkona basin part:
-  OUTBND_LINE(1)       =   13.3194   54.675  0.0 0.0166667  41
+! Nest1: DKinner (old 1 nmi grid), Kattegat part:
+  OUTBND_LINE(1)  = 10.958333  56.4083    0.0277778 0.  60
+! Nest2: DBJ1 (Harlesiel to Thyboroen) 
+!   8.18056+0.0277778 56.74167+1nm 7.68056 53.74167-1nm
+  OUTBND_LINE(2)  =  7.6805555 53.725003 0.        0.0166667 -190 $ to 56.891
+! Nest3: SDK1 Skagerrak - DK 1nm
+  OUTBND_LINE(3)  =  8.125000 56.591667 -0.0277778 0.       -12 $ to 7.79167
+  OUTBND_LINE(4)  =  7.791667 56.591667  0.        0.0166667 31 $ to 57.09167+1nm
+  OUTBND_LINE(5)  =  7.791667 57.108333  0.0277778 0.0166667 48 $ to 9.125 57.908
+  OUTBND_LINE(6)  =  9.125    57.908333  0.0277778 0.        56 $ to 10.68056
+  OUTBND_LINE(7)  = 10.680555 57.908333  0.        0.0166667 59 $ to 58.89167
+  OUTBND_LINE(8)  = 10.680555 58.891667 -0.0277778 0.        27 $ to 9.930555
+  OUTBND_LINE(9)  =  9.930555 58.891667  0.        0.0166667  4 $ to 58.94167+1nm
 /
 ! -------------------------------------------------------------------- !
 ! WAVEWATCH III - end of namelist                                      !

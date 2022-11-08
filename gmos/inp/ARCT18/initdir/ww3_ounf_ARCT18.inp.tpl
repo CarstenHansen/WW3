@@ -20,7 +20,7 @@ $ WCF WCH WCM SXY TWO BHD FOC TUS USS P2S USF P2L TWI FIC ABR UBR BED
 $ FBB TBB MSS MSC DTD FC CFX CFD CFK MFIT U1 
 $
  N
- DPT HS FP T02 T0M1 DIR TUS USS ICE DTD MFIT
+ DPT WND ICE IC1 HS T02 T0M1 DIR SPR TUS USS DTD FC
 $
 $--------------------------------------------------------------------- $
 $ netCDF version [3,4]

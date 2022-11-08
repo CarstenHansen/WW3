@@ -15,8 +15,8 @@
 ! -------------------------------------------------------------------- !
 &SPECTRUM_NML
   SPECTRUM%XFR       =  1.1
-  SPECTRUM%FREQ1     =  0.0452967
-  SPECTRUM%NK        =  34
+  SPECTRUM%FREQ1     =  0.06029
+  SPECTRUM%NK        =  31
   SPECTRUM%NTH       =  36
 /
 
@@ -71,9 +71,9 @@
 !     TIMESTEPS%DTMIN      = 0.         ! minimum source term time step (s)
 ! -------------------------------------------------------------------- !
 &TIMESTEPS_NML
-  TIMESTEPS%DTMAX        =  600.
-  TIMESTEPS%DTXY         =  300.
-  TIMESTEPS%DTKTH        =  300.
+  TIMESTEPS%DTMAX        =  200.
+  TIMESTEPS%DTXY         =  100.
+  TIMESTEPS%DTKTH        =  100.
   TIMESTEPS%DTMIN        =  10.
 /
 
@@ -135,8 +135,8 @@
 !     GRID%DMIN             = 0.        ! abs. minimum water depth (m)
 ! -------------------------------------------------------------------- !
 &GRID_NML
-  GRID%NAME         =  'BAL3 (Baltic Sea 3nmi)'
-  GRID%NML          =  '../setup/namelists_BAL3.nml'
+  GRID%NAME         =  'DKinner (Inner Danish 1nmi)'
+  GRID%NML          =  '../setup/namelists_DKinner.nml'
   GRID%TYPE         =  'RECT'
   GRID%COORD        =  'SPHE'
   GRID%CLOS         =  'NONE'
@@ -171,13 +171,13 @@
 !     RECT%SF0              = 1.       ! scaling division factor for x0,y0 coord
 ! -------------------------------------------------------------------- !
 &RECT_NML
-  RECT%NX           =  247
-  RECT%NY           =  239
-  RECT%SX           =  83.33333
-  RECT%SY           =  50.
+  RECT%NX           =  144
+  RECT%NY           =  154
+  RECT%SX           =  27.77778
+  RECT%SY           =  16.66667
   RECT%SF           =  1000.
-  RECT%X0           =  9.51389
-  RECT%Y0           =  53.89167
+  RECT%X0           =  9.375
+  RECT%Y0           =  53.875
   RECT%SF0          =  1.
 /
 
@@ -311,13 +311,17 @@
 ! OR
 ! INBND_POINT(I) = 0 0 F ! included point
 ! -------------------------------------------------------------------- !
-!&INBND_COUNT_NML
-!INBND_COUNT%N_POINT = 2
-!/
-!&INBND_POINT_NML
-!INBND_POINT(1) = 2 2 F
-!INBND_POINT(2) = 2 11 T
-!/
+&INBND_COUNT_NML
+  INBND_COUNT%N_POINT = 4
+/
+&INBND_POINT_NML
+! Arkona basin
+  INBND_POINT(1) = 143   49 F
+  INBND_POINT(2) = 143   89 T
+! Kattegat
+  INBND_POINT(3) = 58  153 F
+  INBND_POINT(4) = 117  153 T
+/
 !
 ! -------------------------------------------------------------------- !
 ! Define the output boundary points via OUTBND_COUNT_NML and
@@ -355,13 +359,6 @@
 ! OR
 !     OUTBND_LINE(I)        = 0. 0. 0. 0. 0   ! included lines
 ! -------------------------------------------------------------------- !
-&OUTBND_COUNT_NML
-  OUTBND_COUNT%N_LINE   =  2
-/
-&OUTBND_LINE_NML
-! nest1: DKinner (1 nmi grid), Arkona basin part:
-  OUTBND_LINE(1)       =   13.3194   54.675  0.0 0.0166667  41
-/
 ! -------------------------------------------------------------------- !
 ! WAVEWATCH III - end of namelist                                      !
 ! -------------------------------------------------------------------- !

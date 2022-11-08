@@ -15,8 +15,8 @@
 ! -------------------------------------------------------------------- !
 &SPECTRUM_NML
   SPECTRUM%XFR       =  1.1
-  SPECTRUM%FREQ1     =  0.0452967
-  SPECTRUM%NK        =  34
+  SPECTRUM%FREQ1     =  0.030938
+  SPECTRUM%NK        =  31
   SPECTRUM%NTH       =  36
 /
 
@@ -135,13 +135,13 @@
 !     GRID%DMIN             = 0.        ! abs. minimum water depth (m)
 ! -------------------------------------------------------------------- !
 &GRID_NML
-  GRID%NAME         =  'BAL3 (Baltic Sea 3nmi)'
-  GRID%NML          =  '../setup/namelists_BAL3.nml'
+  GRID%NAME         =  'GRL9 (Greenland 9nmi)'
+  GRID%NML          =  '../setup/namelists_GRL9.nml'
   GRID%TYPE         =  'RECT'
   GRID%COORD        =  'SPHE'
   GRID%CLOS         =  'NONE'
   GRID%ZLIM         =  0.0
-  GRID%DMIN         =  0.5
+  GRID%DMIN         =  2.5
 /
 
 ! -------------------------------------------------------------------- !
@@ -171,13 +171,13 @@
 !     RECT%SF0              = 1.       ! scaling division factor for x0,y0 coord
 ! -------------------------------------------------------------------- !
 &RECT_NML
-  RECT%NX           =  247
-  RECT%NY           =  239
-  RECT%SX           =  83.33333
-  RECT%SY           =  50.
+  RECT%NX           =  225
+  RECT%NY           =  187
+  RECT%SX           =  150.
+  RECT%SY           =  150.
   RECT%SF           =  1000.
-  RECT%X0           =  9.51389
-  RECT%Y0           =  53.89167
+  RECT%X0           =  -37.45
+  RECT%Y0           =  -1.5
   RECT%SF0          =  1.
 /
 
@@ -319,6 +319,34 @@
 !INBND_POINT(2) = 2 11 T
 !/
 !
+&INBND_COUNT_NML
+INBND_COUNT%N_POINT = 11     
+/
+
+!
+!
+!    Mid Atlantic to Labrador (to rotated lon,lat -37.3, 11.1)
+!    Mid Atlantic to Faroe-Iceland Ridge (to -25., -1.35 )
+!    Norwegian Sea ( to -4., -1.35 )
+!    Arctic Ocean (to -4., 13.8)
+!    Arctic to Ellesmere ( to -5.65  13.95 )
+!    Lancaster Sound (to -10.6 22.35, then to -10.75 22.35)
+!    Hudson Bay inlet (to -23.5 26.25 )
+&INBND_POINT_NML
+INBND_POINT(1) =       2 147 F  !  -37.3  20.4   0.0  -0.15  -63
+INBND_POINT(2) =       2  84 T  !  
+INBND_POINT(3) =      84   2 T  !    -37.3 10.95  0.15 -0.15 82
+INBND_POINT(4) =     224   2 T  !    -25. -1.35 0.15 0.0 141
+INBND_POINT(5) =     224 104 T  !     -4. -1.2 0.0 0.15 101
+INBND_POINT(6) =     213 104 T  !    -4.  13.95 -0.15 0.0 12
+INBND_POINT(7) =     182 158 F  !     -10.3  22.05 -0.15  0.15 3
+INBND_POINT(8) =     180 160 T  !   
+INBND_POINT(9) =     179 160 T  !     -10.75 22.35 -0.15  0.0 1
+INBND_POINT(10) =    108 186 F  !   -21.4 26.25 -0.15 0.0 15
+INBND_POINT(11) =     94 186 T  !  
+/
+
+!
 ! -------------------------------------------------------------------- !
 ! Define the output boundary points via OUTBND_COUNT_NML and
 !                                       OUTBND_LINE_NML namelist
@@ -354,14 +382,6 @@
 !     OUTBND_LINE(I)%NP     = 0               ! number of points
 ! OR
 !     OUTBND_LINE(I)        = 0. 0. 0. 0. 0   ! included lines
-! -------------------------------------------------------------------- !
-&OUTBND_COUNT_NML
-  OUTBND_COUNT%N_LINE   =  2
-/
-&OUTBND_LINE_NML
-! nest1: DKinner (1 nmi grid), Arkona basin part:
-  OUTBND_LINE(1)       =   13.3194   54.675  0.0 0.0166667  41
-/
 ! -------------------------------------------------------------------- !
 ! WAVEWATCH III - end of namelist                                      !
 ! -------------------------------------------------------------------- !

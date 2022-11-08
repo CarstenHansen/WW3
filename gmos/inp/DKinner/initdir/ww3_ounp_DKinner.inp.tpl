@@ -50,7 +50,7 @@ $                              4 : Spectral partitioning.
 $          - Scaling factors for 1-D and 2-D spectra Negative factor
 $            disables, output, factor = 0. gives normalized spectrum.
 $
-  3  1  0
+  3  1  0 3
 $
 $ The transfer file contains records with the following contents.
 $
