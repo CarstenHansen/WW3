@@ -1086,6 +1086,11 @@ CONTAINS
 #ifdef W3_OASIS
     USE W3ODATMD, ONLY: DTOUT
 #endif
+    ! Begin FCOO local
+#ifdef W3_MPI
+    USE W3ODATMD, ONLY: IAPROC, NAPERR
+#endif    
+    ! End FCOO local
     IMPLICIT NONE
     !/
     !/ ------------------------------------------------------------------- /
@@ -1320,10 +1325,12 @@ CONTAINS
         ! the field is ice or water level, W3FLDG would return TTT=TIME0.
         IF ( .NOT.FLINTERP .AND. FLFRST .AND. DTTST .EQ. 0. ) THEN
           ! Issue a warning
+#ifdef W3_MPI
           IF (IAPROC.EQ.NAPERR ) &
-              WRITE (NDSE,*)' WARNING: An input timestep ', TTT,      &
-                  'is equal to model start time for input type', J,   &
-                  ' (ice or water level). Ignore that input step.'
+#endif
+          WRITE (NDSE,*)' WARNING: An input timestep ',           &
+               'is equal to model start time for input type', J,  &
+               ' (ice or water level). Ignore that input step.'
         END IF
         ! End FCOO local branch
 

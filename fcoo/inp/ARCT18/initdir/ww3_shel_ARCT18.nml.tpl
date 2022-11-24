@@ -62,10 +62,10 @@
 &INPUT_NML
   INPUT%FORCING%WINDS = 'T'
   INPUT%FORCING%ICE_CONC  = 'T'
-  INPUT%FORCING%ICE_PARAM1    = 'H'
+  INPUT%FORCING%ICE_PARAM1    = 'T'
   INPUT%FORCING%ICE_PARAM2    = 'H'
-  INPUT%FORCING%ICE_PARAM3    = 'H'
-  INPUT%FORCING%ICE_PARAM4    = 'H'
+  INPUT%FORCING%ICE_PARAM3    = 'F'
+  INPUT%FORCING%ICE_PARAM4    = 'F'
   INPUT%FORCING%ICE_PARAM5    = 'H'
 /
 
@@ -389,36 +389,18 @@
 !   HOMOG_INPUT(3)%VALUE1     = 5.
 ! /
 &HOMOG_COUNT_NML
-  HOMOG_COUNT%N_IC1                =  1
   HOMOG_COUNT%N_IC2                =  1
-  HOMOG_COUNT%N_IC3                =  1
-  HOMOG_COUNT%N_IC4                =  1
   HOMOG_COUNT%N_IC5                =  1
 /
 
 &HOMOG_INPUT_NML
-  HOMOG_INPUT(1)%NAME        = 'IC1'
-  HOMOG_INPUT(1)%VALUE1      = 0.0
+  HOMOG_INPUT(1)%NAME        = 'IC2'
+  HOMOG_INPUT(1)%VALUE1      = 1.83e-6
 
-  HOMOG_INPUT(2)%NAME        = 'IC2'
-  HOMOG_INPUT(2)%VALUE1      = 0.0
-
-  HOMOG_INPUT(3)%NAME        = 'IC3'
-  HOMOG_INPUT(3)%VALUE1      = 2.12E-3
-
-  HOMOG_INPUT(4)%NAME        = 'IC4'
-  HOMOG_INPUT(4)%VALUE1      = 0.0
-
-  HOMOG_INPUT(5)%NAME        = 'IC5'
-  HOMOG_INPUT(5)%VALUE1      = 4.59E-2
+  HOMOG_INPUT(2)%NAME        = 'IC5'
+  HOMOG_INPUT(2)%VALUE1      = 1.0E2
 /
 
 ! -------------------------------------------------------------------- !
 ! WAVEWATCH III - end of namelist                                      !
 ! -------------------------------------------------------------------- !
-
-
-
-
-
-

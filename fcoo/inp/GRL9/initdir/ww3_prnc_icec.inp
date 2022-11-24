@@ -38,7 +38,7 @@ $
 $
 $ Variables to use --------------------------------------------------- $
 $
-  aice
+  fice
 $
 $ Additional time input ---------------------------------------------- $
 $ If time flag is .FALSE., give time of field in yyyymmdd hhmmss format.
