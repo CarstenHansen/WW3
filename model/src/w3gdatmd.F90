@@ -3156,9 +3156,6 @@ CONTAINS
     !
     !/ ------------------------------------------------------------------- /
     USE W3SERVMD, ONLY: EXTCDE
-#ifdef W3_MEMCHECK
-    USE MallocInfo_m
-#endif
 #ifdef W3_S
     USE W3SERVMD, ONLY: STRACE
 #endif
@@ -3170,9 +3167,6 @@ CONTAINS
     !/ Parameter list
     !/
     INTEGER, INTENT(IN)     :: IMOD, MTRI, MX, COUNTOTA, NNZ, NDSE, NDST
-#ifdef W3_MEMCHECK
-    type(MallInfo_t)        :: mallinfos
-#endif
     INTEGER                 :: IAPROC = 1
     !/
     !/ ------------------------------------------------------------------- /
