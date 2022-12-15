@@ -3,16 +3,10 @@ $ JCOMM stations:
    13.870    54.880 '66021_Balt'
    14.200    54.100 '66022_Balt'
    12.700    54.700 '66024_Balt'
-$ Near-coast stations WW3_NSBaltic 3 stations
-    8.220    54.920 'BSH05_NSea'
-    8.060    56.470 '24023_NSea'
-    1.120    53.061 '62042_NSea'
-$ End of near-coast stations WW3_NSBaltic
-$ New stations dec 2015, 26 stations:
+$ New stations dec 2015:
 $ SMHI, 4 stations: 'HuvudskarO', 'Vaderoarna', 'Finngrunde', 'Knollsgrun'
 $ FIMR, 3 stations: 'HelsinkiBu', 'NorthernBa', 'BothnianSe'
    10.267    54.500 'LTKiel    '
-   10.931    58.489 'Vaderoarna'
    13.154    55.008 'FINO2     '
    17.617    57.516 'Knollsgrun'
    18.606    60.893 'Finngrunde'
