@@ -64,9 +64,9 @@
   INPUT%FORCING%ICE_CONC  = 'T'
   INPUT%FORCING%ICE_PARAM1    = 'T'
   INPUT%FORCING%ICE_PARAM2    = 'H'
-  INPUT%FORCING%ICE_PARAM3    = 'H'
-  INPUT%FORCING%ICE_PARAM4    = 'H'
-  INPUT%FORCING%ICE_PARAM5    = 'F'
+  INPUT%FORCING%ICE_PARAM3    = 'F'
+  INPUT%FORCING%ICE_PARAM4    = 'F'
+  INPUT%FORCING%ICE_PARAM5    = 'H'
   INPUT%FORCING%CURRENTS  = 'F'
 /
 
@@ -376,29 +376,15 @@
 ! /
 &HOMOG_COUNT_NML
   HOMOG_COUNT%N_IC2                =  1
-  HOMOG_COUNT%N_IC3                =  1
-  HOMOG_COUNT%N_IC4                =  1
+  HOMOG_COUNT%N_IC5                =  1
 /
-
-! Switch IC5, with namelist option IC5VEMOD=3:
-! Liu_et_al._2020_JPO Eq (20) k_i = eta h_i^1 omega^3 / (rho_w g^2)
-! eta=3.0 kg/m^3/s == paremeter 'IC2' (IC3 and IC4 are read but not used!).
-! Rogers et al., 2021, estimates a much higher coefficient,
-!  HOMOG_INPUT(1)%VALUE1      = 23.4
-! and also achieves a best fit with k_i multiplied by a frequency measure to power 1
-! but they do not consider IS2 anelastic scattering that also dissipates energy
-! at the highest frequencies ...
-
 
 &HOMOG_INPUT_NML
   HOMOG_INPUT(1)%NAME        = 'IC2'
-  HOMOG_INPUT(1)%VALUE1      = 3.0
+  HOMOG_INPUT(1)%VALUE1      = 1.83e-6
 
-  HOMOG_INPUT(2)%NAME        = 'IC3'
-  HOMOG_INPUT(2)%VALUE1      = 917.0
-
-  HOMOG_INPUT(3)%NAME        = 'IC4'
-  HOMOG_INPUT(3)%VALUE1      = 1.0
+  HOMOG_INPUT(2)%NAME        = 'IC5'
+  HOMOG_INPUT(2)%VALUE1      = 1.0E2
 /
 
 ! -------------------------------------------------------------------- !

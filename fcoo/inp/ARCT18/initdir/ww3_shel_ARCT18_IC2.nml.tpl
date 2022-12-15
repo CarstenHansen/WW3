@@ -64,10 +64,9 @@
   INPUT%FORCING%ICE_CONC  = 'T'
   INPUT%FORCING%ICE_PARAM1    = 'T'
   INPUT%FORCING%ICE_PARAM2    = 'H'
-  INPUT%FORCING%ICE_PARAM3    = 'H'
-  INPUT%FORCING%ICE_PARAM4    = 'H'
-  INPUT%FORCING%ICE_PARAM5    = 'F'
-  INPUT%FORCING%CURRENTS  = 'F'
+  INPUT%FORCING%ICE_PARAM3    = 'F'
+  INPUT%FORCING%ICE_PARAM4    = 'F'
+  INPUT%FORCING%ICE_PARAM5    = 'H'
 /
 
 
@@ -259,8 +258,23 @@
 !
 ! -------------------------------------------------------------------- !
 &OUTPUT_TYPE_NML
-  TYPE%FIELD%LIST     = 'DPT WND ICE IC1 HS T02 T0M1 DIR SPR TUS USS SVP MFIT DTD FC'
+  TYPE%FIELD%LIST     = 'DPT WND ICE IC1 HS T02 T0M1 DIR SPR TUS USS DTD FC'
 /
+
+! -------------------------------------------------------------------- !
+! Define high-frequency limit OFCUT for output fields via namelists
+! OFCUT_COUNT and OFCUT
+! 
+! &OFCUT_COUNT_NML
+! OFCUT_COUNT%N_FIELD = 1   [ Number of fields where OFCUT%FREQ is not infinite ]
+! /
+! &OFCUT_NML
+! OFCUT(1)%FIELD      = 'XSP' [ Name of field no. 1 ]
+! OFCUT(1)%FREQ       = 2.0   [ Cut-off frequency for field no. 1.
+! /                            May be higher than FREQ(NK) ]
+! -------------------------------------------------------------------- !
+
+
 ! -------------------------------------------------------------------- !
 ! Define output dates via OUTPUT_DATE_NML namelist
 !
@@ -296,10 +310,10 @@
 ! -------------------------------------------------------------------- !
 &OUTPUT_DATE_NML
   DATE%FIELD%START         =  '__SIMSTART__'
-  DATE%FIELD%STRIDE        =  1200
+  DATE%FIELD%STRIDE        =  3600
   DATE%FIELD%STOP          =  '__SIMSTOP__'
   DATE%POINT%START         =  '__SIMSTART__'
-  DATE%POINT%STRIDE        =  1200
+  DATE%POINT%STRIDE        =  3600
   DATE%POINT%STOP          =  '__SIMSTOP__'
   DATE%RESTART%START       =  '__SIMSTART__'
   DATE%RESTART%STRIDE      =  '__HOTDELTA__'
@@ -376,29 +390,15 @@
 ! /
 &HOMOG_COUNT_NML
   HOMOG_COUNT%N_IC2                =  1
-  HOMOG_COUNT%N_IC3                =  1
-  HOMOG_COUNT%N_IC4                =  1
+  HOMOG_COUNT%N_IC5                =  1
 /
-
-! Switch IC5, with namelist option IC5VEMOD=3:
-! Liu_et_al._2020_JPO Eq (20) k_i = eta h_i^1 omega^3 / (rho_w g^2)
-! eta=3.0 kg/m^3/s == paremeter 'IC2' (IC3 and IC4 are read but not used!).
-! Rogers et al., 2021, estimates a much higher coefficient,
-!  HOMOG_INPUT(1)%VALUE1      = 23.4
-! and also achieves a best fit with k_i multiplied by a frequency measure to power 1
-! but they do not consider IS2 anelastic scattering that also dissipates energy
-! at the highest frequencies ...
-
 
 &HOMOG_INPUT_NML
   HOMOG_INPUT(1)%NAME        = 'IC2'
-  HOMOG_INPUT(1)%VALUE1      = 3.0
+  HOMOG_INPUT(1)%VALUE1      = 1.83e-6
 
-  HOMOG_INPUT(2)%NAME        = 'IC3'
-  HOMOG_INPUT(2)%VALUE1      = 917.0
-
-  HOMOG_INPUT(3)%NAME        = 'IC4'
-  HOMOG_INPUT(3)%VALUE1      = 1.0
+  HOMOG_INPUT(2)%NAME        = 'IC5'
+  HOMOG_INPUT(2)%VALUE1      = 2.0E2
 /
 
 ! -------------------------------------------------------------------- !

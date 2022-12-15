@@ -3,7 +3,7 @@ $ WAVEWATCH III Grid preprocessor input file                           $
 $ -------------------------------------------------------------------- $
 $ Grid name (C*30, in quotes)
 $
-  'GRID BAL3                     '
+  'GRID NSB3                     '
 $  'TEST GRID (GULF OF NOWHERE)   '
 $
 $ Frequency increment factor and first frequency (Hz) ---------------- $
@@ -14,8 +14,7 @@ $ it is added to mitigate the GSE for a first order scheme. Note that
 $ this factor is IGNORED in the print plots in ww3_outp.
 $
 $ Upper frequency is 0.79040
-   1.1  0.0452967  31  24  0.
-$   1.1  0.06029  28  24  0.
+   1.1  0.06029  28  24  0.
 $   1.1  0.04118  25  24  0.
 $
 $ Set model flags ---------------------------------------------------- $
@@ -31,7 +30,7 @@ $ - Time step information (this information is always read)
 $     maximum global time step, maximum CFL time step for x-y and
 $     k-theta, minimum source term time step (all in seconds).
 $
-     600. 300. 300. 10.
+     600. 300. 300. 300.
 $    900. 950. 900. 300.
 $
 $ Start of namelist input section ------------------------------------ $
@@ -407,13 +406,8 @@ $
 $ In the 'Out of the box' test setup we run with sub-grid obstacles
 $ and with continuous ice treatment.
 $
-  &XSTO NDP = 11, DSC = 1.0, TYP = 'DE20' /
   &MISC CICE0 = 0.25, CICEN = 0.75, FLAGTR = 4 /
   &FLX3 CDMAX = 3.5E-3 , CTYPE = 0 /
-  &SDS4 SDSBCHOICE=3, SDSC2 = -3.8, SDSBR = 0.005, 
-       SDSSTRAIN =0., SDSSTRAIN2 = 0., FXFM3 = 20., SDSFACMTF = 400., 
-       SDSCUM=0., SDSC5 =0. /
-
 $ &SDB1 BJGAM = 1.26, BJFLAG = .FALSE. /
 $
 $ Mandatory string to identify end of namelist input section.
@@ -526,9 +520,9 @@ $    is expected to be a GMESH grid file containing node and element lists.
 $
 $ ------------------------------------------------------------------------
      'RECT'  T  'NONE'
-   247          239
+   410          346
    83.33333     50.          1000.
-   9.51389     53.89167      1.
+  -4.06944      48.5416667      1.
    0.0 0.50  11  -1. 1 1 '(...)' 'NAME' 'bathy.dat'
 $ Example for rectilinear grid with spherical (lon/lat) coordinate system.
 $ Note that for Cartesian coordinates the unit is meters (NOT km).
@@ -682,7 +676,7 @@ $  0 0 0 0 0 0 0 0 0 0 0 0
 $
 $ *** NOTE size of fields is always NX * NY                        ***
 $
-$ CHA at GEOMETOC DK: If the switch RTD is chosen, the lat-lon may have 
+$ CHA at GMOC DK: If the switch RTD is chosen, the lat-lon may have 
 $ a rotated North Pole at the geographic position POLAT POLON.
 $ For a rotated lat-lon grid with POLAT POLON at 10 N, 125 W:
 $     10. -125.
@@ -732,6 +726,13 @@ $
 $      2   2   F
 $      2  11   T
 $
+$ Scotland-Norway
+     14  203  F
+    116  203  T
+$ English Channel:
+     2    5  F 
+     2   35  T
+$
 $  Close list by defining point (0,0) (mandatory)
 $
       0   0   F
@@ -764,9 +765,10 @@ $     1.75  1.50  0.25 -0.10     3
 $     2.25  1.50 -0.10  0.00    -6
 $     0.10  0.10  0.10  0.00   -10
 $
-$ Nest1: DKinner (old 1 nmi grid), Arkona part:
-$     10.958333 56.4083  0.0277778 0.  60
+$ DKinner (old 1 nmi grid):
+     10.95833 56.4083  0.0277778 0.  60
      13.3194   54.675  0. 0.0166667  41
+$
 $  Close list by defining line with 0 points (mandatory)
 $
      0.    0.    0.    0.       0

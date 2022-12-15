@@ -136,7 +136,7 @@
 ! -------------------------------------------------------------------- !
 &GRID_NML
   GRID%NAME         =  'BAL3 (Baltic Sea 3nmi)'
-  GRID%NML          =  '../setup/namelists_BAL3.nml'
+  GRID%NML          =  'namelists.nml'
   GRID%TYPE         =  'RECT'
   GRID%COORD        =  'SPHE'
   GRID%CLOS         =  'NONE'

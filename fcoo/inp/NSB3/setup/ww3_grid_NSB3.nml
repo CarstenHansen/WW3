@@ -15,8 +15,8 @@
 ! -------------------------------------------------------------------- !
 &SPECTRUM_NML
   SPECTRUM%XFR       =  1.1
-  SPECTRUM%FREQ1     =  0.030938
-  SPECTRUM%NK        =  31
+  SPECTRUM%FREQ1     =  0.0452967
+  SPECTRUM%NK        =  34
   SPECTRUM%NTH       =  36
 /
 
@@ -135,13 +135,13 @@
 !     GRID%DMIN             = 0.        ! abs. minimum water depth (m)
 ! -------------------------------------------------------------------- !
 &GRID_NML
-  GRID%NAME         =  'GRL9 (Greenland 9nmi)'
+  GRID%NAME         =  'NS3 (North Sea - BALTIC)'
   GRID%NML          =  'namelists.nml'
   GRID%TYPE         =  'RECT'
   GRID%COORD        =  'SPHE'
   GRID%CLOS         =  'NONE'
   GRID%ZLIM         =  0.0
-  GRID%DMIN         =  2.5
+  GRID%DMIN         =  0.5
 /
 
 ! -------------------------------------------------------------------- !
@@ -171,13 +171,13 @@
 !     RECT%SF0              = 1.       ! scaling division factor for x0,y0 coord
 ! -------------------------------------------------------------------- !
 &RECT_NML
-  RECT%NX           =  225
-  RECT%NY           =  187
-  RECT%SX           =  150.
-  RECT%SY           =  150.
+  RECT%NX           =  410
+  RECT%NY           =  346
+  RECT%SX           =  83.33333
+  RECT%SY           =  50.
   RECT%SF           =  1000.
-  RECT%X0           =  -37.45
-  RECT%Y0           =  -1.5
+  RECT%X0           =  -4.06944
+  RECT%Y0           =  48.5416667
   RECT%SF0          =  1.
 /
 
@@ -320,33 +320,21 @@
 !/
 !
 &INBND_COUNT_NML
-INBND_COUNT%N_POINT = 11     
+INBND_COUNT%N_POINT = 6     
+!
+!   Saint-Gilles-Croix-de-Vie - South-West grid corner -
+!   - North-West grid corner - Vega (Norge)
+!
 /
-
-!
-!
-!    Mid Atlantic to Labrador (to rotated lon,lat -37.3, 11.1)
-!    Mid Atlantic to Faroe-Iceland Ridge (to -25., -1.35 )
-!    Norwegian Sea ( to -4., -1.35 )
-!    Arctic Ocean (to -4., 13.8)
-!    Arctic to Ellesmere ( to -5.65  13.95 )
-!    Lancaster Sound (to -10.6 22.35, then to -10.75 22.35)
-!    Hudson Bay inlet (to -23.5 26.25 )
 &INBND_POINT_NML
-INBND_POINT(1) =       2 147 F  !  -37.3  20.4   0.0  -0.15  -63
-INBND_POINT(2) =       2  84 T  !  
-INBND_POINT(3) =      84   2 T  !    -37.3 10.95  0.15 -0.15 82
-INBND_POINT(4) =     224   2 T  !    -25. -1.35 0.15 0.0 141
-INBND_POINT(5) =     224 104 T  !     -4. -1.2 0.0 0.15 101
-INBND_POINT(6) =     213 104 T  !    -4.  13.95 -0.15 0.0 12
-INBND_POINT(7) =     182 158 F  !     -10.3  22.05 -0.15  0.15 3
-INBND_POINT(8) =     180 160 T  !   
-INBND_POINT(9) =     179 160 T  !     -10.75 22.35 -0.15  0.0 1
-INBND_POINT(10) =    108 186 F  !   -21.4 26.25 -0.15 0.0 15
-INBND_POINT(11) =     94 186 T  !  
+INBND_POINT(1) =    14  203 F  ! Scotland-Norway
+INBND_POINT(2) =   116  203 T  !
+INBND_POINT(3) =     2    5 F  ! English Channel
+INBND_POINT(4) =     2   35 T  !
 /
-
 !
+
+
 ! -------------------------------------------------------------------- !
 ! Define the output boundary points via OUTBND_COUNT_NML and
 !                                       OUTBND_LINE_NML namelist
@@ -382,6 +370,28 @@ INBND_POINT(11) =     94 186 T  !
 !     OUTBND_LINE(I)%NP     = 0               ! number of points
 ! OR
 !     OUTBND_LINE(I)        = 0. 0. 0. 0. 0   ! included lines
+! -------------------------------------------------------------------- !
+&OUTBND_COUNT_NML
+  OUTBND_COUNT%N_LINE   =  11
+/
+&OUTBND_LINE_NML
+! Nest1: DKinner (old 1 nmi grid), Kattegat part:
+  OUTBND_LINE(1)  = 10.958333  56.4083    0.0277778 0.  60
+! Nest1: Arkona basin part:
+  OUTBND_LINE(2)       =   13.3194   54.675  0.0 0.0166667  41
+! Nest2: DBJ1 (Harlesiel to Thyboroen) 
+!   8.18056+0.0277778 56.74167+1nm 7.68056 53.74167-1nm
+  OUTBND_LINE(3)  =  7.6805555 53.725003 0.        0.0166667 -190 $ to 56.891
+  OUTBND_LINE(4)  =  7.6805555 56.875009 0.0277778 0.        20 $ to 8.20833
+! Nest3: SDK1 Skagerrak - DK 1nm
+  OUTBND_LINE(5)  =  8.125000 56.591667 -0.0277778 0.       -12 $ to 7.79167
+  OUTBND_LINE(6)  =  7.791667 56.591667  0.        0.0166667 31 $ to 57.09167+1nm
+  OUTBND_LINE(7)  =  7.791667 57.108333  0.0277778 0.0166667 48 $ to 9.125 57.908
+  OUTBND_LINE(8)  =  9.125    57.908333  0.0277778 0.        56 $ to 10.68056
+  OUTBND_LINE(9)  = 10.680555 57.908333  0.        0.0166667 59 $ to 58.89167
+  OUTBND_LINE(10) = 10.680555 58.891667 -0.0277778 0.        27 $ to 9.930555
+  OUTBND_LINE(11) =  9.930555 58.891667  0.        0.0166667  4 $ to 58.94167+1nm
+/
 ! -------------------------------------------------------------------- !
 ! WAVEWATCH III - end of namelist                                      !
 ! -------------------------------------------------------------------- !

@@ -136,7 +136,7 @@
 ! -------------------------------------------------------------------- !
 &GRID_NML
   GRID%NAME         =  'DKinner (Inner Danish 1nmi)'
-  GRID%NML          =  '../setup/namelists_DKinner.nml'
+  GRID%NML          =  'namelists.nml'
   GRID%TYPE         =  'RECT'
   GRID%COORD        =  'SPHE'
   GRID%CLOS         =  'NONE'

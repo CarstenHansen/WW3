@@ -136,7 +136,7 @@
 ! -------------------------------------------------------------------- !
 &GRID_NML
   GRID%NAME         =  'NS3 (North Sea - Kattegat)'
-  GRID%NML          =  'namelists_NS3.nml'
+  GRID%NML          =  'namelists.nml'
   GRID%TYPE         =  'RECT'
   GRID%COORD        =  'SPHE'
   GRID%CLOS         =  'NONE'
@@ -372,7 +372,7 @@ INBND_POINT(4) =     2   35 T  !
 !     OUTBND_LINE(I)        = 0. 0. 0. 0. 0   ! included lines
 ! -------------------------------------------------------------------- !
 &OUTBND_COUNT_NML
-  OUTBND_COUNT%N_LINE   =  9
+  OUTBND_COUNT%N_LINE   =  10
 /
 &OUTBND_LINE_NML
 ! Nest1: DKinner (old 1 nmi grid), Kattegat part:
@@ -380,14 +380,15 @@ INBND_POINT(4) =     2   35 T  !
 ! Nest2: DBJ1 (Harlesiel to Thyboroen) 
 !   8.18056+0.0277778 56.74167+1nm 7.68056 53.74167-1nm
   OUTBND_LINE(2)  =  7.6805555 53.725003 0.        0.0166667 -190 $ to 56.891
+  OUTBND_LINE(3)  =  7.6805555 56.875009 0.0277778 0.        20 $ to 8.20833
 ! Nest3: SDK1 Skagerrak - DK 1nm
-  OUTBND_LINE(3)  =  8.125000 56.591667 -0.0277778 0.       -12 $ to 7.79167
-  OUTBND_LINE(4)  =  7.791667 56.591667  0.        0.0166667 31 $ to 57.09167+1nm
-  OUTBND_LINE(5)  =  7.791667 57.108333  0.0277778 0.0166667 48 $ to 9.125 57.908
-  OUTBND_LINE(6)  =  9.125    57.908333  0.0277778 0.        56 $ to 10.68056
-  OUTBND_LINE(7)  = 10.680555 57.908333  0.        0.0166667 59 $ to 58.89167
-  OUTBND_LINE(8)  = 10.680555 58.891667 -0.0277778 0.        27 $ to 9.930555
-  OUTBND_LINE(9)  =  9.930555 58.891667  0.        0.0166667  4 $ to 58.94167+1nm
+  OUTBND_LINE(4)  =  8.125000 56.591667 -0.0277778 0.       -12 $ to 7.79167
+  OUTBND_LINE(5)  =  7.791667 56.591667  0.        0.0166667 31 $ to 57.09167+1nm
+  OUTBND_LINE(6)  =  7.791667 57.108333  0.0277778 0.0166667 48 $ to 9.125 57.908
+  OUTBND_LINE(7)  =  9.125    57.908333  0.0277778 0.        56 $ to 10.68056
+  OUTBND_LINE(8)  = 10.680555 57.908333  0.        0.0166667 59 $ to 58.89167
+  OUTBND_LINE(9)  = 10.680555 58.891667 -0.0277778 0.        27 $ to 9.930555
+  OUTBND_LINE(10) =  9.930555 58.891667  0.        0.0166667  4 $ to 58.94167+1nm
 /
 ! -------------------------------------------------------------------- !
 ! WAVEWATCH III - end of namelist                                      !

@@ -136,7 +136,7 @@
 ! -------------------------------------------------------------------- !
 &GRID_NML
   GRID%NAME         =  'ARCT18 (N N Atlant - Arctic)'
-  GRID%NML          =  '../setup/namelists_ARCT18.nml'
+  GRID%NML          =  'namelists.nml'
   GRID%TYPE         =  'RECT'
   GRID%COORD        =  'SPHE'
   GRID%CLOS         =  'NONE'
