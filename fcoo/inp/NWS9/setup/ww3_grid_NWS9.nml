@@ -136,7 +136,7 @@
 ! -------------------------------------------------------------------- !
 &GRID_NML
   GRID%NAME         =  'NWS9 (European N-W Shelf)'
-  GRID%NML          =  '../setup/namelists_NWS9.nml'
+  GRID%NML          =  'namelists.nml'
   GRID%TYPE         =  'RECT'
   GRID%COORD        =  'SPHE'
   GRID%CLOS         =  'NONE'

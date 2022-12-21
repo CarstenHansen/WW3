@@ -386,7 +386,7 @@
 
 ! Switch IC5, with namelist option IC5VEMOD=3:
 ! Liu_et_al._2020_JPO Eq (20) k_i = eta h_i^1 omega^3 / (rho_w g^2)
-! eta=3.0 kg/m^3/s == paremeter 'IC2' (IC3 and IC4 are read but not used!).
+! suggest eta=10.0 kg/m^3/s == parameter 'IC2' (IC3 and IC4 are read but not used!).
 ! Rogers et al., 2021, estimates a much higher coefficient,
 !  HOMOG_INPUT(1)%VALUE1      = 23.4
 ! and also achieves a best fit with k_i multiplied by a frequency measure to power 1
@@ -396,7 +396,7 @@
 
 &HOMOG_INPUT_NML
   HOMOG_INPUT(1)%NAME        = 'IC2'
-  HOMOG_INPUT(1)%VALUE1      = 3.0
+  HOMOG_INPUT(1)%VALUE1      = 6.0
 
   HOMOG_INPUT(2)%NAME        = 'IC3'
   HOMOG_INPUT(2)%VALUE1      = 917.0
