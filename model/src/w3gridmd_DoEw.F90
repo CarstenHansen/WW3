@@ -2753,6 +2753,9 @@ CONTAINS
     ! USXT='Pf-5': Spectrum of Stokes drift with a SIG^{-2} tail as for a
     !              variance spectrum with a Phillips (1958) freq^{-5} tail
     !              and a constant directional spread.
+#ifdef W3_STVP
+    ! USXT='DoEw': Donelan-Ewans 
+#endif
     USXFM=10     ! Cut-off frequency USXF (Real) (Hz).
     ! USXF>=10Hz means integration to infinity.
     !
@@ -2979,7 +2982,11 @@ CONTAINS
     USXF = MAX ( USXFM, SIG(NK)/TPI )
     WRITE (NDSO,4851) USXT
     WRITE (NDSO,4852) USXF
-    IF ( USXT .NE. 'none' .AND. USXT .NE. 'Pf-5' ) THEN
+    IF ( USXT .NE. 'none' .AND. USXT .NE. 'Pf-5' &
+#ifdef W3_STVP
+         .AND. USXT .NE. 'DoEw'                  &
+#endif
+         ) THEN
        WRITE(NDSE,1055) 'USXTT', USXT
        CALL EXTCDE ( 41 )
     ENDIF

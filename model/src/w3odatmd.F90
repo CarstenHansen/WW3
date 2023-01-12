@@ -140,7 +140,6 @@ MODULE W3ODATMD
   !      OFILES   I.A.  Public   Output in one or several files.
 #ifdef W3_STVP
   !      NZO       Int.  Public   Number of output profile depths
-  !      OFCUT     TYPE  Public   Physical low-pass frequency for a field
 #endif
   !     ----------------------------------------------------------------
   !
