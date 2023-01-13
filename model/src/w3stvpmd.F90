@@ -275,7 +275,7 @@
 ! Building the normalized stokes tail look-up
       INTEGER             :: nt
       REAL, allocatable   :: DNSI0(:)
-      REAL                :: tRk, XKHpm3h, XKHpm3nh, XKHpm1, XKHpp1
+      REAL                :: xfk, tRk, XKHpm3h, XKHpm3nh, XKHpm1, XKHpp1
 
       
       stvp_verbose = VERBOSENESS%STVP
@@ -413,22 +413,24 @@
 !/ ------------------------------------------------------------- /
 ! Initializations for calculations related to the diagnostic tail range
 
-! cha 20121123: Shift fitting interval limits away from NK, from NK-4 to NK-1
+! Fitting interval limits from IKST=NK-4 to IKT=NK-1
       IF ( USXT == 'Pf-5' ) THEN
          ! Phillips saturation
          Pn = 5
          IKT = NK - 1
-! cha 20110627: IKST: Lower edge of tail fitting to the prognostic spectrum
+! IKST: Bin of the lower edge of tail fitting to the prognostic spectrum
          IKST = NK - 4
       ELSE IF ( USXT == 'none' ) THEN
-         RETURN
+         RETURN ! No tail extension
       ELSE
         WRITE (NDSV, 916), 'STVP_INIT: Unknown spectral tail type: ', USXT
         CALL EXTCDE ( 73 )
       END IF
 
 ! NP, XKH: Number of bins and relative wavenumber increment of the lookup
-! array for the diagnostic part of the Stokes profile
+! array for the diagnostic part of the Stokes profile.
+! The choice of XKH should be an integer fraction of XFR**2, and NP must
+! be so that SIG(IKT)/SIG(1) <= XKH**(NP/2) (at least)
       NP = NK
       XKH = XFR**2
 
@@ -440,8 +442,8 @@
       k_t = SIG(IKT)**2/GRAV
       
       ! The integrated pseudo-momentum of the diagnostic spectral tail is
-      ! M_tail = m1Bg * Im        
-      Im = 1./(3. * SIG(IKT)**3)
+      ! M_tail = m1Bg * Im. The tail is added from the edge of bin IKT,
+      Im = 1./(3. * (SIG(IKT)*(SQRT(XFR)))**3)
 
       if ( USXF < 10.0 ) then
         sig_c = TPI * USXF
@@ -451,20 +453,32 @@
       
       ! Aassuming deep water waves overall, (g/k_s)^1/2 = g/SIG_S
       ! The tail Stokes drift profile is
-      ! U_S_tail(Z) = m1s B g/SIG_S NSI(IZK, IKt)
+      ! U_S_tail(Z) = m1Bg/SIG_S NSIZ(IZK, IKt)
       ! where
-      ! NSI(IZK, IKt)= \sum_IKt^NP (k/k_s)^-3/2 exp (-2k/k_s ZK_S) D k/k_s
+      ! NSIZ(IZK, IKt)= \sum_IKt^NP DNSI0(IK) exp (-2k/k_s ZK_S)
+      ! DNSI0(IK) = (k/k_s)^-3/2 D k/k_s
+      ! We have:
+      ! k/k_s = k_0/k_s * ( XKH^1, XKH^2, ..., XKH^N, ... ), N=1..NP
+      ! where k_0 = k_t * XFR/SQRT(XKH)  .
+      ! d k/k_s = k_0/k_s * ( ...,( XKH^(N+1) - XKH^(N-1) )/2, ... ), N=1..NP
+      ! The look-up function is (k_t/k_s)^-1/2 times a sum from IKt over the
+      ! elements
+      ! DNSI0(1,2,...)
+      !    = (k_t/k_0)^1/2 ( ..., XKH^-3N/2 ( XKH^(N+1) - XKH^(N-1) )/2 , ... )
       
-      ! k/k_s = k_t/k_s * ( XKH, XKH^2, ..., XKH^N, ... ), N=1..NP
-      ! d k/k_s = k_t/k_s * (...,( XKH^(N+1) - XKH^(N-1) )/2,... ), N=1..NP
-
-      ! DNSI0(1,2,...) = (k/k_s)^-3/2 D k/k_s
-      !   = (...,XKH^-3N/2 * ( XKH^(N+1) - XKH^(N-1) )/2,... ), N=1..NP
-
+      ! k_t/k_0      
+      xfk = SQRT(XKH)/XFR
+      
+      ! Multiplier for XKH^-3N/2
       XKHpm3h = XKH**(-1.5)
-      XKHpm3nh = 1
-      XKHpm1 = 1/XKH * 0.5
+      
+      ! Initialize at nt=0
+      ! sqrt(xfk) * XKH^{-3 nt/2}:
+      XKHpm3nh = SQRT( xfk )
+      ! XKH^{(nt+1)/2}:
       XKHpp1 = XKH * 0.5
+      ! XKH^{(nt-1)/2}:
+      XKHpm1 = 1./XKH * 0.5
       DO nt = 1,NP
         ! DNSI0(nt) = XKH**-(3*nt/2) * 0.5 * (XKH**(nt+1) - XKH**(nt-1))
         ! XKHp3nmh = (XKH**(-1.5))**nt
@@ -480,14 +494,15 @@
       ! shape for spectral bins of the diagnostic tail.
       ! Also, to help determine the look-up index nt, set IKrange(nt) = XKH**nt
       
-      tRk = 2.
+      tRk = 2. / xfk
       DO nt=1,NP
         tRk = tRk*XKH ! = 2 * XKH**nt
         NSIZ(:,nt) = DNSI0(nt) * exp( -tRk * ZK_S(:) )
         if (nt == NP) exit
-        IKrange(nt) = tRk
+        IKrange(nt) = tRk * xfk
       END DO
       IKrange(:) = 0.5 * IKrange(:)
+      
       ! Accumulated sum downwards from the high end of the spectral tail
       DO nt=NP-1,1,-1
          NSIZ(:,nt) = NSIZ(:,nt) + NSIZ(:,nt+1) 
@@ -496,9 +511,12 @@
       deallocate ( DNSI0 )
       
       ! Application:
-      ! ! 1) Determine nt so that k_t/k_s = XKH**nt, and nc so k_c/k_s = XKH**nc
+      ! ! 1) Determine the nearest integer nt so that k_t/k_s ~= XKH**(nt-1), and
+      ! ! determine nc so that k_c/k_s ~= XKH**(nc-1)
       ! nt = index(IKrange,k_t/k_s); nc = index(IKrange*k_c,k_c/k_s)
-      ! ! 2) Diagnostic tail contribution to the drift profile
+      ! ! Then ajust k_s (also a scale for the prognostic range) to
+      ! k_s = k_t / XKH**(nt-1)
+      ! ! 2) The diagnostic tail contribution to the drift profile is
       ! SIG_S = TPI/T02
       ! U_S_tail(ft)(:) = m1Bg / SIG_S * ( NSIZ(:,nt) - NSIZ(:,nc) )
       ! ! 3) Total Stokes drift
@@ -697,18 +715,6 @@
         K_S = SIG_S**2 / GRAV
       END IF
 
-      ! From here, we will use the dimensionless water depth
-      KDPT = K_S * DEPTH
-
-      ! numDepths: Number of depths of the discrete profile above the sea floor
-      numDepths = SPND ! SPND is the configured value
-
-      DO IZ = SPND,1,-1
-        IF ( ZK_S(IZ) > KDPT ) CYCLE
-        numDepths = IZ
-        EXIT
-      END DO
-
       IF ( NP == 0 ) THEN
 
         IF ( stvp_verbose .gt. 0  .and. JSEA .eq. 1 ) &
@@ -729,22 +735,29 @@
         ! The integrated pseudo-momentum of the diagnostic tail has the magnitude
         M_tail = m1Bg * Im        
 
-        ! Determine the index nt of the Stokes look-up, so that k_t/k_s = XKH**nt
+        ! Determine the nearest index nt of the tail look-up, so that
+        ! k_t/K_S ~= XKH**(nt-1)
         ! ( IKrange = XKH**nt / k_t for nt=1,..shape(NSIZ)(2)-1 )
-            ! This would yield same result: nt = minloc( abs(IKrange - k_t/k_s) )
+        ! ( This would yield same result: nt = minloc( abs(IKrange - k_t/K_S) )
         ksi=k_t/K_S
         do nt=2,size(IKrange)
           if (IKrange(nt) > ksi) exit
         end do
-        ! Note, we append this at the prognostic bin IKT which has full bin width
+        ! Note, we append the tail at frequencies above the prognostic bin IKT,
+        ! which has full bin width
 
+        ! Ajust the wavenumber scale K_S slightly to the nearest discrete
+        ! value where the tail matches most precisely        
+        K_S = k_t/XKH**(nt-1)
+        SIG_S = SQRT(K_S * GRAV)
+        
         ! The diagnostic Stokes drift profile, at dimensionless depths Z K_S,
         ! has the magnitude
         U_S_tail(:) = m1Bg / SIG_S * NSIZ(:,nt)
         
         if ( USXF < 10.0 ) then
-          ! If we assume a high-frequency cut-off
-          ! Determine the index nc of the cut-off, so that k_c/k_s = XKH**nt
+          ! If we assume a high-frequency cut-off, determine
+          ! the index nc of the cut-off, so that k_c/K_S = XKH**nt
           ksi=k_c/K_S
           do nc=nt,size(IKrange)
             if (IKrange(nc) > ksi) exit
@@ -757,6 +770,18 @@
         U_S_tail(numDepths+1:SPND) = 0.
 
       END IF ! ( NP == 0 )
+
+      ! From here, we will use the dimensionless water depth
+      KDPT = K_S * DEPTH
+
+      ! numDepths: Number of depths of the discrete profile above the sea floor
+      numDepths = SPND ! SPND is the configured value
+
+      DO IZ = SPND,1,-1
+        IF ( ZK_S(IZ) > KDPT ) CYCLE
+        numDepths = IZ
+        EXIT
+      END DO
 
       ! Prognostic spectrum range IK=1, IKT
 
