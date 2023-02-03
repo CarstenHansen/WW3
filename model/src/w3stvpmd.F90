@@ -1,17 +1,18 @@
 !> @file w3stvpmd.F90
-!> @brief Extended spectral tail for Stokes drift profile.
+!> @brief Vertical profile of the Stokes drift with extended spectral tail.
+
 !> @author Carsten Hansen @date 21-Jan-2021
 #include "w3macros.h"
 !/ ------------------------------------------------------------------- /
       MODULE W3STVPMD
-!/ over
+!/
 !/                  +------------------------------------------+
 !/                  | Stokes drift  profile with extended      |
 !/                  | spectral tail                            |
 !/                  |          Carsten Hansen                  |
 !/                  | Danish defence Joint GEOMETOC Support    |
 !/                  |                            FORTRAN 90    |
-!/                  | Last update :             03-Jan-2023    |
+!/                  | Last update :             03-Feb-2023    |
 !/                  +------------------------------------------+
 !/
 !/    02-Jan-2023 : Implement option USXT = 'Pf-5': Frequency^{-5} tail with no
@@ -21,16 +22,16 @@
 !>  @brief Purpose, and output data.
 !>
 !>  @details
-!>  Calculate the vertical profile of the Stokes drift, using an assumed
-!>  power-law spectral tail (Phillips' frequency^{-5} for the diagnostic parts
-!>  of the spectrum at high frequencies. It assumes that there is no spectral
-!>  broadening as function of frequency, i.e. the so-called 'first circular
-!>  moment' (Ewans, 1997) is assumed constant in the diagnostic tail. A namelist
-!>  parameter USXT = 'Pf-5' must be set to add this tail.
+!>  Calculate the vertical profile of the Stokes drift at a few discrete depths,
+!>  using an assumed power-law spectral tail (Phillips' frequency^{-5}) for the
+!>  diagnostic parts of the spectrum at high frequencies. It assumes that there
+!>  is no spectral broadening as function of frequency, i.e. the so-called
+!>  'first circular moment' (Ewans, 1997) is assumed constant in the diagnostic
+!>  tail. A namelist parameter USXT = 'Pf-5' must be set to add this tail.
 !>  
-!>  This replaces earlier versions with a described directional distribution
-!>  following the empirical results of Ewans (1997) in conjunction with an
-!>  assumed power-law of frequency^{-4}. This could be re-implemented and
+!>  This replaces an earlier version that has a described directional
+!>  distribution following the empirical results of Ewans (1997) in conjunction
+!>  with an assumed power-law of frequency^{-4}. This could be re-implemented and
 !>  activated by a namelist parameter USXT = 'DoEw'. However the numerical
 !>  logics are somewhat more complicated to comprehend, and the difference is
 !>  small.
@@ -95,11 +96,12 @@
 !>  The integrated pseudo-momentum [ per m^2 ] of the spectral tail is a vector
 !>  rho g M_tail, 
 !>  @verbatim
-!>    M_tail = \int_ft^\fc int_-pi^pi kv/sig H(sig,theta) d theta d sig
+!>    M_tail = \int_sig_t^sig_c int_-pi^pi kv/sig H(sig,theta) d theta d sig
 !>  @endverbatim
-!>  Here, ft it the tail start frequency, fc is a high-frequency cut-off, and
-!>  kv is the spectral wave number vector, kv = k * (cos(theta), sin(theta)).
-!>  Assume the tail components are all deep-water waves. Then k = sig^2/g.
+!>  Here, sig_t it the tail start frequency, sig_c is a user-specified
+!>  high-frequency cut-off, and kv is the spectral wave number vector,
+!>  kv = k * (cos(theta), sin(theta)). Assume the tail components are all
+!>  deep-water waves. Then k = sig^2/g.
 !> 
 !>  Assume a constant directional distribution,
 !>  @verbatim
@@ -112,51 +114,55 @@
 !>  @endverbatim
 !>  
 !>  For z = 0 at the very surface we find the contribution to the Stokes drift
-!>  magnitude from the spectral tail between the frequencies ft and fc,
+!>  magnitude from the spectral tail between the frequencies sig_t and sig_c,
 !>  @verbatim
-!>    U_S_tail(z=0) = \int_ft^fc 2 m1s/g sig^3 B g^2 sig^-5 d sig
-!>       = 2 m1s B g ( sig(ft)^-1 - sig(fc)^-1 )
+!>    U_S_tail(z=0) = \int_sig_t^sig_c 2 m1s/g sig^3 B g^2 sig^-5 d sig
+!>       = 2 m1s B g ( sig(sig_t)^-1 - sig(sig_c)^-1 )
 !>        [ units: m s^-1 ]
 !>  @endverbatim
 !>  The tail contribution to the magnitude of the integral Stokes drift is
 !>  @verbatim
-!>    M_tail = \int_ft^fc m1s/g sig B g^2 sig^-5 d sig
-!>       = 1/3 m1s B g ( sig(ft)^-3 - sig(fc)^-3 )
+!>    M_tail = \int_sig_t^sig_c m1s/g sig B g^2 sig^-5 d sig
+!>       = 1/3 m1s B g ( sig(sig_t)^-3 - sig(sig_c)^-3 )
 !>        [ units: m s ]
 !>  @endverbatim
-!>  At depth z>0, the Stokes drift magnitude is an 'incomplete-Gamma' integral
+!>  At depth z>0, the Stokes drift magnitude is an 'incomplete-Gamma' function
+!>  defined as the integral
 !>  @verbatim
-!>    U_S_tail(z) = \int_ft^fc 2 m1s B g sig^-2 exp(-2 k z) d sig
-!>       = \int_ft^fc m1s B g^1/2 k^-3/2 exp(-2 k z) d k
-!>       = m1s B (2 g z)^1/2 \
-!>         * ( GammaInc(-1/2, 2 k_t z) - GammaInc(-1/2, 2 k_c z) )
+!>    U_S_tail(z) = \int_sig_t^sig_c 2 m1s B g sig^-2 exp(-2 k z) d sig
+!>       = \int_k_t^k_c m1s B g^1/2 k^-3/2 exp(-2 k z) d k
+!>       = m1s B (2 g z)^1/2 (GammaInc(-1/2, 2 k_t z) - GammaInc(-1/2, 2 k_c z))
 !>  @endverbatim
-!>  where k_t = (2 pi ft)^2/g, k_c = (2 pi fc)^2/g .
+!>  where k_t = sig_t^2/g, k_c = sig_c^2/g .
 !>
 !>  In the actual numerical approximation we don't need to calculate the
 !>  incomplete Gamma function. We can perform the discrete integration as:
 !>  @verbatim
-!>    U_S_tail(k_s z) = \sum_ft^fc m1s B g^1/2 k^-3/2 exp(-2 k z) D k
-!>       =  \sum_ft^fc m1s B (g/k_s)^1/2 (k/k_s)^-3/2 exp(-2 z k_s k/k_s) D k/k_s
+!>    U_S_tail(k_s z) = \sum_k_t^k_c m1s B g^1/2 k^-3/2 exp(-2 k z) D k
+!>      = \sum_k_t^k_c m1s B (g/k_s)^1/2 (k/k_s)^-3/2 exp(-2 z k_s k/k_s) D k/k_s
 !>  @endverbatim
 !>  This shows that we can apply a look-up function
 !>  @verbatim
-!>    NSIZ(IZK, IKt) = \sum_IKt^NP (k/k_s)^-3/2 exp(-2 z k_s k/k_s) D k/k_s
+!>    NSIZ(IZK, it) = \sum_it^NT (k/k_s)^-3/2 exp(-2 z k_s k/k_s) D k/k_s
 !>  @endverbatim
-!>  where IZK is the index (1..NDP) of the user-defined discrete values of z k_s.
+!>  where IZK is the index (1..NDP) of the user-defined discrete values of z k_s,
+!>  and it is the index (1..NT) where k_t/k_s ~ XKR^(it-1)    
 !>  The summation is over binned values of k/k_s over a subsection of the range
-!>  ( XKH, XKH^2, ..., XKH^NP ) starting at bin number IKt where
-!>  k_t/k_s ~ XKH^IKt. For the value of XKH we have chosen the same increments
-!>  as for the model discrete wavenumber intervals, XKH = XFR**2, and we have
-!>  set NP = NK. Similarly we subtract the highest frequencies beyond the
-!>  cut-off k_c/k_s so that approximately,
+!>  ( XKR, XKR^2, ..., XKR^NT ) starting at the bin number it.
+!>  For the value of XKR we have chosen the same increment factor XFR as for the
+!>  model discrete frequency intervals, XKR = XFR**2.
+!>  We have chosen a value of NT as the highest possible value reaching the
+!>  user-specified high-frequency cutoff sig_c (sig_c/(2pi) defaults to 10 Hz),
+!>  SIG(1)^2*XKR^NT ~ sig_c^2 rad/s, or NT = 2 LOG(sig_c/SIG(1))/LOG(XKR).
+!>  We subtract the highest frequencies beyond the cut-off k_c ~= k_s XKR^(ic-1)
+!>  so that approximately,
 !>  @verbatim
-!>    U_S_tail(k_s z) = m1s B (g/k_s)^1/2 ( NSIZ(IZK, IKt) - NSIZ(IZK, IKc) )
+!>    U_S_tail(k_s z) = m1s B (g/k_s)^1/2 ( NSIZ(IZK, it) - NSIZ(IZK, ic) )
 !>  @endverbatim
-!>  In the present implementation we *define* the wavenumber scale as
-!>  k_s = SIG_S^2/g, where SIG_S = 2 pi/T02. This setting may be changed
-!>  in the future, thus k_s is provided in the output as a netCDF variable
-!>  'ksc'.
+!>  In the present implementation we *define* the wavenumber scale k_s as based
+!>  on the integral wave period measure T02, k_s = (2 pi/T02)^2/g.
+!>  This setting may be changed in the future, thus k_s is provided in the
+!>  output as a netCDF variable 'ksc'.
 !>             
 !/ ------------------------------------------------------------------- /
       USE CONSTANTS, ONLY: GRAV, TPI
@@ -182,47 +188,57 @@
 !/ Local parameters
 !/
 
-! Stokes drift for the diagnostic tail. Scalable array and depths factor
-! DFH: Relative increment of wavenumber bin-to bin for the diagnostic Stokes
-!      array
-! NP:  Number of wavenumber bins in the diagnostic stokes array.
-
-      REAL               :: XKH
-      INTEGER            :: NP
-
 ! File id. for verbose output
       INTEGER            :: NDSV
 !
       INTEGER            :: stvp_verbose = 1
       
-! Look-up lists for Stokes spectral tail calculation
-      REAL, allocatable  :: IKrange(:) ! (NP-1)
-      REAL, allocatable  :: NSIZ(:,:) ! (NZ,NP)
-
-! Power of the spectral tail decay
-      REAL               :: Pn = 5.0
-
-! k_t: Wavenumber at bin IKT; k_c: wavenumber at the cut-off frequency USXF
-      REAL               :: k_t, k_c
-
-! Profile arrays
-      REAL, allocatable  :: U_S_tail(:)
-
+! A global limiter to K_S
+      REAL               :: K_S_max
+      
+! Profile array factors
       REAL, allocatable  :: A2S(:), TZ_S(:), ETKZ(:)
 
 ! Normalized integral momentum (might be an array if transition freq IKT varies)
       REAL               :: Im
+
+! For calculation of shallow water Stokes drift
+      REAL, allocatable  :: fkd(:,:), fkdm(:,:) ! (1:NK,1:NSEAL)
+      
+! For calculation of exp(2 K(IK) Z) = exp(2 K(IK-1) Z) * exp(2 (K(IK)-K(IK-1)) Z)
+! K(IK)-K(IK-1) = WN(IK,JSEA) - WN(IK-1,JSEA)
+      REAL, allocatable  :: DWN(:,:)
+      
+! Drift profile contribution from an extended spectral tail
+      REAL, allocatable  :: U_S_tail(:)
+
+! Stokes drift in the diagnostic tail (look-up table for the extended tail).
+
 
 ! Tail transition indices
 ! IKST: Lower edge of tail estimation from prognostic spectrum
 ! IKT:  Upper edge of tail estimation.
       INTEGER            :: IKST, IKT
 
-! For calculation of shallow water Stokes drift
-      REAL, allocatable  :: fkd(:,:), fkdm(:,:) ! (1:NK,1:NSEAL)
+! k_t: Wavenumber at bin IKT
+! k_c: Wavenumber at the cut-off frequency USXF
+! sig_c: Frequency at the cut-off frequency USXF
+      REAL               :: k_t, k_c, sig_c
+      
+! XKR, XFT: Relative increment of wavenumber, frequency bin-to bin for the
+!      diagnostic Stokes array (the extended tail)
+! NT: Number of wavenumber bins in the full discrete tail profile.
+! NP:  Number of bins in the look-up arrays that matches the range 1, IKT
+      REAL               :: XKR, XFT
+      INTEGER            :: NT
+      INTEGER            :: NP
 
-! 2* (WN(IK,JSEA)-WN(IK-1,JSEA))
-      REAL, allocatable  :: DWN(:,:)
+! Look-up lists for Stokes spectral tail calculation
+      REAL, allocatable  :: NSIZ(:,:) ! (NZ,NT)
+      REAL, allocatable  :: SIG_SI(:) ! (1,NP)
+      
+! Power of the spectral tail decay
+      REAL               :: Pn = 5.0
 
       PUBLIC :: CALC_STVP
 !/
@@ -267,16 +283,14 @@
       INTEGER             :: IERR
 
 ! Common Stokes drift depth distribution parameters
-      REAL                :: DEPTH, XZK, kd, kd_t, kd_d, fkd2, fkdm2, e2kd, shkd4
+      REAL                :: DEPTH, XZK, kd, e2kd, shkd4
+      REAL                :: kd_t, kd_d, dkd, fkd_t, fkdm_t
       INTEGER             :: IZ
       logical             :: OPENED
-! Frequency at the cut-off frequency USXF
-      REAL                :: sig_c
 ! Building the normalized stokes tail look-up
-      INTEGER             :: nt
+      INTEGER             :: ii
       REAL, allocatable   :: DNSI0(:)
-      REAL                :: tRk, XKHpm3h, XKHpm3nh, XKHpm1, XKHpp1
-
+      REAL                :: KRt, XKRpm3h, XKRpm3nh, XKRpm1, XKRpp1
       
       stvp_verbose = VERBOSENESS%STVP
       NDSV = NDST
@@ -284,11 +298,9 @@
       IF ( stvp_verbose .gt. 0 ) THEN
         INQUIRE (NDSV,OPENED=OPENED)
         IF ( .NOT. OPENED ) THEN
+          NDSV = NDSO
           stvp_verbose = 0
-          IF ( IAPROC == NAPOUT) THEN
-            NDSV = NDSO
-            stvp_verbose = VERBOSENESS%STVP
-            END IF
+          IF ( IAPROC == NAPOUT)  stvp_verbose = VERBOSENESS%STVP
           END IF
         END IF
 
@@ -310,10 +322,9 @@
 
       allocate( U_S_tail(SPND), stat=IERR )
 
-      ! For calculating exp(2 K Z) = exp(2 K0 Z) * exp( 2 (K-K0) Z )
+      ! For calculation of exp(2 K(IK) Z) ...
       allocate( DWN(NK,NSEAL), stat=IERR )
       
-
       ! Construct a scalable array ZK_S of the stokes profile for each
       ! individual sea point:
       !   ZK_S  = K_S * Z(m),
@@ -325,9 +336,9 @@
       ! SPBP: Power of profile depth progression
       !   Z_S(SPND) = SPDS / K_S
       ! Let K_S = (TPI/Tm02)**2 / GRAV
-      ! Dimensionless depths will be constructed as
+      ! The array of dimensionless depths will be constructed as
       !      ZK_S(IZ) = SPDS*(XZK**((IZ-1.)**SPBP) - 1.) for IZ = 1 .. SPND
-      ! The exponential base XZK is defined so that the deepest point is
+      ! The exponential base XZK is here defined so that the deepest point is
       ! ZK_S(SPND) = SPDS,
 
       XZK = 2.**((SPND*1.-1.)**(-SPBP))
@@ -336,24 +347,34 @@
       END DO
       ZK_S(:) = SPDS*(ZK_S(:) - 1.)
 
-      ! Shallow water Stokes profile parameters fkd(1:NK,1:NSEAL),
-      ! fkdm(1:NK,1:NSEAL) for calculation of the action-to-stokes factor
-      ! A2S(:) in subroutine STOKES_PROFILE
-
-      ! In the deep water limit,
+      ! Calculation for finite water depth of the action-to-stokes factor
+      ! A2S(:) in subroutine STOKES_PROFILE. There, the factor is:
+      ! A2S[IK,iz] = fkd[IK,JSEA] * ETKZ + fkdm[IK,JSEA] / ETKZ, where
+      ! ETKZ = EXP( - 2. * kz[iz] )
+      ! The gridded parameters fkd(1:NK,1:NSEAL), fkdm(1:NK,1:NSEAL) are to be
+      ! set here with a linear interpolation in a transitional range,
+      ! e.g. 2 < kd <= 3, from an exact shallow expression for
+      ! kd <= 2 to assumed deep water for kd > 3, where fkd=1, fkdm=0 
+      ! Note: At the surface where kz[1] = 0 we have ETKZ = 1, and 
+      !       A2Sf[IK,1] = 0.5 * COSH(2.*kd) / SINH(kd)**2
+      !                  = fkd[IK,JSEA] + fkdm[IK,JSEA]
+      !
+      ! Start fill the arrays as if all points and bins are deep water waves,
       fkd = 1.
       fkdm = 0.
       
-      ! Apply a linear interpolation in the range kd_t < kd <= kd_d of
-      ! transitional to deep water. Our choise is:
+      ! Apply a linear interpolation in the transitional range kd_t < kd <= kd_d
+      ! of shallow water waves to deep water. Our choice is:
       kd_t = 2. 
       kd_d = 3.
-      
+      dkd = kd_d-kd_t
+
+      ! At the lower wavenumber kd_t of this range, fkd=fkd_t and fkdm=fkdm_t are
+      ! calculated as:
       e2kd = exp (2.*kd_t)
       shkd4 = 4. * (sinh( kd_t ))**2
-      ! For use in calculation of fdk, fdkm:
-      fkd2 = e2kd/shkd4
-      fkdm2 = 1./ (e2kd * shkd4)
+      fkd_t = e2kd/shkd4
+      fkdm_t = 1./ (e2kd * shkd4)
 
       DO JSEA = 1,NSEAL
 #ifdef W3_DIST
@@ -363,146 +384,196 @@
         ISEA       = JSEA
 #endif
 
-        ! For finite depth Stokes profile shape, parameters fkd, fkdm:
         DEPTH  = MAX ( DMIN, DW(ISEA) )
 
+        ! The parameters fkd, fkdm are:
         DO IK=1,NK
           kd = WN(IK, ISEA) * DEPTH
 
-          ! kd>2: pure deep water (then fkd(IK,JSEA)=1 and fkdm(IK,JSEA)=0)
+          ! kd>kd_d: pure deep water (then keep the filled fkd=1 and fkdm=0)
           IF (kd .gt. kd_d) exit
 
           ! kd_t < kd <= kd_d: Linear interpolation of transitional to deep water
           IF (kd .gt. kd_t) THEN
-            fkd(IK,JSEA) = fkd2 * (kd_d - kd) + (kd - kd_t)
-            fkdm(IK,JSEA) = fkdm2 * (kd_d - kd)
+            ! Re-use the factors fkd_t, fkdm_t calculated for kd = kd_t
+            fkd(IK,JSEA) = ( fkd_t * (kd_d - kd) + (kd - kd_t) ) / dkd
+            fkdm(IK,JSEA) = ( fkdm_t * (kd_d - kd) ) / dkd
             CYCLE
-            END IF
+          END IF
 
           ! kd<kd_t: shallow water
           e2kd = exp (2.*kd)
           shkd4 = 4. * (sinh( kd ))**2
           fkd(IK,JSEA) = e2kd / shkd4
           fkdm(IK,JSEA) = 1./ (e2kd * shkd4)
-          ! In subroutine STOKES_PROFILE the action-to-stokes factor is
-          ! calculated as
-          ! A2Sf[IK,iz] = fkd[IK,JSEA] * ETKZ + fkdm[IK,JSEA] / ETKZ, where
-          ! ETKZ = EXP( - 2. * kz[iz] )
-          ! Note: At the surface where kz[1] = 0 we have ETKZ = 1, and 
-          !       A2Sf[IK,1] = 0.5 * COSH(2.*kd) / SINH(kd)**2
-          !                  = fkd[IK,JSEA] + fkdm[IK,JSEA]
           
         END DO ! IK=1,NK
 
-        ! For calculating exp(-2 K Z) = exp(-2 K0 Z) * exp( -2 (K-K0) Z ),
-        ! DWN(IK) = K - K0 = WN(IK) - WN(IK-1)
+        ! For calculation of exp(-2 K Z)
+        ! DWN(IK) = K(IK) - K(IK-1)
         DWN(1,JSEA) = WN(1,ISEA)
         DWN(2:NK,JSEA) = WN(2:NK,ISEA) - WN(1:NK-1,ISEA)
 
       END DO ! JSEA = 1,NSEAL
 
-      ! IKT: The upper edge of the prognostic range.
-      ! For a truncated spectrum with no tail extension:
-      IKT = NK
-      IKST = NK+1
-      NP = 0
-      
-      IF ( USXF*TPI <= SIG(NK) ) return
-      
-      
+      ! Set a global limiter to the scale parameter K_S
+      K_S_max = SIG(NK - 4)**2 / GRAV
+      ! The index NK - 4 here ensures that K_S is determined from at
+      ! least a number of order 6 of the highest prognostic bins
+
 !/ ------------------------------------------------------------- /
 ! Initializations for calculations related to the diagnostic tail range
 
-! cha 20121123: Shift fitting interval limits away from NK, from NK-4 to NK-1
+      ! IKT: The upper edge of the prognostic range.
+      ! NP: Number of bins of the lookup array for the spectral tail extension
+      !     that may match at the end of the prognostic range
+      ! For a truncated spectrum with no tail extension:
+      IKT = NK
+      NP = 0 ! NP=0 indicates no addition of a spectral tail
+
+      ! User-specified upper cutoff frequency for Stokes drift. At most 10 Hz
+      sig_c = TPI * MIN(USXF, 10.)
+      
+      ! Corresponding wavenumber
+      ! k_c = sig_c**2/GRAV
+      
+      ! If the user-specified cutoff for Stokes drift is within SIG(1..NK),
+      if ( sig_c <= SIG(NK) ) then
+        do IKT=NK-1,1,-1
+          if ( sig_c > SIG(IKT) ) exit
+        end do
+        ! End the prognostic summation at IKT with no addition of a spectral tail
+        return
+      end if      
+      
+! Fitting interval limits from IKST=NK-4 to IKT=NK-1
       IF ( USXT == 'Pf-5' ) THEN
          ! Phillips saturation
          Pn = 5
          IKT = NK - 1
-! cha 20110627: IKST: Lower edge of tail fitting to the prognostic spectrum
+! IKST: Bin of the lower edge of tail fitting to the prognostic spectrum
          IKST = NK - 4
       ELSE IF ( USXT == 'none' ) THEN
-         RETURN
+         RETURN ! No tail extension. The value NP = 0 will indicate this.
       ELSE
-        WRITE (NDSV, 916), 'STVP_INIT: Unknown spectral tail type: ', USXT
+        WRITE (NDSE, 916), 'STVP_INIT: Unknown spectral tail type: ', USXT
         CALL EXTCDE ( 73 )
       END IF
 
-! NP, XKH: Number of bins and relative wavenumber increment of the lookup
-! array for the diagnostic part of the Stokes profile
-      NP = NK
-      XKH = XFR**2
+! In the fittting of an extended tail at index IKT it will be required
+! that K_S_max <= SIG(IKT)**2 / GRAV. Ensure that this is so
+      K_S_max = min( K_S_max, SIG(IKT)**2 / GRAV )
+      
+! To simplify the notations later in the usage of look-up arrays for
+! the spectral tail, we will formally represent the wave number scale K_S by
+! a discretized array SIG_SI(1:NP) so that for each element sig_s = SIG_SI(it)
+! the wavenumber scale is K_S = sig_s^2/g.      
+! 
+! Let XKR be the relative wavenumber increment of the lookup array for the
+! extended tail part of the Stokes profile. In the present formulation, the
+! choice of XKR must be an integer root r: XKR = (XFR**2)**(1/r). We choose
+! r = 1. The length of the look-up table NT must be so that
+! sig_c/SIG(1) <= XKR**(NT/2) (at least).
+!      
+! Note that for r=1 the first NK values in SIG_SI will coincide with
+! the values of the prognostic angular frequencies SIG(1..NK)
+! Be aware that when the depth is limited, the elements of the array SIG_SI
+! are NOT (precisely) equal to the true angular frequencies SIG(1..NK)      
 
-      allocate ( DNSI0(NP), stat=IERR )
-      allocate( NSIZ(SPND, NP), stat=IERR )
-      allocate( IKrange(NP-1), stat=IERR )
+      XKR = XFR**2
+      NT = ceiling( 2. * LOG( sig_c/SIG(1) ) / LOG(XKR) ) + 1
+      NP = nint( 2. * LOG( SIG(IKT)/SIG(1) ) / LOG(XKR) ) + 1
 
-      ! Wavenumber at bin IKT, approximated as deep water waves
+      allocate ( DNSI0(NT-1), stat=IERR )
+      allocate( NSIZ(SPND, NT), stat=IERR )
+      allocate( SIG_SI(NP), stat=IERR )
+
+! The waves beyond bin IKT are approximated as deep water waves. Thus
       k_t = SIG(IKT)**2/GRAV
       
-      ! The integrated pseudo-momentum of the diagnostic spectral tail is
-      ! M_tail = m1Bg * Im        
-      Im = 1./(3. * SIG(IKT)**3)
+! We will make use of the frequency increment factor of the look-up tail
+      XFT = SQRT(XKR)
+      
+! The formal representation of K_S by a discretized array SIG_SI(1:NP) is
+      SIG_SI(1) = SIG(1)
+      do ii=2,NP
+         SIG_SI(ii) = SIG_SI(ii-1) * XFT
+      end do
+      
+! The integrated pseudo-momentum of the diagnostic spectral tail is
+! M_tail = m1Bg * Im. The tail is added from the upper edge of bin IKT.
+      Im = 1./(3. * (SIG(IKT)*(SQRT(XFR)))**3)
 
-      if ( USXF < 10.0 ) then
-        sig_c = TPI * USXF
-        k_c = sig_c**2/GRAV
-        Im = Im - 1./(3. * sig_c**3)
-      end if
+! Subtract the range beyond the cut-off frequency
+      Im = Im - 1./(3. * sig_c**3)
       
-      ! Aassuming deep water waves overall, (g/k_s)^1/2 = g/SIG_S
-      ! The tail Stokes drift profile is
-      ! U_S_tail(Z) = m1s B g/SIG_S NSI(IZK, IKt)
-      ! where
-      ! NSI(IZK, IKt)= \sum_IKt^NP (k/k_s)^-3/2 exp (-2k/k_s ZK_S) D k/k_s
-      
-      ! k/k_s = k_t/k_s * ( XKH, XKH^2, ..., XKH^N, ... ), N=1..NP
-      ! d k/k_s = k_t/k_s * (...,( XKH^(N+1) - XKH^(N-1) )/2,... ), N=1..NP
+! Construction of NSIZ(IZ,it): A 'normalized, look-up' vertical Stokes
+! drift profile for spectral bins of the diagnostic tail.
+!
+! Let the scale parameter K_S be defined in terms of one of the usual
+! integral period measures. In the subroutine
+! STOKES_PROFILE we choose the 2'nd moment upcrossing period T02,
+! so that the speed term becomes (g/K_S)^1/2 = g T02 / (2 pi).
 
-      ! DNSI0(1,2,...) = (k/k_s)^-3/2 D k/k_s
-      !   = (...,XKH^-3N/2 * ( XKH^(N+1) - XKH^(N-1) )/2,... ), N=1..NP
+! The tail Stokes drift profile is
+!   U_S_tail(Z) = m1B (g/K_S)^1/2 NSIZ(IZ, it)
+! where
+!   NSIZ(IZ, it)= \sum_ii=it^NT DNSI0(ii) exp (-2k/K_S ZK_S)
+!   DNSI0(ii) = (k/K_S)^-3/2 D k/K_S
+! The look-up is constructed for k_t being an element in an array of
+! discrete bins k(it).
 
-      XKHpm3h = XKH**(-1.5)
-      XKHpm3nh = 1
-      XKHpm1 = 1/XKH * 0.5
-      XKHpp1 = XKH * 0.5
-      DO nt = 1,NP
-        ! DNSI0(nt) = XKH**-(3*nt/2) * 0.5 * (XKH**(nt+1) - XKH**(nt-1))
-        ! XKHp3nmh = (XKH**(-1.5))**nt
-        ! XKHpp1 = XKH**(nt+1)
-        ! XKHpm1 = XKH**(nt-1)
-        XKHpm3nh = XKHpm3nh * XKHpm3h
-        XKHpp1 = XKHpp1 * XKH
-        XKHpm1 = XKHpm1 * XKH
-        DNSI0(nt) = XKHpm3nh  * (XKHpp1 - XKHpm1)      
-      END DO      
-      
-      ! NSIZ(KZ,nt): A 'normalized, look-up' vertical Stokes Drift profile
-      ! shape for spectral bins of the diagnostic tail.
-      ! Also, to help determine the look-up index nt, set IKrange(nt) = XKH**nt
-      
-      tRk = 2.
-      DO nt=1,NP
-        tRk = tRk*XKH ! = 2 * XKH**nt
-        NSIZ(:,nt) = DNSI0(nt) * exp( -tRk * ZK_S(:) )
-        if (nt == NP) exit
-        IKrange(nt) = tRk
+! Now we seek to discretize the ratio k_t/K_S into an array:
+!   k(ii)/K_S ~= Kr(ii) = ( XKR^1, XKR^2, ..., XKR^ii, ... ), ii=1..NT
+! This construction is to be matched precisely to k_t at a certain
+! index it determined so that k_t * XKR = K_Sd * Kr(it), where K_Sd
+! is the discrete value nearest K_S. For example, if there were energy
+! at only one prognostic bin (i.e. precisely at k_t), then K_S = K_Sd = k_t
+! precisely, and we will apply the arrays at it = 1.
+! The discrete intervals have widths
+!   D k/K_S = ( k(ii)/K_S*SQRT(XKR) - k(ii-1)/K_S*SQRT(XKR) )
+!           = (SQRT(XKR) - 1/SQRT(XKR)) * ( k(ii)/K_S ), ii=1..NT
+
+! The look-up function at Z=0, NSIZ(1,it), is a sum from ii=it over
+! elements in DNSI0(1,2,...)
+!     = (..., XKR^-3ii/2, ...) (XFT-1/XFT) (..., XKR^ii, ...)
+!     = (XFT-1/XFT) (..., XKR^-ii/2, ...)
+!     = (XFT-1/XFT) (..., XFT^-ii, ...), ii=1..NT
+
+! Now, suppose the diagnostic tail increment is an integer fraction 1/r
+! of the prognostic increment, XFR = XFT^r. Then the start bin of the tail
+! is shifted relative to the prognostic bin by a factor XFR/XFT, and
+! DNSI0 is consequently shifted by a factor (XFT/XFR)^1/2. Thus
+
+      DNSI0(1) = SQRT( XFT/XFR ) * ( XFT - 1./XFT ) / XFT
+      DO ii = 2,NT-1
+        DNSI0(ii) = DNSI0(ii-1) / XFT
       END DO
-      IKrange(:) = 0.5 * IKrange(:)
-      ! Accumulated sum downwards from the high end of the spectral tail
-      DO nt=NP-1,1,-1
-         NSIZ(:,nt) = NSIZ(:,nt) + NSIZ(:,nt+1) 
+
+! NSIZ is a cumulated sum downwards from the high end of the spectral tail
+      KRt = -2. * XKR**NT ! starting at ii = NT
+      NSIZ(:,NT) = 0. ! Any value here (beyond the tail sig_c) will be subtracted
+      DO ii=NT-1,1,-1
+         KRt = KRt / XKR ! KRt = -2 * XKR**ii
+         NSIZ(:,ii) = NSIZ(:,ii+1) + DNSI0(ii) * exp( KRt * ZK_S(:) )
       END DO
 
-      deallocate ( DNSI0 )
-      
-      ! Application:
-      ! ! 1) Determine nt so that k_t/k_s = XKH**nt, and nc so k_c/k_s = XKH**nc
-      ! nt = index(IKrange,k_t/k_s); nc = index(IKrange*k_c,k_c/k_s)
-      ! ! 2) Diagnostic tail contribution to the drift profile
-      ! SIG_S = TPI/T02
-      ! U_S_tail(ft)(:) = m1Bg / SIG_S * ( NSIZ(:,nt) - NSIZ(:,nc) )
-      ! ! 3) Total Stokes drift
-      ! M_tail = m1Bg * Im
+! DNSI0 has now been accumulated in NSIZ(1,:) and is not needed further
+      deallocate ( DNSI0 )      
+
+! Application procedure in the subroutine STOKES_PROFILE():
+! ! 1) Determine the level m1 B g near SIG(IKT).
+! ! 2) For a choice of SIG_S = TPI/T02 based on the integral period T02,
+! !    determine the nearest integer it so that SIG(IKT)/SIG_S~=XFT**(it-1),
+! !    and the tail cut-off index ic so that sig_c/SIG_S~=XFT**(ic-1)
+! ! 3) The diagnostic tail contribution to the drift profile is, in case
+! !    SIG_S is one of the binned values, 
+!        U_S_tail(:) = m1Bg / SIG_S * ( NSIZ(:,it) - NSIZ(:,ic) )
+! !    For a value of SIG_S between two bins, apply a linear interpolation
+! !    between the corresponding neighbour indices it-1, it.
+! ! 4) The total Stokes drift is
+!        M_tail = m1Bg * Im
+
   904 FORMAT ('  ', A,I5,A)
   916 FORMAT ('  ', A, A)
 
@@ -511,7 +582,7 @@
 
       SUBROUTINE CALC_STVP (A)
 !/ ------------------------------------------------------------------- /
-!> @brief CALC_STVP (A) - Calculate the profiles looping over all seapoints
+!> @brief CALC_STVP (A) - Calculate the profiles looping over all sea points
 !>      
 !> @details
 !>  At each WW3 output time step, the subroutine STOKES_PROFILE is called to
@@ -636,6 +707,8 @@
 !/ ------------------------------------------------------------------- /
       SUBROUTINE STOKES_PROFILE(A, JSEA, T02)
 !/
+      USE W3GDATMD, ONLY: MAPSF
+      USE W3SERVMD, ONLY : EXTCDE
       IMPLICIT NONE
 !/
 !/ ------------------------------------------------------------------- /
@@ -652,23 +725,33 @@
       REAL                  :: SIG_S, DEPTH, KDPT
       INTEGER               :: numDepths, IZ
 
-      ! Factors for the prognostic calculation
-      REAL                  :: A2S0, AX, AY, EDWTZ, DDWTZ
+! Factors for the prognostic calculation
+      REAL                  :: A2M, A2S0, AX, AY, EDWTZ, DDWTZ
 
       INTEGER               :: ISEA, ITH, IK, NIK
-
-! Tail spectral level
-      REAL                  :: m1Bg
-      INTEGER               :: nt, nc
-      
-! Integral pseudo-momentum parameters
-      REAL                  :: A2M, M_tail
 
 ! Stokes drift wave number scale and parameters for 'inlined version of WAVNU1'
       REAL                  :: SIX, R1
       INTEGER               :: I1
 
-      REAL                  :: CTH, STH, ksi
+! Tail spectral level
+      REAL                  :: m1Bg
+! Look-up tail index
+      INTEGER               :: it ! Index in the full tail
+      INTEGER               :: ip ! Index in the tail look-up array below k_t
+! Look-up tail and interpolation parameters
+      REAL                  :: SIG_DS, wgt
+      
+! Tail integral pseudo-momentum and tail direction parameters
+      REAL                  :: M_tail, CTH, STH
+      
+! Numerical consistency check output
+      LOGICAL               :: INDTEST = .FALSE.
+      INTEGER               :: INDTESTX = 0, INDTESTY = 0
+      CHARACTER(LEN=30)     :: rowfmt
+      ! To generate output to NDSE for verification the central parameters
+      ! for the numerical consistency (correct indexing etc.), choose INDTESTX,
+      ! INDTESTY as sea point values /=0. This will stop the program afterwards.
 
 #ifdef W3_DIST
       ISEA       = IAPROC + (JSEA-1)*NAPROC
@@ -677,7 +760,11 @@
       ISEA       = JSEA
 #endif
 
-      ! SIG_S is an integral wave frequency chosen as SIG_S == 2pi/T02
+! Numerical consistency check output
+      if ( MAPSF(ISEA,1) == INDTESTX .and. MAPSF(ISEA,2) == INDTESTY ) &
+        INDTEST = .TRUE.
+      
+! SIG_S is an integral wave frequency chosen as SIG_S == 2pi/T02
       SIG_S = TPI/T02
 
       CTH=0.
@@ -697,17 +784,8 @@
         K_S = SIG_S**2 / GRAV
       END IF
 
-      ! From here, we will use the dimensionless water depth
-      KDPT = K_S * DEPTH
-
-      ! numDepths: Number of depths of the discrete profile above the sea floor
-      numDepths = SPND ! SPND is the configured value
-
-      DO IZ = SPND,1,-1
-        IF ( ZK_S(IZ) > KDPT ) CYCLE
-        numDepths = IZ
-        EXIT
-      END DO
+! Apply the global limiter to K_S
+      K_S = MIN(K_S_max,K_S)
 
       IF ( NP == 0 ) THEN
 
@@ -727,36 +805,73 @@
         call PROG_EDGE( A, Pn, m1Bg, CTH, STH, JSEA)
 
         ! The integrated pseudo-momentum of the diagnostic tail has the magnitude
-        M_tail = m1Bg * Im        
-
-        ! Determine the index nt of the Stokes look-up, so that k_t/k_s = XKH**nt
-        ! ( IKrange = XKH**nt / k_t for nt=1,..shape(NSIZ)(2)-1 )
-            ! This would yield same result: nt = minloc( abs(IKrange - k_t/k_s) )
-        ksi=k_t/K_S
-        do nt=2,size(IKrange)
-          if (IKrange(nt) > ksi) exit
-        end do
-        ! Note, we append this at the prognostic bin IKT which has full bin width
+        M_tail = m1Bg * Im
 
         ! The diagnostic Stokes drift profile, at dimensionless depths Z K_S,
-        ! has the magnitude
-        U_S_tail(:) = m1Bg / SIG_S * NSIZ(:,nt)
-        
-        if ( USXF < 10.0 ) then
-          ! If we assume a high-frequency cut-off
-          ! Determine the index nc of the cut-off, so that k_c/k_s = XKH**nt
-          ksi=k_c/K_S
-          do nc=nt,size(IKrange)
-            if (IKrange(nc) > ksi) exit
-          end do
-        
-          U_S_tail(:) = U_S_tail(:) - m1Bg / SIG_S * NSIZ(:,nc)
-        end if
-        
-        ! The Stokes drift values are zero below the sea floor
-        U_S_tail(numDepths+1:SPND) = 0.
+        ! has the magnitude U_S_tail(:).
 
-      END IF ! ( NP == 0 )
+        ! We now introduce the approximation that above the prognostic bin IKT,
+        ! we assume assume deep water waves. We therefore define a frequency
+        ! scale SIG_DS for the tail look-up assuming they are deep water waves.
+        SIG_DS = SQRT(K_S * GRAV)
+        ! With this approximation the tail contribution to the surface Stokes
+        ! drift is overestimated by a slight value.
+        !
+        ! For limited depths we have K_S = SIG_S**2 / GRAV / tanh(K_S D).
+        ! Therefore SIG_DS is (slightly) larger than SIG_S, and thus always
+        ! SIG_DS > SIG_S > SIG(1) as required for the look-up. For the look-up
+        ! we also require that SIG(IKT)/SIG_DS >= 1. This is why we have set
+        ! a limiter K_S_max = SIG(IKT)^2/GRAV above.
+        
+        ! Note, we append the tail at frequencies above the prognostic bin IKT,
+        ! which has full bin width.
+      
+        ! Interpolate between the two discrete values of SIG_SI nearest the
+        ! frequency scale SIG_DS where the tail matches most precisely
+        ! Because SIG_DS is an spectral measure, then always SIG_SI(NP) > SIG_DS
+        do ip=2,NP
+          if (SIG_SI(ip) > SIG_DS) exit
+        end do
+        
+        wgt = ( SIG_SI(ip) - SIG_DS )/( SIG_SI(ip) - SIG_SI(ip-1) )
+        it = NP - ip + 2
+        U_S_tail(:) = m1Bg * ( NSIZ(:,it) / SIG_SI(ip-1) * wgt &
+                             + NSIZ(:,it-1) / SIG_SI(ip) * (1.-wgt) &
+                             - NSIZ(:,NT-(NP-it)) / SIG_SI(ip) )
+ 
+        ! In the last line above, we have subtracted the high-frequency cut-off
+        ! near sig_c to a reasonable accuracy.
+        
+        ! Examples: if SIG_DS = SIG_SI(ip = NP), then apply NSIZ(:, it-1 = 1).
+        !           if SIG_DS = SIG_SI(ip = 2), then apply NSIZ(:, it-1 = NP-1)
+
+        ! Numerical consistency check output
+        if ( INDTEST ) then
+          write(NDSE,912), 'SIG_DS, m1Bg, SIG_S0, SIG_t, it ='
+          write(NDSE, FMT='(5(1X,F6.4),1X,I2)'), SIG_DS, m1Bg, &
+               SIG_SI(ip-1),SIG_SI(ip),SIG(IKT), it
+          WRITE(rowfmt,'(A,I4,A)') '(1X,I2,',size(U_S),'(1X,F6.3))'
+          write(NDSE,912), 'IK, log10(NSIZ(:,IK))'
+          
+          do it = 1, NT
+            write(NDSE, FMT=rowfmt ) it, &
+                 ( log10(max(NSIZ(IZ,it),1.e-06)), IZ=1,size(U_S) )
+          end do
+        end if
+
+      END IF ! ( NP == 0 ) .. ELSE
+
+      ! numDepths: Number of depths of the discrete profile above the sea floor
+
+      ! SPND is the configured, maximum number of profile depths
+      ! The dimensionless water depth is
+      KDPT = K_S * DEPTH
+
+      DO IZ = SPND,1,-1
+        IF ( ZK_S(IZ) > KDPT ) CYCLE
+        numDepths = IZ
+        EXIT
+      END DO
 
       ! Prognostic spectrum range IK=1, IKT
 
@@ -764,25 +879,50 @@
         WRITE (NDSV, 912), '    .. for the prognostic part'
       END IF
 
-      ! Stokes profile exponential shape for IK=1:
+      ! We represent the Stokes profile exponential shape exp(-2 K Z) by an
+      ! array ETKZ(Z) which depends on the prognostic wavenumber bin IK. An
+      ! initial value of K may be K=K0=0. For each of the prognostic wavenumbers
+      ! K in WN(IK=1..NK), the exponential shape over Z(:) is calculated as 
+      ! ETKZ(:)[IK=1] = exp( -2 WN(1) Z(:) )
+      !               = exp( -2 K0 Z(:)) exp( -2 (WN(1)-K0) Z(:) ),
+      ! ETKZ(:)[IK=2] = exp( -2 WN(2) Z(:) )
+      !               = exp( -2 WN(1) Z(:) ) exp( -2 (WN(2)-WN(1)) Z(:) )
+      !               = ETKZ(:)[IK=1] exp( -2 (WN(2)-WN(1)) Z(:) ),
+      ! ETKZ(:)[IK=3] = exp( -2 WN(3) Z(:) )
+      !               = ETKZ(:)[IK=2] exp( -2 (WN(3)-WN(2)) Z(:) ),
+      ! etc.
+      ! The profile for the initial K0=0 is exp( -2 K0 Z(:) )
       ETKZ(:) = 1
 
-      ! Initialize summation over the prognostic bins
+      ! Note that at the surface (Z=0) we have for all IK that ETKZ(1) == 1
+      
+      ! Initialize the summation over the prognostic bins
       U_S = 0.
       V_S = 0.
       M_X = 0.
       M_Y = 0.
 
-      TZ_S(:) = -2.0 * ZK_S(:)/K_S
+      ! An array holding -2 Z(:) is
+      TZ_S(:) = -2.0/K_S * ZK_S(:)
 
+      ! Numerical consistency check output
+      if ( INDTEST ) then
+        write(NDSE,912), 'IK, log10(D M_X), log10(D U_S(IK,:)) ='
+        WRITE(rowfmt,'(A,I4,A)') '(1X,I2,1X,F6.3,',size(U_S),'(1X,F6.3))'
+      end if
+      
       DO IK=1, IKT
 
-        ! Conversion factor for Action spectrum to Stokes at the surface, A2S0
+        ! if (USXF == 9.999) exit ! Testing extended tail only
+         
         ! SIG: angular frequency
         ! CG: Group velocity
         ! DDEN(IK): Spectrum 2D bin size DTH * DSII(IK)
         ! WN(IK,ISEA): Wave number of the spectral bin IK
         ! (Same calculation as in CALC_U3STOKES at Z=0 in w3iogomd)
+
+        ! DWN(IK,ISEA): The linear increment WN(IK+1,ISEA) - WN(IK,ISEA)
+        ! defined in STVP_INIT()
 
         ! Action-to-momentum factor, times angular frequency.
         ! M = A k, also in shallow water.
@@ -791,14 +931,6 @@
         A2S0 = 2.0 * A2M * SIG(IK)
         ! Action-to-pseudo-momentum factor
         A2M = A2M / SIG(IK)
-
-        ! Stokes profile exponential shape in deep water at ISEA for IK:
-        ! ETKZ(:) = EXP( - 2. * WN * Z_S(:) )
-        ! Remember, the values of Z_S depend on the actual value of K_S
-        ! ETKZ(1) == 1. at the surface, always
-
-        ! In order to calculate the exponential of a small argument (< order 1),
-        ! it may be faster to increment from IK-1: Use DWN(IK)
 
         ETKZ(:) = ETKZ(:) * EXP( DWN(IK,JSEA) * TZ_S(:) )
 
@@ -818,12 +950,11 @@
           A2S(:) = A2S0 * ETKZ(:)
         ELSE
           ! Finite water depth: Gridded parameters fkd, fkdm have been set in
-          ! STVP_INIT with a linear interpolation in a transitional
-          ! range, e.g. 2. < kd <= 3., from an exact shallow expression for
-          !  kd <= 2. to assumed deep water for kd > 3. where fkd=1, fkdm=0 
+          ! STVP_INIT() with a linear interpolation in a transitional
+          ! range, e.g. 2 < kd <= 3, from an exact shallow expression for
+          !  kd <= 2 to assumed deep water for kd > 3, where fkd=1, fkdm=0 
           A2S(:) = A2S0 * ( fkd(IK,JSEA) * ETKZ(:) + fkdm(IK,JSEA) / ETKZ(:) )
         END IF
-
         ! Stokes drift projected on grid-Eastern and grid-Northern components
         U_S(:) = U_S(:) + AX * A2S(:)
         V_S(:) = V_S(:) + AY * A2S(:)
@@ -831,9 +962,28 @@
         ! Integral pseudo-momentum per unit surface area, divided by rho_w*GRAV
         M_X = M_X + A2M * AX
         M_Y = M_Y + A2M * AY
-
+        
+        ! Numerical consistency check output
+        if ( INDTEST ) &
+           write(NDSE, FMT=rowfmt ) IK, log10(max(A2M * AX,1.e-09)), &
+                ( log10(max(AX * A2S(IZ),1.e-09)), IZ=1,size(U_S) )
       END DO
 
+      ! Numerical consistency check output
+      if ( INDTEST ) then
+        WRITE(rowfmt,'(A,I4,A)') '(',size(U_S),'(1X,F6.3))'
+        write(NDSE,912), 'log10(U_S_prog) ='
+        write(NDSE,FMT=rowfmt) ( log10(max(U_S(IZ),1.e-09)), IZ=1,size(U_S) )
+        WRITE(rowfmt,'(A,I4,A)') '(',size(U_S_tail),'(1X,F6.3))'
+        write(NDSE,912), 'log10(U_S_tail) ='
+        write(NDSE,FMT=rowfmt) &
+              ( log10(max(U_S_tail(IZ)* CTH,1.e-09)), IZ=1,size(U_S_tail) )
+        write(NDSE,FMT='(2(A,F8.5))'), 'M_X = ', M_X, 'M_tail = ', M_tail* CTH
+        
+        call extcde(999,MSG="Stop after point output for graphics", &
+             FILE="w3stvpmd_graphout.F90")
+      end if
+      
       IF ( NP > 0 ) THEN
         ! Add the contributions from the tail, projected on x and y
         U_S(:) = U_S(:) + U_S_tail(:) * CTH
@@ -850,10 +1000,10 @@
       ! [ units m^2/s ]
       M_X = M_X * GRAV
       M_Y = M_Y * GRAV
-
+      
+      
 ! Formats
 !
-  907 FORMAT ('  ',3(A,I6))
   912 FORMAT ('  ',A)
 
       END SUBROUTINE STOKES_PROFILE
@@ -864,7 +1014,7 @@
 !>      
 !>  @details
 !>  Calculate the energy spectral level and circular moment from the average
-!>  over an interval [IKST,IKT] of bands near NK.
+!>  over an interval [IKST:IKT] of bands near NK. IKST, IKT are global integers.
 !>  Assume the energy (variance) spectrum F(theta,sig) is symmetric around theta0
 !>  @verbatim
 !>     F(theta,sig) = H0(th)S(sig)
