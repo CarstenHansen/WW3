@@ -400,9 +400,6 @@ CONTAINS
          OUTPTS, FNMPRE, IX0, IXN, IXS, IY0, IYN,    &
          IYS, FLFORM, IOSTYP, UNIPTS, UPPROC, NOTYPE,&
          FLOGR2, NOGRP, NGRPP, FLOGD, FLOG2
-#ifdef W3_STVP
-    USE W3ODATMD, ONLY: VERBOSENESS
-#endif
 #ifdef W3_NL5
     USE W3ODATMD, ONLY: TOSNL5
 #endif
@@ -671,28 +668,11 @@ CONTAINS
     IF ( OUTPTS(IMOD)%IAPROC .EQ. OUTPTS(IMOD)%NAPLOG ) &
          OPEN (MDS(1), FILE=FNMPRE(:J)//LFILE(:IFL),ERR=888,IOSTAT=IERR)
     !
-#ifdef W3_STVP
-    IF ( MDS(3).NE.MDS(1) .AND. MDS(3).NE.MDS(4) ) THEN
-      IF ( TSTOUT .OR. VERBOSENESS%STVP .GT. 0 ) THEN
-        INQUIRE (MDS(3),OPENED=OPENED)
-        ! Under STVP, if W3_DIST, let Stokes verbose output to testNNN.FEXT
-# ifdef W3_DIST
-        IF ( OPENED ) THEN
-          CLOSE (MDS(3))
-          OPENED = .FALSE.
-        END IF 
-# endif 
-        IF ( .NOT. OPENED ) OPEN                                    &
-           (MDS(3),FILE=FNMPRE(:J)//TFILE(:IFT),ERR=889,IOSTAT=IERR)
-      END IF ! TSTOUT
-    END IF
-#else
     IF ( MDS(3).NE.MDS(1) .AND. MDS(3).NE.MDS(4) .AND. TSTOUT ) THEN
       INQUIRE (MDS(3),OPENED=OPENED)
       IF ( .NOT. OPENED ) OPEN (MDS(3),FILE=FNMPRE(:J)//TFILE(:IFT), ERR=889, &
            IOSTAT=IERR)
     END IF
-#endif
     !
     ! 1.d Dataset unit numbers
     !

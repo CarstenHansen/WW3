@@ -461,16 +461,6 @@ MODULE W3ODATMD
   END TYPE OUTPUT
 
 #ifdef W3_STVP
-  ! Verboseness of specific processes (CALC_STVP() for the moment)
-  ! Parameters for ww3_shel are declared here in order not to link w3nmlshelmd
-  ! with the program ww3_ounf
-  TYPE NML_VERBOSENESS_T
-    INTEGER               :: STVP
-  END TYPE NML_VERBOSENESS_T  
-#endif
-  
-#ifdef W3_STVP
-  TYPE(NML_VERBOSENESS_T), PUBLIC  :: VERBOSENESS
   INTEGER, POINTER        :: NZO  
 #endif
   

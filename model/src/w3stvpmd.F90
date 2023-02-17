@@ -2,6 +2,11 @@
 !> @brief Vertical profile of the Stokes drift with extended spectral tail.
 
 !> @author Carsten Hansen @date 21-Jan-2021
+
+!> Remenber set TSTOUT = .TRUE. in constants.F90
+
+! TODO: remove VERBOSENESS from w3initmd.F90 w3nmlshelmd.F90 w3odatmd.F90
+! TODO: remove DEBUG output to NDSV
 #include "w3macros.h"
 !/ ------------------------------------------------------------------- /
       MODULE W3STVPMD
@@ -177,7 +182,7 @@
       USE W3GDATMD, ONLY: SPND, SPDS, SPBP, NSEAL, DMIN, XFR, DTH,  &
                           SIG, DDEN, ECOS, ESIN, NK, NTH, USXT, USXF
 
-      USE W3ODATMD, ONLY: NDST, NDSO, NDSE, IAPROC, NAPROC, NAPOUT, VERBOSENESS
+      USE W3ODATMD, ONLY: NDST, NDSO, NDSE, IAPROC, NAPROC, NAPOUT
       USE W3DISPMD, ONLY: DSIE, N1MAX, ECG1, EWN1
 
 
@@ -188,10 +193,8 @@
 !/ Local parameters
 !/
 
-! File id. for verbose output
-      INTEGER            :: NDSV
-!
-      INTEGER            :: stvp_verbose = 1
+! DEBUG: File id. for verbose output
+      INTEGER            :: NDSV, stvp_verbose = 1
       
 ! A global limiter to K_S
       REAL               :: K_S_max
@@ -292,17 +295,15 @@
       REAL, allocatable   :: DNSI0(:)
       REAL                :: KRt
       
-      stvp_verbose = VERBOSENESS%STVP
       NDSV = NDST
       ! Highly verbose output only with test output
       IF ( stvp_verbose .gt. 0 ) THEN
         INQUIRE (NDSV,OPENED=OPENED)
         IF ( .NOT. OPENED ) THEN
           NDSV = NDSO
-          stvp_verbose = 0
-          IF ( IAPROC == NAPOUT)  stvp_verbose = VERBOSENESS%STVP
-          END IF
+          IF ( .NOT. IAPROC == NAPOUT )  stvp_verbose = 0
         END IF
+      END IF
 
 !/ ------------------------------------------------------------- /
 ! Allocate arrays for depths, prognostic Stokes, and tail Stokes
