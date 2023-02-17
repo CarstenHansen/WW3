@@ -18,15 +18,6 @@ MODULE W3NMLSHELMD
   !
   !/ ------------------------------------------------------------------- /
 
-#ifdef W3_STVP
-  USE W3ODATMD, ONLY: VERBOSENESS
-  ! Declared in w3odatmd to avoid linking w3nmlshelmd with ww3_ounf.
-  ! It has a type similar to the *_T below, and is read from
-  ! the namelist by calling the subroutine READ_VERBOSENESS_NML().
-  ! Contains:
-  ! Integer VERBOSENESS%STVP for CALC_STVP()
-#endif
-  
   ! module defaults
   IMPLICIT NONE
 
@@ -330,12 +321,7 @@ CONTAINS
     ! read homogeneous namelist
     CALL READ_HOMOGENEOUS_NML (NDSI, NML_HOMOG_COUNT, NML_HOMOG_INPUT)
     IF ( IMPROC .EQ. NMPLOG ) CALL REPORT_HOMOGENEOUS_NML (NML_HOMOG_COUNT, NML_HOMOG_INPUT)
-#ifdef W3_STVP
 
-    ! read verboseness of specific processes
-    CALL READ_VERBOSENESS_NML (NDSI)
-    IF ( IMPROC .EQ. NMPLOG ) CALL REPORT_VERBOSENESS_NML ()
-#endif    
     ! close namelist files
     CLOSE (NDSI)
     IF ( NMPLOG .EQ. IMPROC ) CLOSE (NDSN)
@@ -1007,58 +993,9 @@ CONTAINS
 
 
 
-#ifdef W3_STVP
-!/ ------------------------------------------------------------------- /
 
-  SUBROUTINE READ_VERBOSENESS_NML (NDSI)
 
-!  1. Purpose :
-!
-!     Read namelist for verboseness of specific processes
-!    
-! 10. Source code :
-!
-!/ ------------------------------------------------------------------- /
-    USE WMMDATMD, ONLY: MDSE
-    USE W3SERVMD, ONLY: EXTCDE
-# ifdef W3_S
-    USE W3SERVMD, ONLY: STRACE
-# endif
-    IMPLICIT NONE
 
-    INTEGER, INTENT(IN)               :: NDSI
-
-    ! locals
-    INTEGER                           :: IERR
-    
-    NAMELIST /VERBOSENESS_NML/ VERBOSENESS
-
-# ifdef W3_S
-    INTEGER, SAVE                     :: IENT = 0
-# endif
-    
-# ifdef W3_S
-    CALL STRACE (IENT, 'READ_VERBOSENESS_NML')
-# endif
-    
-    IERR = 0
-    
-    REWIND (NDSI)
-    READ (NDSI, nml=VERBOSENESS_NML, iostat=IERR, iomsg=MSG)
-    IF (IERR.GT.0) THEN
-      WRITE (MDSE,'(A,/A)') &
-        'ERROR: READ_VERBOSENESS_NML: namelist read error', &
-        'ERROR: '//TRIM(MSG)
-      CALL EXTCDE (8)
-    END IF
-
-    ! Implemented verbosenesses of processes
-    VERBOSENESS%STVP = 0 ! Mean Stokes drift vertical profile
-    
-  END SUBROUTINE READ_VERBOSENESS_NML
-
-!/ ------------------------------------------------------------------- /
-#endif
 
 
   !/ ------------------------------------------------------------------- /
@@ -1608,38 +1545,6 @@ CONTAINS
   !/ ------------------------------------------------------------------- /
 
 
-
-#ifdef W3_STVP
-
-!/ ------------------------------------------------------------------- /
-
-  SUBROUTINE REPORT_VERBOSENESS_NML ()
-
-!/ ...
-! 10. Source code :
-!
-!/ ------------------------------------------------------------------- /
-    
-# ifdef W3_S
-    USE W3SERVMD, ONLY: STRACE
-# endif
-
-    IMPLICIT NONE
-# ifdef W3_S
-    INTEGER, SAVE                           :: IENT = 0
-    CALL STRACE (IENT, 'REPORT_VERBOSENESS_NML')
-# endif
-
-    WRITE (MSG,'(A)') 'VERBOSENESS % '
-    WRITE (NDSN,'(A)')
-    WRITE (NDSN,10) TRIM(MSG), 'STVP       = ', VERBOSENESS%STVP
-    
- 10  FORMAT (A,2X,A,I1)
-
-  END SUBROUTINE REPORT_VERBOSENESS_NML
-    
-!/ ------------------------------------------------------------------- /
-#endif
 
 
 
