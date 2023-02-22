@@ -225,7 +225,7 @@
       
 ! XKR, XFT: Relative increment of wavenumber, frequency bin-to bin for the
 !      diagnostic Stokes array (the extended tail)
-! NT: Number of wavenumber bins in the full discrete tail profile.
+! NT: Number of wavenumber bins in the full look-up array for the tail profile.
 ! NP:  Number of bins in the look-up arrays that matches the range 1, IKT
       REAL               :: XKR, XFT
       INTEGER            :: NT
@@ -739,10 +739,9 @@
 
 ! Factors for the prognostic calculation
       REAL                  :: A2M, A2S0, AX, AY, EDWTZ, DDWTZ
-
       INTEGER               :: ISEA, ITH, IK, NIK
 
-! Stokes drift wave number scale and parameters for 'inlined version of WAVNU1'
+! Parameters for 'inlined version of WAVNU1'
       REAL                  :: SIX, R1
       INTEGER               :: I1
 
@@ -864,6 +863,8 @@
 
       ! Numerical consistency check output
       if ( INDTEST ) then
+        write(NDSE,912), 'NT, SPND, IKT ='
+        write(NDSE, FMT='(3(1X,I2))'), NT, SPND, IKT
         write(NDSE,912), 'IK, log10(D M_X), log10(D U_S(IK,:)) ='
         WRITE(rowfmt,'(A,I4,A)') '(1X,I2,1X,F6.3,',size(U_S),'(1X,F6.3))'
       end if
@@ -992,7 +993,7 @@
           write(NDSE,912), 'SIG_DS, m1Bg, sig_t, it ='
           write(NDSE, FMT='(3(1X,F6.4),1X,I2)'), SIG_DS, m1Bg, sig_t, it
           WRITE(rowfmt,'(A,I4,A)') '(1X,I2,',size(U_S),'(1X,F6.3))'
-          write(NDSE,912), 'IK, log10(NSIZ(:,IK))'
+          write(NDSE,912), 'IK, log10(NSIZ(:,IK)) ='
           
           do it = 1, NT
             write(NDSE, FMT=rowfmt ) it, &
@@ -1005,8 +1006,11 @@
           write(NDSE,912), 'log10(U_S_tail) ='
           write(NDSE,FMT=rowfmt) &
                 ( log10(max(U_S_tail(IZ)* CTH,1.e-09)), IZ=1,size(U_S_tail) )
-          write(NDSE,FMT='(2(A,F8.5))'), 'M_X = ', M_X, 'M_tail = ', M_tail* CTH
-          
+          write(NDSE,FMT='(A,F9.6)'), 'M_X = ', M_X
+          write(NDSE,FMT='(A,F9.6)'),  'cos M_tail = ', M_tail * CTH
+          write(NDSE,FMT='(A,F9.6)'), 'M_Y = ', M_Y
+          write(NDSE,FMT='(A,F9.6)'),  'sin M_tail = ', M_tail * STH
+
           call extcde(999,MSG="Stop after point output for graphics", &
                FILE="w3stvpmd_graphout.F90")
         end if
