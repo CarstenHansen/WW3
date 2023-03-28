@@ -670,12 +670,10 @@ MODULE W3GDATMD
     ! SPDS: Depth scale specifying the largest depth Z(SPND) for the profile,
     !       Z(SPND) = SPDS / K , where K is a wavenumber scale based on e.g T02  
     ! SPBP: Power of profile depth progression
-    !! XSTY: Tail par. type. 'DoEw': Donelan-Ewans, 'None': Truncated spectrum
 
     INTEGER               :: SPND
     REAL                  :: SPDS       
     REAL                  :: SPBP       
-    !!CHARACTER(LEN=4)      :: XSTY
 
 #endif
     REAL   , POINTER :: ZB(:)     ! BOTTOM GRID, DEFINED ON ISEA
@@ -1194,7 +1192,6 @@ MODULE W3GDATMD
   INTEGER, POINTER           :: SPND
   REAL, POINTER              :: SPDS
   REAL, POINTER              :: SPBP
-  ! CHARACTER(LEN=4), POINTER  :: XSTY
 #endif
   REAL   , POINTER :: ZB(:)
   REAL   , POINTER :: CLATS(:)
@@ -2354,8 +2351,6 @@ CONTAINS
     SPND  => GRIDS(IMOD)%SPND
     SPDS  => GRIDS(IMOD)%SPDS
     SPBP  => GRIDS(IMOD)%SPBP
-    ! XSTY  => GRIDS(IMOD)%XSTY
-    !
 #endif
     FICEN  => GRIDS(IMOD)%FICEN
     FICEL  => GRIDS(IMOD)%FICEL

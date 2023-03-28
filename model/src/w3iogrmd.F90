@@ -255,7 +255,7 @@ CONTAINS
     !     !/S    Enable subroutine tracing.
     !     !/T    Enable test output
     !
-    !     !/STVP  Extended tail Stokes drift
+    !     !/STVP  Stokes drift vertical profile
     !
     ! 10. Source code :
     !
@@ -796,7 +796,7 @@ CONTAINS
 
 #endif
 #ifdef W3_STVP
-      !  Add extended tail Stokes parameters to mod_def
+      !  Add Stokes drift vertical profile parameters to mod_def
       WRITE (NDSM) SPND, SPDS, SPBP
 #endif
       !!        WRITE(NDSM)                                                 &
@@ -934,7 +934,7 @@ CONTAINS
 #endif
 #ifdef W3_STVP
       !
-      !  Read extended tail Stokes parameters from mod_def
+      !  Read Stokes drift vertical profile parameters from mod_def
       READ (NDSM) SPND, SPDS, SPBP
 #endif
       !

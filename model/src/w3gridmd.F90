@@ -113,8 +113,8 @@ MODULE W3GRIDMD
   !/    27-May-2021 : Moved to a subroutine               ( version 7.13 )
   !/    07-Jun-2021 : S_{nl} GKE NL5 (Q. Liu)             ( version 7.13 )
   !/    19-Jul-2021 : Momentum and air density support    ( version 7.14 )
-  !/    27-Jan-2022 : Namelist group for extended tail    ( version ?.?? ) 
-  !/                  Stokes profile
+  !/    27-Jan-2022 : Namelist group for Stokes drift     ( version ?.?? ) 
+  !/                  vertical profile
   !/
   !/    Copyright 2009-2013 National Weather Service (NWS),
   !/       National Oceanic and Atmospheric Administration.  All rights
@@ -497,7 +497,7 @@ MODULE W3GRIDMD
   !     !/O2b   Print obstruction data.
   !     !/O2c   Print extended status map.
   !
-  !     !/STVP  Extended tail Stokes drift of GEOMETOC Support Denmark
+  !     !/STVP  Stokes drift vertical profile of GEOMETOC Support Denmark
   !
   ! 10. Source code :
   !
@@ -946,11 +946,10 @@ MODULE W3GRIDMD
 #endif
 #ifdef W3_STVP
   !
-  ! Extended tail Stokes drift profile
+  ! Stokes drift vertical profile
   INTEGER                 :: NDP
   REAL                    :: DSC
   REAL                    :: BP
-  CHARACTER(LEN=4)        :: TYP
 #endif
   !
 #ifdef W3_FLD1
@@ -1144,7 +1143,7 @@ MODULE W3GRIDMD
   NAMELIST /ROTB/ BPLAT, BPLON
 #endif
 #ifdef W3_STVP
-  ! Extended tail Stokes drift profile
+  ! Stokes drift vertical profile
   NAMELIST /STVP/ NDP, DSC, BP
 #endif
   !/
@@ -3140,7 +3139,7 @@ CONTAINS
     WRITE (NDSO,*)
 #ifdef W3_STVP
     !
-    ! Extended spectral tail Stokes drift of Joint GeoMETOC Denmark
+    ! Stokes drift ivertical profile of Joint GeoMETOC Denmark
     ! SPND: Number of depths for Stokes profile
     ! SPDS: Depth scale specifying the largest depth for the profile,
     !       SPDS = K * Z(SPND)
@@ -3440,7 +3439,7 @@ CONTAINS
       WRITE(NDSO,4992) BPLAT, BPLON
 #endif
 #ifdef W3_STVP
-      WRITE(NDSO,2988) SPND, SPDS, SPBP !, XSTY
+      WRITE(NDSO,2988) SPND, SPDS, SPBP
 #endif
       !
       WRITE (NDSO,918)
@@ -6833,8 +6832,7 @@ CONTAINS
          '        BPLON =',9(F6.1,","),' /')
 #endif
 #ifdef W3_STVP
-2988 FORMAT ( '  &STVP NDP =',I3,' DSC =',F5.2,' BP =',F5.2,' /')! ,     &
-    !     ' XSTY ="',A,'" /')
+2988 FORMAT ( '  &STVP NDP =',I3,' DSC =',F5.2,' BP =',F5.2,' /')
 #endif
 
 3000 FORMAT (/'  The spatial grid: '/                                &
