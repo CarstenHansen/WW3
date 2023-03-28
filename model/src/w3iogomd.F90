@@ -2427,7 +2427,7 @@ CONTAINS
 # endif
 #endif
 
-   IF (FLOLOC( 6, 8)) THEN
+    IF (FLOLOC( 6, 8)) THEN
       CALL CALC_U3STOKES(A,1)
     END IF
     !
@@ -3402,6 +3402,7 @@ CONTAINS
               IF ( IFJ .LE. NOEXTR ) &
 #endif
               WRITE ( NDSOG ) USERO(1:NSEA,IFJ)
+              !
             END IF
             !
           ELSE

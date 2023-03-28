@@ -194,8 +194,6 @@ MODULE W3ADATMD
   !      CFLTHMAX  R.A.  Public   Max. CFL number for refraction.
   !      CFLKMAX   R.A.  Public   Max. CFL number for wavenumber shift.
   !      USVP      R.A.  Public   Stokes drift vertical profile
-  !
-  !      USVP      R.A.  Public   Stokes drift vertical profile W3_STVP
   !      XSMH      R.A.  Public   Stokes drift profile parametric fit W3_MFIT
   !
   !    Orphans, commented out here, now automatic arrays in W3WAVE, ....
