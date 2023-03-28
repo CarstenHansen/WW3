@@ -316,6 +316,7 @@
 /
 
 &OUTBND_LINE_NML
+! nest1.ww3 to GRL9
   OUTBND_LINE(1)           =  -37.3 20.4 0.0 -0.15 63
   OUTBND_LINE(2)           =  -37.3 10.95 0.15 -0.15 82
   OUTBND_LINE(3)           =  -25. -1.35 0.15 0.0 141
@@ -324,6 +325,7 @@
   OUTBND_LINE(6)           =  -10.3 22.05 -0.15 0.15 3
   OUTBND_LINE(7)           =  -10.75 22.35 -0.15 0.0 1
   OUTBND_LINE(8)           =  -21.4 26.25 -0.15 0.0 15
+! nest2.ww3 to NWS9
   OUTBND_LINE(9)           =  -2.1528 46.6417 -0.25 0.0 -40
   OUTBND_LINE(10)           =  -11.9028 46.7917 0.0 0.15 127
   OUTBND_LINE(11)           =  -11.65 65.6917 0.25 0.0 94

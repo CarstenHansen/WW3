@@ -290,16 +290,16 @@
 ! -------------------------------------------------------------------- !
 &OUTPUT_DATE_NML
   DATE%FIELD%START         =  '__SIMSTART__'
-  DATE%FIELD%STRIDE        =  3600
+  DATE%FIELD%STRIDE        =  '3600'
   DATE%FIELD%STOP          =  '__SIMSTOP__'
   DATE%POINT%START         =  '__SIMSTART__'
-  DATE%POINT%STRIDE        =  1200
+  DATE%POINT%STRIDE        =  '1200'
   DATE%POINT%STOP          =  '__SIMSTOP__'
   DATE%RESTART%START       =  '__SIMSTART__'
   DATE%RESTART%STRIDE      =  '__HOTDELTA__'
   DATE%RESTART%STOP        =  '__SIMSTOP__'
   DATE%BOUNDARY%START      =  '__SIMSTART__'
-  DATE%BOUNDARY%STRIDE     =  1200
+  DATE%BOUNDARY%STRIDE     =  '1200'
   DATE%BOUNDARY%STOP       =  '__SIMSTOP__'
 /
 

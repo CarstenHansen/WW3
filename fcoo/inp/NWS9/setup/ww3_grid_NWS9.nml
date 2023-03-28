@@ -374,16 +374,17 @@ INBND_POINT(6) =    96   129 T  !    95   128   11.5972   65.6917
 !     OUTBND_LINE(I)        = 0. 0. 0. 0. 0   ! included lines
 ! -------------------------------------------------------------------- !
 &OUTBND_COUNT_NML
-  OUTBND_COUNT%N_LINE   =  2
+  OUTBND_COUNT%N_LINE   =  3
 /
 &OUTBND_LINE_NML
-! nest1: NS3 (North Sea 3nmi grid) or NSB3
+! nest1: NS3 (North Sea 3nmi grid)
 ! North boundary Scotland to Norway
 !
 ! North boundary Scotland to Norway
-  OUTBND_LINE(1)       =  -2.98611    58.641667  0.083333  0.0 103
+  OUTBND_LINE(1)       =   -4.819440  58.641666  0.000000  0.050000    64
+  OUTBND_LINE(2)       =   -4.819440  61.791668  0.083333  0.000000   116
 ! English Channel boundary conditions S-N line to -3.98610667, 50.2416667
-  OUTBND_LINE(2)       =  -3.98610667 48.7416667 0.0       0.05 31
+  OUTBND_LINE(3)       =  -4.819440  48.591667   0.0       0.05        33
 /
 ! -------------------------------------------------------------------- !
 ! WAVEWATCH III - end of namelist                                      !

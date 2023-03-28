@@ -15,8 +15,8 @@
 ! -------------------------------------------------------------------- !
 &SPECTRUM_NML
   SPECTRUM%XFR       =  1.1
-  SPECTRUM%FREQ1     =  0.0452967
-  SPECTRUM%NK        =  34
+  SPECTRUM%FREQ1     =  .0309383
+  SPECTRUM%NK        =  38
   SPECTRUM%NTH       =  36
 /
 
@@ -72,9 +72,9 @@
 ! -------------------------------------------------------------------- !
 &TIMESTEPS_NML
   TIMESTEPS%DTMAX        =  600.
-  TIMESTEPS%DTXY         =  300.
+  TIMESTEPS%DTXY         =  200.
   TIMESTEPS%DTKTH        =  300.
-  TIMESTEPS%DTMIN        =  10.
+  TIMESTEPS%DTMIN        =  5.
 /
 
 ! -------------------------------------------------------------------- !
@@ -171,12 +171,12 @@
 !     RECT%SF0              = 1.       ! scaling division factor for x0,y0 coord
 ! -------------------------------------------------------------------- !
 &RECT_NML
-  RECT%NX           =  205
-  RECT%NY           =  222
+  RECT%NX           =  215
+  RECT%NY           =  267
   RECT%SX           =  83.33333
   RECT%SY           =  50.
   RECT%SF           =  1000.
-  RECT%X0           =  -4.06944
+  RECT%X0           =  -4.902773
   RECT%Y0           =  48.5416667
   RECT%SF0          =  1.
 /
@@ -271,7 +271,7 @@
 !     OBST%FORMAT          = '(....)' ! formatted read format
 ! -------------------------------------------------------------------- !
 &OBST_NML
-  OBST%SF        =  0.1
+  OBST%SF        =  0.01
   OBST%FILENAME  =  'obstruct.dat'
 /
 
@@ -320,17 +320,17 @@
 !/
 !
 &INBND_COUNT_NML
-INBND_COUNT%N_POINT = 6     
+INBND_COUNT%N_POINT = 5
 !
-!   Saint-Gilles-Croix-de-Vie - South-West grid corner -
-!   - North-West grid corner - Vega (Norge)
+!   English Channel, Scotland - North-West grid corner - Kalvåg (Norway)
 !
 /
 &INBND_POINT_NML
-INBND_POINT(1) =    14  203 F  ! Scotland-Norway
-INBND_POINT(2) =   116  203 T  !
-INBND_POINT(3) =     2    5 F  ! English Channel
-INBND_POINT(4) =     2   35 T  !
+INBND_POINT(1) =     2    2 F  ! English Channel
+INBND_POINT(2) =     2   34 T  !
+INBND_POINT(3) =     2  203 F  ! Scotland-Norway
+INBND_POINT(4) =     2  266 T  !
+INBND_POINT(5) =   117  266 T  !
 /
 !
 

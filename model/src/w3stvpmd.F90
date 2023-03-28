@@ -3,7 +3,7 @@
 
 !> @author Carsten Hansen @date 21-Jan-2021
 
-!> Under development: Remenber set TSTOUT = .TRUE. in constants.F90
+!> Under development: Remember set TSTOUT = .TRUE. in constants.F90
 
 #include "w3macros.h"
 !/ ------------------------------------------------------------------- /
@@ -955,8 +955,10 @@
         IF ( stvp_verbose .gt. 0  .and. JSEA .eq. 1 ) &
           WRITE (NDSV, 912), 'Truncate at NK-1. No diagnostic spectral extension'
 
-      ELSE
-
+      ELSE IF ( AX .gt. 0. .or. AY .gt. 0. ) THEN
+        ! (If the wave action is zero at the highest prognostic frequency band,
+        ! then there is a zero tail contribution)
+         
         IF ( stvp_verbose .gt. 1  .and. JSEA .eq. 1 ) &
              WRITE (NDSV, 912), '    .. for the diagnostic part'
 
@@ -964,18 +966,18 @@
         ! Here we estimate the product m1Bg of the 1st circular moment m1, and
         ! the spectral level Bg, and also estimate the band mean *vector*
         ! orientation CTH, STH:(cos(theta0),sin(theta0)) m1 B g = (CTH,STH)*m1Bg
-        U_SBX = AX * A2S0 ! The band IKT contribution to U_S in the loop above
-        U_SBY = AY * A2S0
+        U_SBX = AX * A2S0 ! The contribution to U_S, VS from band IKT
+        U_SBY = AY * A2S0 !
         U_SB = SQRT(U_SBX**2 + U_SBY**2)        
         
         ! At the highest prognostic frequency band, the Stokes spectral level
         ! is derived as explained in SUBROUTINE STVP_INIT:
         if (INT(I1 * SIG(IKT) / SIG_S) .LE. N1MAX) then
-           ! For shallow depth
-           m1Bg = U_SB * SQRT(GRAV * WN(IKT,ISEA)) / NSI0B
+          ! For shallow depth
+          m1Bg = U_SB * SQRT(GRAV * WN(IKT,ISEA)) / NSI0B
         else
-           ! Deep water
-           m1Bg = U_SB * SIG(IKT) / NSI0B
+          ! Deep water
+          m1Bg = U_SB * SIG(IKT) / NSI0B
         end if
         
         ! Band mean direction unit vector

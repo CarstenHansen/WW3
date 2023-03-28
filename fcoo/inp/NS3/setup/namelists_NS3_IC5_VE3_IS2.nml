@@ -1,0 +1,15 @@
+! Vertical Stokes drift profile
+&STVP NDP = 11, DSC = 2.0, BP = 2.0 /
+! Diagnostic tail extension for Stokes drift, and truncation frequency
+&XSTP USXTT = "Pf-5", USXFM = 2.0 /
+&MISC ICEHMIN = 0.05, CICE0 = 0.25, CICEN = 0.75, FLAGTR = 4 /
+&FLX3 CDMAX = 3.5E-3 , CTYPE = 0 /
+! Source terms ST4 Romero:
+&SDS4 SDSBCHOICE=3, SDSC2 = -3.8, SDSBR = 0.005, 
+      SDSSTRAIN =0., SDSSTRAIN2 = 0., FXFM3 = 40., FXPM3 = 20., SDSFACMTF = 400.,
+      SDSCUM=0., SDSC5 =0. /
+&PRO3 WDTHCG=2.0, WDTHTH=2.0 /
+! Damping by ice thickness and ice area fraction
+&SIC5 IC5VEMOD=3 /
+! Scattering from ice thicker that ICEHMIN and damping from (anelastic) ice creep
+&SIS2 ISC1 = 1., IS2DISP = F, IS2BACKSCAT=1, IS2DUPDATE=T, IS2BREAK=T, IS2CREEPB=1e7/
