@@ -157,7 +157,8 @@ MODULE W3NMLSHELMD
     REAL                        :: VALUE2
     REAL                        :: VALUE3
   END TYPE NML_HOMOG_INPUT_T
-  
+
+
   ! miscellaneous
   CHARACTER(256)                :: MSG
   INTEGER                       :: NDSN

@@ -68,7 +68,6 @@ PROGRAM W3OUNF3
   !/    28-Feb-2022 : New program ww3_ounf3: Sub-fields   ( version X.XX )
   !/                  and more than one 'third' dimension    
   !/    28-Feb-2022 : STVP option: Stokes drift profile   ( version X.XX )
-  !/                  for extended spectral tail
   !/    28-Feb-2022 : MFIT option: Stokes drift           ( version 7.XX )
   !/                  profile parametric fit
   !/
@@ -218,7 +217,7 @@ PROGRAM W3OUNF3
   !  9. Switches :
   !
   !     !/S     Enable subroutine tracing.
-  !     !/STVP  Stokes drift profile for spectrum with extended tail
+  !     !/STVP  Stokes drift vertical profile
   !
   ! 10. Source code :
   !

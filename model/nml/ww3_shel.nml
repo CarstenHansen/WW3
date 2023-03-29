@@ -188,7 +188,7 @@
 !  F  F  6    11   PHICE      FIC   Wave to sea ice energy flux
 !  F  F  6    12   USSP       USP   Partitioned surface Stokes drift
 !  F  F  6    13   TAUOC[X,Y] TOC   Total momentum to the ocean
-!  F  F  6    14   XSSP       XSP   Extended tail Stokes profile
+!  F  F  6    14   USVP       SVP   Stokes drift vertical profile
 !   -------------------------------------------------
 !        7                          Wave-bottom layer
 !   -------------------------------------------------
@@ -263,6 +263,7 @@
 &OUTPUT_TYPE_NML
   TYPE%FIELD%LIST     = 'HS DIR SPR WND ICE CUR LEV'
 /
+
 
 
 ! -------------------------------------------------------------------- !

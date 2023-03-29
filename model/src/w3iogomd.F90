@@ -1277,8 +1277,8 @@ CONTAINS
     !/    22-Aug-2018 : Add WBT parameter                   ( version 6.06 )
     !/    25-Sep-2019 : Corrected th2m and sth2m            ( version 6.07 )
     !/                  calculations. (J Dykes, NRL)
-    !/    06-Mar-2020 : Stokes drift with extended tail     ( version 7.XX )
-    !/                  ( C Hansen, GEOMETOC Support Denmark)
+    !/    06-Mar-2020 : Stokes drift vertical profile       ( version 7.XX )
+    !/                  (C Hansen)
     !/
     !  1. Purpose :
     !
@@ -1369,7 +1369,7 @@ CONTAINS
     !
     USE W3PARALL, ONLY : INIT_GET_ISEA
 #ifdef W3_STVP
-    ! Stokes drift over NZO depths
+    ! Stokes drift at NZO depths
     ! TODO: Consider use an inner #ifndef W3_POST here (switch with ww3_ounf)
     ! to avoid linking w3stvpmd into ww3_ounf
     USE W3STVPMD, ONLY: CALC_STVP
@@ -2406,19 +2406,10 @@ CONTAINS
 
     END IF
 #ifdef W3_STVP
-    !  Stokes drift over NZO depths
+    !  Stokes drift at NZO depths
     !  USVP(JSEA,1:3+2*NZO) is set by CALC_STVP(A)
     !  NZO is 0 if FLOLOC(ISVP,JSVP) is False (no Stokes profile output).
-    IF (FLOLOC(ISVP,JSVP)) THEN
-      CALL CALC_STVP(A)
-      IF ( USXT .EQ. 'DoEw' ) THEN
-        DO JSEA=1, NSEAL
-          ! Integral field with Donelan-Ewans tail as calculated in CALC_STVP
-          USSX(JSEA)  = USVP(JSEA,4)
-          USSY(JSEA)  = USVP(JSEA,4+NZO) 
-        END DO
-      END IF
-    END IF
+    IF (FLOLOC(ISVP,JSVP)) CALL CALC_STVP(A)
 # ifdef W3_MFIT
     IF ( FLOLOC(10,NOEXTR+1) ) THEN
       IF ( .NOT. FLOLOC(ISVP,JSVP) ) CALL CALC_STVP(A)
@@ -3672,7 +3663,7 @@ CONTAINS
                    TAUOCY(1:NSEA)
 #ifdef W3_STVP
             ELSE IF ( IFI .EQ. ISVP .AND. IFJ .EQ. JSVP ) THEN
-              READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)    &
+              READ (NDSOG,END=801,ERR=802,IOSTAT=IERR)         &
                    USVP(1:NSEA,1:3+SPND*2)
 #endif
               !

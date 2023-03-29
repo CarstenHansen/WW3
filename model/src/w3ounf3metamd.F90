@@ -104,68 +104,68 @@
 !>    Example ounfmeta.inp file:
 !>
 !>    @verbatim
-!>    $ Lines starting with dollars are comments.                               
-!>    $ The line starts a meta-data section for the depth field                 
-!>    META DPT                                                                  
-!>      standard_name = depth                                                   
-!>      long_name = "can be quoted string"                                      
-!>      comment = or an unquoted string                                         
-!>      vmax = 999.9                                                            
-!>                                                                              
-!>    $ Next one is HSig (group 2, field 1)                                     
-!>    META 2 1                                                                  
-!>      varns = "sig. wave height"                                              
-!>      varnl = "this is long name"                                             
-!>                                                                              
-!>    $ Next one is second component of wind. It also sets an                   
-!>    $ "extra" meta data value (height - a float)                              
-!>    META WND 2                                                                
-!>      standard_name = "v-wind"                                                
-!>      height = 10.0 "r"                                                       
-!>                                                                              
-!>    $ User defined partitioned parameters template strings:                   
-!>    TEMPLATE PARTSTR                                                          
-!>      wind wave                                                               
-!>      primary swell                                                           
-!>      secondary swell                                                         
-!>                                                                              
-!>    $ Use partition templates in partitioned Hs field:                        
-!>    $ (SPART and IPART are built-in)                                          
-!>    META PHS                                                                  
-!>      standard_name = "<SPART_>_sigificant_wave_height"                       
-!>      long_name = "<PARTSTR>"                                                 
-!>      partition_number = "<IPART>"                                            
-!>                                                                              
-!>    $ Coordinate reference system:                                            
-!>    CRS crs                                                                   
-!>      grid_mapping_name = "latitude_longitude"                                
-!>      semi_major_axis = 6371000.0 f                                           
-!>      inverse_flattening = 0 f                                                
-!>                                                                              
-!>    $ Global metadata:                                                        
-!>    META global                                                               
-!>      institution = UKMO                                                      
-!>      comment "space seperated strings should be quoted" c                    
-!>      version = 1.0 r                                                         
-!>                                                                              
-!>    $ BED output, with sub-fields:                                            
+!>    $ Lines starting with dollars are comments.
+!>    $ The line starts a meta-data section for the depth field
+!>    META DPT
+!>      standard_name = depth
+!>      long_name = "can be quoted string"
+!>      comment = or an unquoted string
+!>      vmax = 999.9
+!>
+!>    $ Next one is HSig (group 2, field 1)
+!>    META 2 1
+!>      varns = "sig. wave height"
+!>      varnl = "this is long name"
+!>
+!>    $ Next one is second component of wind. It also sets an
+!>    $ "extra" meta data value (height - a float)
+!>    META WND 2
+!>      standard_name = "v-wind"
+!>      height = 10.0 "r"
+!>
+!>    $ User defined partitioned parameters template strings:
+!>    TEMPLATE PARTSTR
+!>      wind wave
+!>      primary swell
+!>      secondary swell
+!>
+!>    $ Use partition templates in partitioned Hs field:
+!>    $ (SPART and IPART are built-in)
+!>    META PHS
+!>      standard_name = "<SPART_>_sigificant_wave_height"
+!>      long_name = "<PARTSTR>"
+!>      partition_number = "<IPART>"
+!>
+!>    $ Coordinate reference system:
+!>    CRS crs
+!>      grid_mapping_name = "latitude_longitude"
+!>      semi_major_axis = 6371000.0 f
+!>      inverse_flattening = 0 f
+!>
+!>    $ Global metadata:
+!>    META global
+!>      institution = UKMO
+!>      comment "space seperated strings should be quoted" c
+!>      version = 1.0 r
+!>
+!>    $ BED output, with sub-fields:
 !>    $ Note, the sub-field component is the index IFS as defined in ww3_ounf.F90
-!>    $ defined in the ww3_shel/ww3_multi program code.                         
-!>    $ Sub-field 1 (a scalar)                                                  
-!>    META BED 1 1                                                              
-!>      standard_name = "sea_bottom_roughness_length"                           
-!>      varng = ''                                                              
-!>      fsc = 0.0001                                                            
-!>      units = 'm'                                                             
-!>      vmin = 0.                                                               
-!>      vmax = 3.                                                               
-!>    $ Sub-field 2, component 1: ripple-x                                      
-!>    META BED 1 2                                                              
-!>      standard_name = "eastward_ripple_wavelength"                            
-!>      varnd = ''                                                              
-!>    $ Sub-field 2, component 2: ripple-y                                      
-!>    META BED 2 2                                                              
-!>      long_name = "northward_ripple_wavelength"                               
+!>    $ defined in the ww3_shel/ww3_multi program code.
+!>    $ Sub-field 1 (a scalar)
+!>    META BED 1 1
+!>      standard_name = "sea_bottom_roughness_length"
+!>      varng = ''
+!>      fsc = 0.0001
+!>      units = 'm'
+!>      vmin = 0.
+!>      vmax = 3.
+!>    $ Sub-field 2, component 1: ripple-x
+!>    META BED 1 2
+!>      standard_name = "eastward_ripple_wavelength"
+!>      varnd = ''
+!>    $ Sub-field 2, component 2: ripple-y
+!>    META BED 2 2
+!>      long_name = "northward_ripple_wavelength"
 !>      varnd = ''
 !>    @endverbatim
 !>
@@ -194,7 +194,7 @@ MODULE W3OUNF3METAMD
   !/    22-Mar-2021 : Adds extra coupling fields          ( version 7.13 )
   !/    02-Sep-2021 : Add coordinates attribute           ( version 7.12 )
   !/    23-Feb-2022 : Sub-fields and more than one        ( version X.XX )
-  !/                  'fourth' dimension (in preparation, C. Hansen)    
+  !/                  'fourth' dimension (in preparation, C. Hansen)
   !/    23-Feb-2022 : Extra (subfield) components         ( version X.XX )
   !/                  under switch STVP (C.Hansen)
   !/
@@ -258,8 +258,8 @@ MODULE W3OUNF3METAMD
   ! Type for storage of meta data aggregated by sub-field ...
   TYPE SUBFIELD_T
     TYPE(META_T), POINTER :: META(:) !< Pointer to meta data for sub-field
-  END TYPE SUBFIELD_T         
-   
+  END TYPE SUBFIELD_T
+
   !> Type for storage of meta data aggregated by component (NFIELD)
   TYPE FIELD_T
     TYPE(META_T), POINTER :: META(:) !< Pointer to meta data for field
@@ -393,11 +393,11 @@ CONTAINS
     DO K = 1,SIZE(SPS)
        CALL W3FLDTOIJ(SPS(K), I, J, 1, 1, 1)
        SPIJ2(K) = I*NOGMAX+J
-    ENDDO   
-       
+    ENDDO
+
     ! 1. Allocate nested GROUP, FIELD structure:
     ALLOCATE(GROUP(NOGRP))
-    
+
     NFSMAX=0
     DO I = 1,NOGRP
       ALLOCATE(GROUP(I)%FIELD(NOGE(I)))
@@ -409,7 +409,7 @@ CONTAINS
         ENDDO
         IF ( SPIJ2(K) .NE. S ) THEN
           ALLOCATE(GROUP(I)%FIELD(J)%META(3)) ! Hardcode to 3 components for the moment
-        ELSE 
+        ELSE
           ! If S is one of the fields with sub-fields
           NFSMAX = MAX( NFSMAX, NSP(K) )
           ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(NSP(K)))
@@ -520,7 +520,7 @@ CONTAINS
           DO S = 1,SIZE(GROUP(I)%FIELD(J)%SUBFIELD)
             DEALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(S)%META)
           ENDDO
-          DEALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD)            
+          DEALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD)
         ELSE
           DEALLOCATE(GROUP(I)%FIELD(J)%META)
         END IF
@@ -904,7 +904,7 @@ CONTAINS
           WRITE(NDSE,5016) NFSMAX, TRIM(FN_META), ILINE
           CALL EXTCDE(1)
         ENDIF
-        
+
         ! Select correct variable metadata entry:
         IF ( IFS == 0 ) THEN
           PMETA => GROUP(IFI)%FIELD(IFJ)%META(IFC)
@@ -1068,7 +1068,7 @@ CONTAINS
     IF(IERR .EQ. 0) THEN
       ! Try reading four values (group, field, vector-comp., sub-field):
       READ(BUF, *, iostat=IERR) IFI, IFJ, IFC, IFS
-      IF(IERR .NE. 0) THEN        
+      IF(IERR .NE. 0) THEN
         ! Try reading three values:
         READ(BUF, *, iostat=IERR) IFI, IFJ, IFC
         IF(IERR .NE. 0) THEN
@@ -3741,7 +3741,7 @@ CONTAINS
     ELSE
       META(1)%FSC  = 1.
       META(1)%VMIN = 0.
-      META(1)%VMAX = 1.e6         
+      META(1)%VMAX = 1.e6
     ENDIF
 
     META(1)%ENAME  = '.p2s'
@@ -4049,7 +4049,7 @@ CONTAINS
     META(1)%VARNS=''
     META(1)%VARNG='ripple_wavelength'
     META(1)%VARNC='ripple_length=sqrt(ripplex**2+rippley**2)'
-    
+
     ! Second sub-field
     META => GROUP(7)%FIELD(3)%SUBFIELD(2)%META
     META(1)%FSC    = 0.001

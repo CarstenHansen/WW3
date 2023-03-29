@@ -49,9 +49,9 @@ MODULE W3ODATMD
   !/    22-Mar-2021 : Add extra coupling variables        ( version 7.13 )
   !/    07-Jun-2021 : S_{nl} GKE NL5 (Q. Liu)             ( version 7.13 )
   !/    19-Jul-2021 : Momentum and air density support    ( version 7.14 )
-  !/    27-Jan-2022 : Stokes drift profile for extended   ( version 7.XX )
-  !/                  spectral tail (C. Hansen, GEOMETOC Denmark)
-  !/    09-Mar-2020 : Stokes drift profile parametric fit ( version 7.?? )
+  !/    27-Jan-2022 : Stokes drift vertical profile       ( version 7.XX )
+  !/                  (C. Hansen)
+  !/    27-Jan-2022 : Stokes drift profile parametric fit ( version 7.XX )
   !/
   !/    Copyright 2009-2012 National Weather Service (NWS),
   !/       National Oceanic and Atmospheric Administration.  All rights
@@ -708,7 +708,6 @@ CONTAINS
       OUTPTS(I)%NOSWLL = -1
       !
 #ifdef W3_STVP
-      ! OUTPTS(I)%XSVB = 1
       OUTPTS(I)%NZO = -1
 #endif
       OUTPTS(I)%TBPI0 = (-1,0)
@@ -1690,7 +1689,6 @@ CONTAINS
     NOSWLL => OUTPTS(IMOD)%NOSWLL
     !
 #ifdef W3_STVP
-    ! XSVB  => OUTPTS(IMOD)%XSVB
     NZO  => OUTPTS(IMOD)%NZO
     !
 #endif
