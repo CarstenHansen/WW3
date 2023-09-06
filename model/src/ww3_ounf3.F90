@@ -840,43 +840,43 @@ PROGRAM W3OUNF3
   !
   ! Error format strings
   !
-1000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF : '/               &
+1000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3 : '/               &
        '     ERROR IN OPENING INPUT FILE'/                    &
        '     IOSTAT =',I5/)
   !
-1001 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF : '/               &
+1001 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3 : '/               &
        '     PREMATURE END OF INPUT FILE'/)
   !
-1002 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF : '/               &
+1002 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3 : '/               &
        '     ERROR IN READING FROM INPUT FILE'/               &
        '     IOSTAT =',I5/)
   !
-1003 FORMAT (/' *** WAVEWATCH III WERROR IN W3OUNF : '/              &
+1003 FORMAT (/' *** WAVEWATCH III WERROR IN W3OUNF3 : '/              &
        '     OUT OF RANGE REQUEST FOR NBIPART =',I2, /        &
        '     MAX SWELL PARTITIONS (NOSW) =',I2 /)
   !
-1010 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF : '/               &
+1010 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3 : '/               &
        '     ILLEGAL TYPE, NCTYPE =',I4/)
   !
-1013 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF : '/               &
+1013 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3 : '/               &
        '     TIMEUNITS MUST BE ONE OF "S" OR "D"' /           &
        '     GOT: ',A /)
   !
-1014 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF : '/               &
+1014 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3 : '/               &
        '     TIMEVAR TYPE MUST BE ONE OF "I" OR "D"' /        &
        '     GOT: ',A /)
   !
-1015 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF : '/               &
+1015 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3 : '/               &
        '     CANNONT HAVE TIME UNITS OF DAYS WITH'/           &
        '     TIME VARYTPE OF INT64' /)
   !
-1016 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF : '/               &
+1016 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3 : '/               &
        '     INT64 TIME ENCODING REQUIRES NETCDF4' /          &
        '     FILE FORMAT' /)
   !
   ! Warning format strings
   !
-1500 FORMAT (/' *** WAVEWATCH III WARNING IN W3OUNF : '/             &
+1500 FORMAT (/' *** WAVEWATCH III WARNING IN W3OUNF3 : '/             &
        '     IGNORING REQUEST FOR IPART =',I2, /              &
        '     MAX SWELL PARTITIONS (NOSW) =',I2 /)
   !
@@ -1727,7 +1727,10 @@ CONTAINS
             !
             ! Wave energy flux
           ELSE IF ( IFI .EQ. 5 .AND. IFJ .EQ. 3 ) THEN
-            CGE=CGE*0.001  ! from W / m to kW / m
+            DO ISEA=1, NSEA
+              IF ( CGE(ISEA) .NE. UNDEF )                       &
+                   CGE(ISEA) = 0.001 * CGE(ISEA)  ! from W / m to kW / m
+            END DO
             CALL S2GRID(CGE(1:NSEA), X1)
             !
             ! Wind to wave energy flux
@@ -3009,19 +3012,16 @@ CONTAINS
             ELSE
               ! If it is spherical coordinate
               IF (FLAGLL) THEN
-                IF(SMCGRD) THEN
 #ifdef W3_SMC
-                  IF(SMCOTYPE .EQ. 1) THEN
-                    IRET=NF90_INQ_DIMID (NCID, 'seapoint', DIMID(2))
-                  ELSE
-                    IRET=NF90_INQ_DIMID (NCID, 'longitude', DIMID(2))
-                    IRET=NF90_INQ_DIMID (NCID, 'latitude', DIMID(3))
-                  ENDIF
-#endif
+                IF(SMCGRD .AND. SMCOTYPE .EQ. 1) THEN
+                  IRET=NF90_INQ_DIMID (NCID, 'seapoint', DIMID(2))
                 ELSE
+#endif
                   IRET=NF90_INQ_DIMID (NCID, 'longitude', DIMID(2))
                   IRET=NF90_INQ_DIMID (NCID, 'latitude', DIMID(3))
-                ENDIF ! SMCGRD
+#ifdef W3_SMC
+                ENDIF
+#endif
                 IRET=NF90_INQ_VARID (NCID, 'longitude', VARID(1))
                 IRET=NF90_INQ_VARID (NCID, 'latitude', VARID(2))
                 ! If it is cartesian coordinate
@@ -3111,37 +3111,35 @@ CONTAINS
               IVAR=IVAR1+I
 
               IF (NCVARTYPE.EQ.2) THEN
-                IF( SMCGRD ) THEN
-#ifdef W3_SMC    
-                  IF( SMCOTYPE .EQ. 1 ) THEN
+#ifdef W3_SMC
+                  IF( SMCGRD .AND. SMCOTYPE .EQ. 1 ) THEN
                     ! SMC Flat file
+                    ! CarsteHansen: TDIM==2 so we could use dims DIMFIELD(1:TDIM)
                     IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_SHORT, (/DIMFIELD(1), DIMFIELD(TDIM)/), VARID(IVAR))
                   ELSE
                     ! SMC Regridded file
+#endif
                     IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_SHORT, DIMFIELD(1:TDIM), VARID(IVAR))
+#ifdef W3_SMC
                   ENDIF
+#endif
                   CALL CHECK_ERR(IRET)
-#endif       
-                ELSE ! SMCGRD
-                  IRET=NF90_DEF_VAR(NCID,META(I)%VARNM, NF90_SHORT, DIMFIELD(1:TDIM), VARID(IVAR))
-                  CALL CHECK_ERR(IRET)
-                ENDIF ! SMCGRD
+                  IF (NCTYPE.EQ.4) IRET = NF90_DEF_VAR_DEFLATE(NCID, VARID(IVAR), 1, 1, DEFLATE)
+                  IF (NCTYPE.EQ.4) CALL CHECK_ERR(IRET)
               ELSE
-                IF( SMCGRD ) THEN
 #ifdef W3_SMC    
-                  IF( SMCOTYPE .EQ. 1 ) THEN
+                  IF( SMCGRD .AND. SMCOTYPE .EQ. 1 ) THEN
                     ! SMC Flat file
+                    ! CarsteHansen: TDIM==2 so we could use dims DIMFIELD(1:TDIM)
                     IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_FLOAT, (/DIMFIELD(1), DIMFIELD(TDIM)/), VARID(IVAR))
                   ELSE
                     ! SMC Regridded file
+#endif
                     IRET = NF90_DEF_VAR(NCID,META(I)%varnm, NF90_FLOAT, DIMFIELD(1:TDIM), VARID(IVAR))
+#ifdef W3_SMC    
                   ENDIF
+#endif
                   CALL CHECK_ERR(IRET)
-#endif       
-                ELSE ! SMCGRD
-                  IRET=NF90_DEF_VAR(NCID,META(I)%VARNM, NF90_FLOAT, DIMFIELD(1:TDIM), VARID(IVAR))
-                  CALL CHECK_ERR(IRET)
-                ENDIF ! SMCGRD
               END IF
               
               IF (NCTYPE.EQ.4) THEN
@@ -3261,11 +3259,14 @@ CONTAINS
           ELSE
             I1F = 0
             I2F = 0
-            ! X1, X2, and XY are applied directly except if NFIELD.EQ.2,
-            IF (NFIELD.EQ.2) THEN
-              X1(:,:)=XX(:,:)
-              X2(:,:)=XY(:,:)
-            END IF
+          END IF
+          
+          ! The real-type fields to dump in the netcdf file will be
+          ! X1, X2, and XY. To obtain this for NFIELD.EQ.2 and EXTRADIM.EQ.0,
+          ! We will copy XX to X1 and XY to X2          
+          IF (EXTRADIM.EQ.0 .AND. NFIELD.EQ.2) THEN
+            X1(:,:)=XX(:,:)
+            X2(:,:)=XY(:,:)
           END IF
 
           DO IK=I1F,I2F
@@ -3282,7 +3283,7 @@ CONTAINS
               ELSE
                 ! Implementation of an eventual variable with NFIELD==3 and
                 ! EXTRADIM==1 has to be completed here
-                WRITE(NDSE,*) ' *** WAVEWATCH III ERROR IN OUNF :'
+                WRITE(NDSE,*) ' *** WAVEWATCH III ERROR IN OUNF3 :'
                 WRITE(NDSE,*) ' No program code for NFIELD==3 with a third dim'
                 CALL EXTCDE ( 45 )                  
               END IF
@@ -3312,6 +3313,13 @@ CONTAINS
                 MX1(IX1:IXN,IY1:IYN) = NINT(X1(IX1:IXN,IY1:IYN)/META(1)%FSC)
               END WHERE
               IF (NFIELD.GE.2 ) THEN
+                ! MX1 is defined above, and we set the second field MXX:
+!
+! CarstenHansen note: The commit dcafc8cb21ca96 changed X1 to XX here when
+! EXTRADIM.EQ.0, but this isn't relevant here, as I already copied XX to X1 when
+! NFIELD.EQ.2 (and also copied XY to X2). When EXTRADIM.EQ.1, we are looping
+! over IK=I1F,I2F, and have copied XXK(:,:,IK)->X1 and XYK(:,:,IK)->X2. 
+!
                 WHERE ( X1(IX1:IXN,IY1:IYN) .EQ. MFILLR )
                   MXX(IX1:IXN,IY1:IYN) = MFILL
                 ELSEWHERE
@@ -3319,6 +3327,7 @@ CONTAINS
                 END WHERE
               END IF
               IF (NFIELD.EQ.3 ) THEN
+                ! MX1 and MXX are defined above, and we set the third field MXY:
                 WHERE ( X1(IX1:IXN,IY1:IYN) .EQ. MFILLR )
                   MXY(IX1:IXN,IY1:IYN) = MFILL
                 ELSEWHERE
@@ -3358,6 +3367,9 @@ CONTAINS
               IF ( NCVARTYPE.EQ.2 ) THEN
                  IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),             &
                      MXX(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
+! CarstenHansen note: If (SMCGRD .AND. SMCOTYPE .EQ. 1), then ww3_ounf3 differs
+! from ww3_ounf in that START(1:TDIM) here is (/START(1), START(3)/) in ww3_ounf,
+! and COUNT(1:TDIM) here is (/COUNT(1), COUNT(3)/) in ww3_ounf.
               ELSE
                 IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+2),             &
                      X2(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
@@ -3366,6 +3378,7 @@ CONTAINS
             END IF
             IF (NFIELD.EQ.3 ) THEN
               IF ( NCVARTYPE.EQ.2 ) THEN
+! CarstenHansen note: If (SMCGRD .AND. SMCOTYPE .EQ. 1) as above.
                 IRET=NF90_PUT_VAR(NCID,VARID(IVAR1+3),             &
                      MXY(IX1:IXN,IY1:IYN),START(1:TDIM),COUNT(1:TDIM))
               ELSE
@@ -3671,21 +3684,18 @@ CONTAINS
     !
     IF (GTYPE.NE.UNGTYPE) THEN
       IF (FLAGLL) THEN
-        IF (SMCGRD) THEN
 #ifdef W3_SMC
-          IF(SMCOTYPE .EQ. 1) THEN
-            ! Flat seapoints file
-            IRET = NF90_DEF_DIM(NCID, 'seapoint', dimln(2), DIMID(2))
-          ELSE
-            ! Regular gridded file:
-            IRET = NF90_DEF_DIM(NCID, 'longitude', dimln(2), DIMID(2))
-            IRET = NF90_DEF_DIM(NCID, 'latitude', dimln(3), DIMID(3))
-          ENDIF
-#endif
+        IF(SMCGRD .AND. SMCOTYPE .EQ. 1) THEN
+          ! Flat seapoints file
+          IRET = NF90_DEF_DIM(NCID, 'seapoint', dimln(2), DIMID(2))
         ELSE
-          IRET = NF90_DEF_DIM(NCID, 'longitude', DIMLN(2), DIMID(2))
-          IRET = NF90_DEF_DIM(NCID, 'latitude', DIMLN(3), DIMID(3))
-        ENDIF ! SMCGRD
+#endif
+          ! Regular gridded file:
+          IRET = NF90_DEF_DIM(NCID, 'longitude', dimln(2), DIMID(2))
+          IRET = NF90_DEF_DIM(NCID, 'latitude', dimln(3), DIMID(3))
+#ifdef W3_SMC
+        ENDIF
+#endif
       ELSE
         IRET = NF90_DEF_DIM(NCID, 'x', DIMLN(2), DIMID(2))
         IRET = NF90_DEF_DIM(NCID, 'y', DIMLN(3), DIMID(3))
@@ -4232,7 +4242,7 @@ CONTAINS
     INTEGER IRET, ILINE
 
     IF (IRET .NE. NF90_NOERR) THEN
-      WRITE(NDSE,*) ' *** WAVEWATCH III ERROR IN OUNF :'
+      WRITE(NDSE,*) ' *** WAVEWATCH III ERROR IN OUNF3 :'
       WRITE(NDSE,*) ' LINE NUMBER ', ILINE
       WRITE(NDSE,*) ' NETCDF ERROR MESSAGE: '
       WRITE(NDSE,*) NF90_STRERROR(IRET)
@@ -4246,6 +4256,6 @@ CONTAINS
 
 
   !/
-  !/ End of W3OUNF ----------------------------------------------------- /
+  !/ End of W3OUNF3 ----------------------------------------------------- /
   !/
 END PROGRAM W3OUNF3
