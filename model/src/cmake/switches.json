@@ -1,5 +1,16 @@
 [
     {
+        "name": "xsmf",
+        "num_switches": "upto1",
+        "description": "Fit to Stokes drift vertical profile",
+        "valid-options": [
+            {
+                "name": "MFIT",
+                "build_files": ["w3xsmfmd.F90"]
+            }
+        ]
+    },
+    {
         "name": "stvp",
         "num_switches": "upto1",
         "description": "Stokes drift vertical profile",
