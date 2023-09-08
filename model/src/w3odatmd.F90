@@ -332,9 +332,8 @@ MODULE W3ODATMD
   INTEGER                 :: NOGE(NOGRP)
   INTEGER                 :: NOTYPE
   INTEGER, PARAMETER      :: NOEXTR=  2
-#ifdef W3_MFIT
+  ! To be used under switch MFIT. XSMH(1,NOXSM=1) always exists (w3{adat,xsmf}md)
   INTEGER, PARAMETER      :: NOXSM=  7
-#endif
   CHARACTER(LEN=20)       :: IDOUT(NOGRP,NGRPP)
   CHARACTER(LEN=80)       :: FNMPRE = './'
   !Moved UNDEF to constants and included above
