@@ -1,5 +1,16 @@
 [
     {
+        "name": "stvp",
+        "num_switches": "upto1",
+        "description": "Stokes drift vertical profile",
+        "valid-options": [
+            {
+                "name": "STVP",
+                "build_files": ["w3stvpmd.F90"]
+            }
+        ]
+    },
+    {
         "name": "nco",
         "num_switches": "upto1",
         "description": "NCO modifications",
