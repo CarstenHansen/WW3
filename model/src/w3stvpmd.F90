@@ -327,7 +327,7 @@
 ! Allocate arrays for depths, prognostic Stokes, and tail Stokes
 !
       IF ( stvp_verbose .gt. 0 ) &
-        WRITE (NDSV, 904),  'INITIALIZE Stokes drift for ', SPND, 'depths'
+        WRITE (NDSV, 904)  'INITIALIZE Stokes drift for ', SPND, 'depths'
 
       ! Shallow water Stokes parameters
       allocate ( fkd(NK,NSEAL), stat=IERR )
@@ -473,7 +473,7 @@
       ELSE IF ( USXT == 'none' ) THEN
          RETURN ! No tail extension. The value NP = 0 will indicate this.
       ELSE
-        WRITE (NDSE, 916), 'STVP_INIT: Unknown spectral tail type: ', USXT
+        WRITE (NDSE, 916) 'STVP_INIT: Unknown spectral tail type: ', USXT
         CALL EXTCDE ( 73 )
       END IF
 
@@ -508,7 +508,7 @@
 ! the full tail, including SIG_SI(NP), have a dispersion relation as for deep
 ! water waves. This means that we may apply SIG_SI(NP) = SIG(IKT), and
 ! NP = (IKT-1)*rr + 1
-      NP = IKT + (1 - rr)
+      NP = (IKT-1)*rr + 1
 
       allocate( SIG_SI(NP), stat=IERR )
 
@@ -673,7 +673,7 @@
 
       IF ( .NOT. ALLOCATED(DWN) ) CALL STVP_INIT()
       IF ( stvp_verbose .GT. 0 ) THEN
-           WRITE (NDSV, 912), OSTEP, 'Calculate Stokes drift ..'
+           WRITE (NDSV, 912) OSTEP, 'Calculate Stokes drift ..'
            OSTEP = OSTEP + 1
       END IF
 
@@ -854,7 +854,7 @@
       ! Prognostic spectrum range IK=1, IKT
 
       IF ( stvp_verbose .gt. 1 ) THEN
-        WRITE (NDSV, 912), '    .. for the prognostic part'
+        WRITE (NDSV, 912) '    .. for the prognostic part'
       END IF
 
       ! We represent the Stokes profile exponential shape exp(-2 K Z) by an
@@ -888,9 +888,9 @@
 
       ! Numerical consistency check output
       if ( INDTEST ) then
-        write(NDSE,912), 'NT, SPND, IKT ='
-        write(NDSE, FMT='(3(1X,I2))'), NT, SPND, IKT
-        write(NDSE,912), 'IK, log10(D M_X/Y), log10(D U/V_S(IK,:)) ='
+        write(NDSE,912) 'NT, SPND, IKT ='
+        write(NDSE, FMT='(3(1X,I2))') NT, SPND, IKT
+        write(NDSE,912) 'IK, log10(D M_X/Y), log10(D U/V_S(IK,:)) ='
         WRITE(rowfmt,'(A,I4,A)') '(1X,I2,1X,F6.3,',size(U_S),'(1X,F6.3))'
       end if
       
@@ -950,17 +950,16 @@
         end if
       END DO
 
-      IF ( NP == 0 ) THEN
+      IF ( NP == 0 ) ) THEN
 
-        IF ( stvp_verbose .gt. 0  .and. JSEA .eq. 1 ) &
-          WRITE (NDSV, 912), 'Truncate at NK-1. No diagnostic spectral extension'
+        IF ( stvp_verbose .gt. 0 .and.  NP == 0 .and.  JSEA .eq. 1 ) &
+          WRITE (NDSV, 912) 'Truncate at NK-1. No diagnostic spectral extension'
+        U_SB = 0.0        
 
-      ELSE IF ( AX .gt. 0. .or. AY .gt. 0. ) THEN
-        ! (If the wave action is zero at the highest prognostic frequency band,
-        ! then there is a zero tail contribution)
+      ELSE
          
         IF ( stvp_verbose .gt. 1  .and. JSEA .eq. 1 ) &
-             WRITE (NDSV, 912), '    .. for the diagnostic part'
+             WRITE (NDSV, 912) '    .. for the diagnostic part'
 
         ! We append the tail at frequencies above the prognostic bin IKT.   
         ! Here we estimate the product m1Bg of the 1st circular moment m1, and
@@ -968,17 +967,29 @@
         ! orientation CTH, STH:(cos(theta0),sin(theta0)) m1 B g = (CTH,STH)*m1Bg
         U_SBX = AX * A2S0 ! The contribution to U_S, VS from band IKT
         U_SBY = AY * A2S0 !
-        U_SB = SQRT(U_SBX**2 + U_SBY**2)        
-        
+        U_SB = SQRT(U_SBX**2 + U_SBY**2)
+
         ! At the highest prognostic frequency band, the Stokes spectral level
-        ! is derived as explained in SUBROUTINE STVP_INIT:
-        if (INT(I1 * SIG(IKT) / SIG_S) .LE. N1MAX) then
-          ! For shallow depth
+        ! is derived as explained in SUBROUTINE STVP_INIT.
+        ! If it were over deep water:
+
+        m1Bg = U_SB * SIG(IKT) / NSI0B
+        
+        ! If the spectral level is near zero at the highest frequency, then
+        ! we will consider it a zero tail in order not to apply divisions
+        ! with a small number
+
+        IF ( m1Bg < 1.e-4 ) U_SB = 0.0
+
+      END IF
+
+      
+      IF ( U_SB > 0.) THEN
+
+        ! For shallow depth, the Stokes spectral level is (see STVP_INIT):
+        if (INT(I1 * SIG(IKT) / SIG_S) .LE. N1MAX) &
           m1Bg = U_SB * SQRT(GRAV * WN(IKT,ISEA)) / NSI0B
-        else
-          ! Deep water
-          m1Bg = U_SB * SIG(IKT) / NSI0B
-        end if
+        ! Over deep water we found m1Bg above
         
         ! Band mean direction unit vector
         CTH = U_SBX/U_SB
@@ -1053,31 +1064,31 @@
 
         ! Numerical consistency check output
         if ( INDTEST ) then
-          write(NDSE,912), 'SIG_DS, m1Bg, SIG_SI(NP), it ='
-          write(NDSE, FMT='(3(1X,F6.4),1X,I2)'), SIG_DS, m1Bg, SIG_SI(NP), it
+          write(NDSE,912) 'SIG_DS, m1Bg, SIG_SI(NP), it ='
+          write(NDSE, FMT='(3(1X,F6.4),1X,I2)') SIG_DS, m1Bg, SIG_SI(NP), it
           WRITE(rowfmt,'(A,I4,A)') '(1X,I2,',size(U_S),'(1X,F6.3))'
-          write(NDSE,912), 'IK, log10(NSIZ(:,IK)) ='
+          write(NDSE,912) 'IK, log10(NSIZ(:,IK)) ='
           
           do it = 1, NT
             write(NDSE, FMT=rowfmt ) it, &
                  ( log10(max(NSIZ(IZ,it),1.e-06)), IZ=1,size(U_S) )
           end do
           WRITE(rowfmt,'(A,I4,A)') '(',size(U_S),'(1X,F6.3))'
-          write(NDSE,912), 'log10(U_S_prog) ='
+          write(NDSE,912) 'log10(U_S_prog) ='
           write(NDSE,FMT=rowfmt) ( log10(max(U_S(IZ),1.e-09)), IZ=1,size(U_S) )
-          write(NDSE,912), 'log10(V_S_prog) ='
+          write(NDSE,912) 'log10(V_S_prog) ='
           write(NDSE,FMT=rowfmt) ( log10(max(V_S(IZ),1.e-09)), IZ=1,size(U_S) )
           WRITE(rowfmt,'(A,I4,A)') '(',size(U_S_tail),'(1X,F6.3))'
-          write(NDSE,912), 'log10(U_S_tail) ='
+          write(NDSE,912) 'log10(U_S_tail) ='
           write(NDSE,FMT=rowfmt) &
                 ( log10(max(U_S_tail(IZ)* CTH,1.e-09)), IZ=1,size(U_S_tail) )
-          write(NDSE,912), 'log10(V_S_tail) ='
+          write(NDSE,912) 'log10(V_S_tail) ='
           write(NDSE,FMT=rowfmt) &
                 ( log10(max(U_S_tail(IZ)* STH,1.e-09)), IZ=1,size(U_S_tail) )
-          write(NDSE,FMT='(A,F9.6)'), 'M_X = ', M_X
-          write(NDSE,FMT='(A,F9.6)'),  'cos M_tail = ', M_tail * CTH
-          write(NDSE,FMT='(A,F9.6)'), 'M_Y = ', M_Y
-          write(NDSE,FMT='(A,F9.6)'),  'sin M_tail = ', M_tail * STH
+          write(NDSE,FMT='(A,F9.6)') 'M_X = ', M_X
+          write(NDSE,FMT='(A,F9.6)')  'cos M_tail = ', M_tail * CTH
+          write(NDSE,FMT='(A,F9.6)') 'M_Y = ', M_Y
+          write(NDSE,FMT='(A,F9.6)')  'sin M_tail = ', M_tail * STH
 
           call extcde(988,MSG="Stop after point output for graphics", &
                FILE="w3stvpmd.F90")
