@@ -950,7 +950,7 @@
         end if
       END DO
 
-      IF ( NP == 0 ) ) THEN
+      IF ( NP == 0 ) THEN
 
         IF ( stvp_verbose .gt. 0 .and.  NP == 0 .and.  JSEA .eq. 1 ) &
           WRITE (NDSV, 912) 'Truncate at NK-1. No diagnostic spectral extension'
