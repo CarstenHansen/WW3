@@ -65,10 +65,10 @@ PROGRAM W3OUNF3
   !/    02-Feb-2021 : Make default global meta optional   ( version 7.12 )
   !/    22-Mar-2021 : New coupling fields output          ( version 7.12 )
   !/    02-Sep-2021 : Added coordinates attribute         ( version 7.12 )
-  !/    14-Feb-2023 : Added QKK output                    ( version 7.12 )
   !/    28-Feb-2022 : New program ww3_ounf3: Sub-fields   ( version X.XX )
   !/                  and more than one 'third' dimension    
   !/    28-Feb-2022 : STVP option: Stokes drift profile   ( version X.XX )
+  !/    14-Feb-2023 : Added QKK output                    ( version 7.12 )
   !/
   !/    Copyright 2009-2013 National Weather Service (NWS),
   !/       National Oceanic and Atmospheric Administration.  All rights
@@ -147,8 +147,8 @@ PROGRAM W3OUNF3
   !
   !    Indices 21 - 300 are for storage of field output variable IDs.
   !
-  !     The program ww3_ounf3 does all that its former version can do,
-  !     and furter allow for different sub-fields to be output together in
+  !     The program ww3_ounf3 does all that its former version ww3_ounf can do,
+  !     and further allows for different sub-fields to be output together in
   !     the same netCDF file even if the boolean TOGETHER is set to .false. .
   !     Also, the code may define one or more other 'extra' dimensions like
   !     the frequency ('f') dimension. This is a 'third' dimension after the
@@ -161,7 +161,7 @@ PROGRAM W3OUNF3
   !     A field may contain more than one sub-field. Two examples of
   !     this are the field 'P2S' (IFI,IFJ=6,7), which contains two scalar
   !     sub-fields 'p2s' and 'pp2s', and the field 'BED' (IFI,IFJ=7,3),
-  !     which  contains two sub-fields, a scalar 'bed' and a 2D field
+  !     which contains two sub-fields: a scalar 'bed' and a 2D field
   !     ('ripplex', 'rippley').
   !   
   !     The maximum number of sub-fields is NFSMAX=2 as presently hard-coded
@@ -354,7 +354,7 @@ PROGRAM W3OUNF3
   CALL ITRACE ( NDSTRC, NTRACE )
   !
 #ifdef W3_S
-  CALL STRACE (IENT, 'W3OUNF3')
+  CALL STRACE (IENT, 'W3OUNF')
 #endif
   !
   WRITE (NDSO,900)
@@ -841,43 +841,43 @@ PROGRAM W3OUNF3
   !
   ! Error format strings
   !
-1000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3 : '/               &
+1000 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF : '/               &
        '     ERROR IN OPENING INPUT FILE'/                    &
        '     IOSTAT =',I5/)
   !
-1001 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3 : '/               &
+1001 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF : '/               &
        '     PREMATURE END OF INPUT FILE'/)
   !
-1002 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3 : '/               &
+1002 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF : '/               &
        '     ERROR IN READING FROM INPUT FILE'/               &
        '     IOSTAT =',I5/)
   !
-1003 FORMAT (/' *** WAVEWATCH III WERROR IN W3OUNF3 : '/              &
+1003 FORMAT (/' *** WAVEWATCH III WERROR IN W3OUNF : '/              &
        '     OUT OF RANGE REQUEST FOR NBIPART =',I2, /        &
        '     MAX SWELL PARTITIONS (NOSW) =',I2 /)
   !
-1010 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3 : '/               &
+1010 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF : '/               &
        '     ILLEGAL TYPE, NCTYPE =',I4/)
   !
-1013 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3 : '/               &
+1013 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF : '/               &
        '     TIMEUNITS MUST BE ONE OF "S" OR "D"' /           &
        '     GOT: ',A /)
   !
-1014 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3 : '/               &
+1014 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF : '/               &
        '     TIMEVAR TYPE MUST BE ONE OF "I" OR "D"' /        &
        '     GOT: ',A /)
   !
-1015 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3 : '/               &
+1015 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF : '/               &
        '     CANNONT HAVE TIME UNITS OF DAYS WITH'/           &
        '     TIME VARYTPE OF INT64' /)
   !
-1016 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF3 : '/               &
+1016 FORMAT (/' *** WAVEWATCH III ERROR IN W3OUNF : '/               &
        '     INT64 TIME ENCODING REQUIRES NETCDF4' /          &
        '     FILE FORMAT' /)
   !
   ! Warning format strings
   !
-1500 FORMAT (/' *** WAVEWATCH III WARNING IN W3OUNF3 : '/             &
+1500 FORMAT (/' *** WAVEWATCH III WARNING IN W3OUNF : '/             &
        '     IGNORING REQUEST FOR IPART =',I2, /              &
        '     MAX SWELL PARTITIONS (NOSW) =',I2 /)
   !
@@ -1893,12 +1893,13 @@ CONTAINS
             !
             ! Power spectral density of equivalent surface pressure
           ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 7 ) THEN
-            ! This is an example of placing more than one field in the
-            ! same file even if TOGETHER is set as .FALSE. This is managed
-            ! by joining sub-fields into into a common netCDF Id:
+            ! The parameter 'P2S' is an example of placing more than one field
+            ! in the same file even if TOGETHER is set as .FALSE. This is
+            ! managed by joining sub-fields into into a common netCDF Id:
             ! NCID = NCIDS(IFI, IFJ, 1)
-            NFS = 2 ! Number of sub-fields in loop over IFS=1,NFS
-                    ! Hardcoded ! Check that NFS equals w3ounf3metamd SPIJ2(K)
+            NFS = 2 ! The number of sub-fields of the parameter 'P2S'. It is
+                    ! hardcoded here - check in w3ounf3metamd that NFS equals
+                    ! the value in the the list NSP
             ISUB=IFS
             !
             IF ( IFS .EQ. 1 ) THEN
@@ -2086,7 +2087,7 @@ CONTAINS
             !
             ! Bottom roughness
           ELSE IF ( IFI .EQ. 7 .AND. IFJ .EQ. 3 ) THEN
-            NFS = 2 ! Number of sub-fields in loop over IFS=1,NFS
+            NFS = 2 ! The Number of sub-fields of the parameter 'BED'
             ISUB=IFS
 !
             IF ( IFS .EQ. 1 ) THEN
@@ -3291,7 +3292,7 @@ CONTAINS
               ELSE
                 ! Implementation of an eventual variable with NFIELD==3 and
                 ! EXTRADIM==1 has to be completed here
-                WRITE(NDSE,*) ' *** WAVEWATCH III ERROR IN OUNF3 :'
+                WRITE(NDSE,*) ' *** WAVEWATCH III ERROR IN OUNF :'
                 WRITE(NDSE,*) ' No program code for NFIELD==3 with a third dim'
                 CALL EXTCDE ( 45 )                  
               END IF
@@ -4250,7 +4251,7 @@ CONTAINS
     INTEGER IRET, ILINE
 
     IF (IRET .NE. NF90_NOERR) THEN
-      WRITE(NDSE,*) ' *** WAVEWATCH III ERROR IN OUNF3 :'
+      WRITE(NDSE,*) ' *** WAVEWATCH III ERROR IN OUNF :'
       WRITE(NDSE,*) ' LINE NUMBER ', ILINE
       WRITE(NDSE,*) ' NETCDF ERROR MESSAGE: '
       WRITE(NDSE,*) NF90_STRERROR(IRET)
@@ -4264,6 +4265,6 @@ CONTAINS
 
 
   !/
-  !/ End of W3OUNF3 ----------------------------------------------------- /
+  !/ End of W3OUNF ----------------------------------------------------- /
   !/
 END PROGRAM W3OUNF3
