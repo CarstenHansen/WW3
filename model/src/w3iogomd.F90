@@ -3599,8 +3599,9 @@ CONTAINS
 #ifdef W3_STVP
              ELSE IF ( IFI .EQ. ISVP .AND. IFJ .EQ. JSVP ) THEN
               WRITE ( NDSOG ) USVP(1:NSEA,1:3+SPND*2)
-#ifdef W3_ASCII
+# ifdef W3_ASCII
               WRITE ( NDSOA,* ) 'USVP:', USVP(1:NSEA,1:3+SPND*2)
+# endif
 #endif
               !
               !     Section 7)
