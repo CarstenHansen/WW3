@@ -164,7 +164,7 @@ PROGRAM W3OUNF3
   !     ('ripplex', 'rippley').
   !   
   !     The maximum number of sub-fields is NFSMAX=2 as presently hard-coded
-  !     in the SUBROUTINE INIT_META of w3ounf3metamd.F90.
+  !     in the SUBROUTINE INIT_META of w3ounfmetamd.F90.
   !          
   !     FLJOIN is a flag indicating if a sub-field should be put together in
   !     a joint netCDF file, even if TOGETHER is .FALSE.. FLJOIN is set to False
@@ -1940,9 +1940,6 @@ CONTAINS
             ! Wave to sea ice energy flux
           ELSE IF ( IFI .EQ. 6 .AND. IFJ .EQ. 11 ) THEN
             IF (NCVARTYPEI.EQ.3) NCVARTYPE=4
-            DO ISEA=1, NSEA
-              PHIOC(ISEA)=MIN(3000.,PHIOC(ISEA))
-            END DO
             CALL S2GRID(PHICE(1:NSEA), X1)
           !
           ! Partitioned surface stokes drift

@@ -1,4 +1,4 @@
-!> @file w3ounf3metamd.F90
+!> @file w3ounfmetamd.F90
 !> @brief User configurable netCDF meta-data for ww3_ounf.
 !> @author Chris Bunney @date 02-Nov-2020
 !/ ------------------------------------------------------------------- /
