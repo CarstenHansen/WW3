@@ -100,7 +100,7 @@ set(programs ww3_strt ww3_grid ww3_bound ww3_outf ww3_outp ww3_trck ww3_grib
   ww3_gint gx_outf gx_outp ww3_uprstr ww3_shel ww3_prep ww3_gspl ww3_multi ww3_systrk)
 
 # Executables to build if NetCDF is found
-set(netcdf_programs ww3_ounf ww3_ounp ww3_bounc ww3_trnc ww3_prnc)
+set(netcdf_programs ww3_ounf ww3_ounf3 ww3_ounp ww3_bounc ww3_trnc ww3_prnc)
 
 if("OASIS" IN_LIST switches)
   find_package(OASIS REQUIRED)
@@ -119,6 +119,7 @@ endif()
 
 if(NetCDF_Fortran_FOUND)
   target_sources(ww3_lib PRIVATE w3ounfmetamd.F90)
+  target_sources(ww3_lib PRIVATE w3ounf3metamd.F90)
   if(TARGET NetCDF::NetCDF_Fortran)
     # NetCDF library flags provided by compiler or wrapper script: don't add as dependency
     target_link_libraries(ww3_lib PUBLIC NetCDF::NetCDF_Fortran)
