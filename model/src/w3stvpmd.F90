@@ -195,8 +195,8 @@
 ! Full Stokes profile vectors
       USE W3ADATMD, ONLY: U_S, V_S, ZK_S
 
-      USE W3GDATMD, ONLY: SPND, SPDS, SPBP, NSEAL, DMIN, XFR, DTH,  &
-                          SIG, DDEN, ECOS, ESIN, NK, NTH, USXT, USXF
+      USE W3GDATMD, ONLY: SPND, SPDS, SPBP, NSEAL, DMIN, XFR, SIG, &
+                          DDEN, ECOS, ESIN, NK, NTH, USXT, USXF
 
       USE W3ODATMD, ONLY: NDST, NDSO, NDSE, IAPROC, NAPROC, NAPOUT
       USE W3DISPMD, ONLY: DSIE, N1MAX, ECG1, EWN1
@@ -236,9 +236,6 @@
 ! IKT:  Prognostic band for tail estimation.
       INTEGER            :: IKT
 
-! sig_c: Frequency at the cut-off frequency USXF
-      REAL               :: sig_c
-      
 ! XKR, XFT: Relative increment of wavenumber, frequency bin-to bin for the
 !      diagnostic Stokes array (the extended tail)
 ! NT: Number of wavenumber bins in the full look-up array for the tail profile.
@@ -247,7 +244,7 @@
       REAL               :: XKR, XFT
       INTEGER            :: NT
       INTEGER            :: NP
-      REAL               :: rr
+      INTEGER            :: rr
 
 ! Deriving m1Bg from U_S in band IKT by division with the norm:
       REAL               :: NSI0B
@@ -436,7 +433,7 @@
       END DO ! JSEA = 1,NSEAL
       
       ! Apply a global limit to K_S
-      K_S_max = SIG(NK - 2)**2 / GRAV
+      K_S_max = SIG(NK - 1)**2 / GRAV
       ! In the fittting of an extended tail at index IKT it will be required
       ! that K_S_max <= SIG(IKT)**2 / GRAV. Ensure also that this is so
       ! K_S_max = min( K_S_max, SIG(IKT)**2 / GRAV )
@@ -448,24 +445,25 @@
       ! IKT: The upper edge of the prognostic range.
       ! NP: Number of bins of the lookup array for the spectral tail extension
       !     that may match at the end of the prognostic range
-      ! For a truncated spectrum with no tail extension:
-      IKT = NK
-      NP = 0 ! NP=0 indicates no addition of a spectral tail
+      ! A truncated spectrum with no tail extension will be indicated as
+      NP = 0
 
       ! User-specified upper cutoff frequency for Stokes drift. At most 10 Hz
       sig_c = TPI * MIN(USXF, 10.)
       
       ! If the user-specified cutoff for Stokes drift is within SIG(1..NK),
+      ! we will truncate near the the cutoff with no tail extension
       if ( sig_c < SIG(NK) ) then
-        do IKT=NK-1,1,-1
+        do IKT=NK-1,2,-1
           if ( sig_c > SIG(IKT) ) exit
         end do
-        ! End the prognostic summation at IKT with no addition of a spectral tail
-        K_S_max = min( K_S_max, SIG(IKT)**2 / GRAV )
+        ! End the prognostic summation at IKT
+        K_S_max = SIG(IKT)**2 / GRAV
         return
       end if      
       
 ! Fitting the tail at IKT=NK-1
+
       IF ( USXT == 'Pf-5' ) THEN
          ! Phillips saturation
          Pn = 5
@@ -482,14 +480,14 @@
 ! choice of XKR must be an integer root r: XKR = (XFR**2)**(1/r). We choose
 ! r = 1.     
       rr=1
-      XKR = (XFR**2)**(1./rr)
-! We will later make use of the frequency increment factor for the look-up tail
+! We will later also make use of a frequency increment factor XFT
       XFT = XFR**(1./rr)
+      XKR = XFT**2
       
-! We should have in mind that when the depth is limited, the elements of the array SIG_SI
-! are NOT (precisely) equal to the true angular frequencies SIG(1..NK)
+! We should have in mind that if the depth is limited, the elements of the array
+! SIG_SI are NOT (precisely) equal to the true angular frequencies SIG(1..NK)
       
-! The length of the look-up table NT must be so that
+! The length NT of the look-up table must be so that
 ! sig_c/SIG(1) <= XKR**(NT/2) (at least).
       NT = ceiling( 2. * LOG( sig_c/SIG(1) ) / LOG(XKR) ) + 1
 
@@ -560,7 +558,7 @@
 ! Thus the first element needed is NSIZ(1,1) = 2 (Kr(1)/XFT)^-1/2
 !    = 2 ( XFT**(rr+1)/XFT )^-1/2 = 2 XFT**(-(rr-1)/2)
       NSIZ(1,1) = 2.
-      IF ( rr > 1 ) NSIZ(1,1) = 2. * XFT**(-(rr-1)/2)
+      IF ( rr > 1 ) NSIZ(1,1) = 2. * XFT**(-(rr-1)/2.)
       DO ii = 2,NT
           NSIZ(1,ii) = NSIZ(1,ii-1) / XFT
       END DO
@@ -655,7 +653,7 @@
 
 ! USVP: Full Stokes profile variables + M_X, M_Y, K_S, but not ZK_S
       USE W3ADATMD, ONLY: T02, USVP
-      USE W3GDATMD, ONLY: NSEA, MAPSF, MAPSTA ! module scope:,NSEAL,NK,NTH,SIG
+      USE W3GDATMD, ONLY: MAPSF, MAPSTA ! known in module scope: NSEAL,NK,NTH,SIG
 !/
       IMPLICIT NONE
 !/
@@ -768,8 +766,8 @@
       INTEGER               :: numDepths, IZ
 
 ! Factors for the prognostic calculation
-      REAL                  :: A2M, A2S0, AX, AY, EDWTZ, DDWTZ
-      INTEGER               :: ISEA, ITH, IK, NIK
+      REAL                  :: A2M, A2S0, AX, AY
+      INTEGER               :: ISEA, ITH, IK
 
 ! Parameters for 'inlined version of WAVNU1'
       REAL                  :: SIX, R1
@@ -844,12 +842,10 @@
       ! SPND is the configured, maximum number of profile depths
       ! The dimensionless water depth is
       KDPT = K_S * DEPTH
-
-      DO IZ = SPND,1,-1
-        IF ( ZK_S(IZ) > KDPT ) CYCLE
-        numDepths = IZ
-        EXIT
+      DO IZ = SPND,2,-1
+        IF ( ZK_S(IZ) < KDPT ) EXIT
       END DO
+      numDepths = IZ ! numDepths = 1 is the lowest valid value
 
       ! Prognostic spectrum range IK=1, IKT
 
@@ -1014,17 +1010,22 @@
         ! we also require that SIG(IKT)/SIG_DS >= 1. This is why we have set
         ! a limiter K_S_max = SIG(IKT)^2/GRAV above.
         
-        ! Interpolate between the two discrete values of SIG_SI nearest
-        ! SIG_DS where the tail matches most precisely.
-        
-        do ip=2,NP
+        ! Interpolate between the two discrete values of SIG_SI(ip), SIG_SI(ip+1)
+        ! nearest SIG_DS where the tail matches most precisely.
+
+        do ip=2,NP-1
           if (SIG_SI(ip) > SIG_DS) exit
         end do
-        ip = ip - 1
+        ip=ip-1 ! Results in the range 1,NP-1
 
-        ! Perform linear interpolation of the tail Stokes drift between the
-        ! two neighbour points ip and ip+1.
+        if ( ip+1 .gt. size(SIG_SI) ) then
+           write(NDSE,*) 'NP=',NP, ip, '>size(SIG_SI)=', size(SIG_SI)
+           call extcde(988,MSG="Stop because too short array SIG_SI", &
+               FILE="w3stvpmd.F90")
+        endif
 
+        ! Perform linear interpolation between the neighbour points ip and ip+1
+        
         ! The linear weights are
         wgt = ( SIG_SI(ip+1) - SIG_DS )/( SIG_SI(ip+1) - SIG_SI(ip) )
 
