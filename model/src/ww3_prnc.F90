@@ -2054,6 +2054,11 @@ PROGRAM W3PRNC
         ENDWHERE
         CALL INTERP(MXM, MYM, XTEMP, IX21, IX22, IY21, IY22,   &
              RD11, RD12, RD21, RD22, FILLVALUE, A3)
+        ! CHA at FCOO: For at test I had padded zeros to the wind field over land areas 
+        ! and experienced that A3 got a (small) negative value after interpolation
+        ! at a grid point. Then it failed in taking the SQRT below
+        ! I haven't reported back to the WW3 dev community
+        A3 = ABS(A3)
 
         WHERE ( XTEMP.NE.FILLVALUE )
           XTEMP =  SQRT(XTEMP)
