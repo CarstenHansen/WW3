@@ -404,13 +404,13 @@ CONTAINS
       DO J = 1,NOGE(I)
         ! Does the field have sub-fields?
         S=I*NOGMAX+J
-        DO K=1,size(SPIJ2)
-          IF ( SPIJ2(K) .EQ. S ) EXIT
-        ENDDO
-        IF ( SPIJ2(K) .NE. S ) THEN
+        IF ( .NOT. ANY( SPIJ2 .EQ. S ) ) THEN 
           ALLOCATE(GROUP(I)%FIELD(J)%META(3)) ! Hardcode to 3 components for the moment
         ELSE
-          ! If S is one of the fields with sub-fields
+          DO K=1,size(SPIJ2)
+            IF ( SPIJ2(K) .EQ. S ) EXIT
+          ENDDO
+          ! S is index K in the fields with sub-fields
           NFSMAX = MAX( NFSMAX, NSP(K) )
           ALLOCATE(GROUP(I)%FIELD(J)%SUBFIELD(NSP(K)))
           DO S = 1,NSP(K)
