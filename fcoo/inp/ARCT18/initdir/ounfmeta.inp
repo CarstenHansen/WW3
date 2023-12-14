@@ -1,0 +1,8 @@
+$ Freefoem netcdf metadata definitions for ww3_ounf
+
+   $ Coordinate reference system:
+     CRS rotated_pole
+       grid_mapping_name = "rotated_latitude_longitude"
+       grid_north_pole_latitude = 10. f
+       grid_north_pole_longitude = -125. f
+   

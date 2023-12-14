@@ -338,6 +338,10 @@ CONTAINS
            TSYNC(:,0) = TSYNC(:,INGRP(J,1))
     END DO
     !
+    ! TPRNT has to be initialised as its value is evaluated in the
+    ! beginning of each step of LOOP_OUTER
+    TPRNT  = TSYNC(:,0)
+    !
     !     Check if FLSYNC initialized
     !
     IF ( .NOT. ALLOCATED(FLSYNC) ) THEN
