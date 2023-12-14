@@ -470,7 +470,7 @@
           WRITE (NDSV, *) '    Stokes profile fit initialized for',NSEAL,'points'
       END IF
      
-      IF ( xsmf_verbose .GT. 0 ) WRITE (NDSV, 912), 'Stokes profile fit ..'
+      IF ( xsmf_verbose .GT. 0 ) WRITE (NDSV, 912) 'Stokes profile fit ..'
 !
 ! -------------------------------------------------------------------- /
 ! 1.  Loop over sea points
@@ -496,7 +496,7 @@
           USVP(JSEA,4+NZO:3+2*NZO) = USVP(JSEA,4+SPND:3+SPND+NZO)
       END DO
       
-      IF ( xsmf_verbose .GT. 0 ) WRITE (NDSV, 912), 'Stokes fits done'
+      IF ( xsmf_verbose .GT. 0 ) WRITE (NDSV, 912) 'Stokes fits done'
       
   912 FORMAT ('  ',A)
 
@@ -528,7 +528,7 @@
 !     AM=2.5, PM=0.45, Ud=0
 
       if ( xsmf_verbose > 1 .and. JSEA == 1 ) &
-           WRITE (NDSV, *), JSEA, '  Fit the MHfit profile'
+           WRITE (NDSV, *) JSEA, '  Fit the MHfit profile'
       
 
       K_S = USVP(JSEA,1)
@@ -570,7 +570,7 @@
       ! (...)
 
       if ( xsmf_verbose > 1  .and. JSEA == NSEAL )  &
-         WRITE (NDSV, *), JSEA, '  MHfit done. SIC =', SIC
+         WRITE (NDSV, *) JSEA, '  MHfit done. SIC =', SIC
 
       END SUBROUTINE Stokes_MHfit
 
@@ -877,7 +877,7 @@
 !  step 3: Determine AMd as the best fit of the secondary, 'deep',
 !       profile given its surface drift vector Ud
 
-        if (xsmf_verbose > 2 ) write (NDSV,*), '  Fit AMd'
+        if (xsmf_verbose > 2 ) write (NDSV,*) '  Fit AMd'
             
         ! Find  Umr(z)= proj_d(Um) - proj_d(Up)*Pp
         ! projected on the direction of Ud
@@ -919,7 +919,7 @@
         
           
 !  step 4: Update the profile partitions based on the old IPp and a new AMd, PMd
-        if (xsmf_verbose > 2 ) write (NDSV,*), '  IP_calc(KsD', AMd, PMd,')'
+        if (xsmf_verbose > 2 ) write (NDSV,*) '  IP_calc(KsD', AMd, PMd,')'
         
         IPd = IP_calc( KsD, AMd, PMd)
         
@@ -959,16 +959,16 @@
 
       if ( xsmf_verbose > 2 &
            .or. ( xsmf_verbose  > 1 .and. warning_issued ) ) then
-        write (NDSV,*), '  U0,     Ud,     AM,  PM,  IPp,  AMd,  IPd, si = '
-        write (NDSV,*), U0, Ud, AM, PM, IPp, AMd, IPd, si
+        write (NDSV,*) '  U0,     Ud,     AM,  PM,  IPp,  AMd,  IPd, si = '
+        write (NDSV,*) U0, Ud, AM, PM, IPp, AMd, IPd, si
 
-        write (NDSV,*), '    MK =  ', MK
-        write (NDSV,*), '    Upi = ', Upi(1:iter) , Up
-        write (NDSV,*), '   IPpi = ', IPpi(1:iter), IPp
-        write (NDSV,*), '    AMi = ', AMi(1:iter) , AM
-        write (NDSV,*), '    PMi = ', PMi(1:iter) , PM
-        write (NDSV,*), '   AMdi = ', AMdi(1:iter), AM
-        write (NDSV,*), '    si = ', sqrt( msi(1:iter) )
+        write (NDSV,*) '    MK =  ', MK
+        write (NDSV,*) '    Upi = ', Upi(1:iter) , Up
+        write (NDSV,*) '   IPpi = ', IPpi(1:iter), IPp
+        write (NDSV,*) '    AMi = ', AMi(1:iter) , AM
+        write (NDSV,*) '    PMi = ', PMi(1:iter) , PM
+        write (NDSV,*) '   AMdi = ', AMdi(1:iter), AM
+        write (NDSV,*) '    si = ', sqrt( msi(1:iter) )
       end if
         
       im = iter + 1
@@ -1043,7 +1043,7 @@
       end if
 
       if ( .not. abs(Ud) < abs(U0) + abs(MK) ) then
-        write (NDSV,*), '  WARNING in w3xsmfmd:', &
+        write (NDSV,*) '  WARNING in w3xsmfmd:', &
                 ' Strong secondary Stokes drift |Ud| > |U0| + |MK|'
         warning_issued = .true.
       end if
@@ -1159,7 +1159,7 @@
       num_unmasked = numD - 1 - sum(Zmask(2:numD))
       
       ! Linear regression fit
-      if (xsmf_verbose > 2 ) write (NDSV,*), '  lin_reg () ... '
+      if (xsmf_verbose > 2 ) write (NDSV,*) '  lin_reg () ... '
       if ( num_unmasked == 0 .OR. ( num_unmasked == 1 .AND. &
             .NOT. ( present(A0) .OR. present(P0) ) ) ) then
         ! Number of depths that go into the fitting. Returned in numD
@@ -1639,14 +1639,14 @@
 
         ! Check convergence
         if (abs(tni) > eps*sm) then
-          WRITE (NDSV, *), 'WARNING in w3xsmfmd function giGR: ', \
+          WRITE (NDSV, *) 'WARNING in w3xsmfmd function giGR: ', \
             'max number of terms (', nm, ') too small for q=', q, 'u=', u
 
           do n = nm,2*nm
             sm = sm + tni
             ! Exit loop if converged
             if ( abs(tni) < eps*sm) then
-              WRITE (NDSV, *), ' - Sufficient number of terms: ', n
+              WRITE (NDSV, *) ' - Sufficient number of terms: ', n
               exit
             end if
             tn = tn * xt/n
@@ -1754,7 +1754,7 @@
         GCF=G
         
         IF ( N == NUMIT .and.  xsmf_verbose > 1 ) &
-           write (NDSV, *), 'WARNING in w3xsmfmd function GCF: ', &
+           write (NDSV, *) 'WARNING in w3xsmfmd function GCF: ', &
            'number of iterations (', NUMIT, ') too small for A=', A, 'X=', X
 
 
