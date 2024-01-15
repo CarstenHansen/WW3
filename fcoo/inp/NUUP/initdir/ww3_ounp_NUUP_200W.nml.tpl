@@ -35,7 +35,7 @@
 !     FILE%NETCDF        = 3                 ! Netcdf version [3|4]
 ! -------------------------------------------------------------------- !
 &FILE_NML
-  FILE%PREFIX        = 'NUUP_200NW.' 
+  FILE%PREFIX        = 'NUUP_200W.' 
   FILE%NETCDF        = 3
 /
 

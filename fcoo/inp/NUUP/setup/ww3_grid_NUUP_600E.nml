@@ -173,8 +173,8 @@
 &RECT_NML
   RECT%NX           =  160
   RECT%NY           =  136
-  RECT%SX           =  0.005370
-  RECT%SY           =  0.005370
+  RECT%SX           =  0.00537
+  RECT%SY           =  0.00537
   RECT%SF           =  1.
   RECT%X0           =  -13.48481
   RECT%Y0           =  -0.20943

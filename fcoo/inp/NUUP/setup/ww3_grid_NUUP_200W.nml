@@ -135,8 +135,8 @@
 !     GRID%DMIN             = 0.        ! abs. minimum water depth (m)
 ! -------------------------------------------------------------------- !
 &GRID_NML
-  GRID%NAME         =  'NUUP_200NW (to about 2 nmi offshore)'
-  GRID%NML          =  'namelists_NUUP.nml'
+  GRID%NAME         =  'NUUP_200W (to about 2 nmi offshore)'
+  GRID%NML          =  'namelists_NUUP_200.nml'
   GRID%TYPE         =  'RECT'
   GRID%COORD        =  'SPHE'
   GRID%CLOS         =  'NONE'
@@ -219,9 +219,18 @@
 ! -------------------------------------------------------------------- !
 &DEPTH_NML
   DEPTH%SF        =  -1.
-  DEPTH%FILENAME  =  'bathy_FCOO-NUUP_200NW.dat'
+  DEPTH%FILENAME  =  'bathy_FCOO-NUUP_200W.dat'
   DEPTH%FORMAT    =  '(...)'
 /
+
+! -------------------------------------------------------------------- !
+! Define the point status map via MASK_NML namelist
+! -------------------------------------------------------------------- !
+&MASK_NML
+  MASK%FILENAME  =  'mapsta.NUUP_200W'
+  MASK%IDLA      =  1
+/
+
 
 ! -------------------------------------------------------------------- !
 ! Define the obstruction map via OBST_NML namelist
@@ -272,7 +281,7 @@
 ! -------------------------------------------------------------------- !
 !&OBST_NML
 !  OBST%SF        =  0.1
-!  OBST%FILENAME  =  'obstruct_NUUP_200NW.dat'
+!  OBST%FILENAME  =  'obstruct_NUUP_200W.dat'
 !
 ! NOTE, NO obstructions: I have changed &MISC FLAGTR = 4 to FLAGTR = 0 !
 !
@@ -321,36 +330,36 @@
 !INBND_POINT(1) = 2 2 F
 !INBND_POINT(2) = 2 11 T
 !/
-!
-! NUUP_600 S-W-N
-!
-&INBND_COUNT_NML
-INBND_COUNT%N_POINT = 18
-/
-! INBND_POINT(1..12) are from the outer 600m grid
-! INBND_POINT(13..18) are from the inner 600m or 200m grid(s)
-&INBND_POINT_NML
-INBND_POINT(1)  =  129    2 F  !  -13.61906     -0.09308
-INBND_POINT(2)  =   97    2 T  !  -13.70856     -0.09308  
-INBND_POINT(3)  =   95    2 F  !  -13.67992     -0.09308
-INBND_POINT(4)  =   95    2 T  !  -13.67992     -0.09308
-INBND_POINT(5)  =   93    2 F  !  -13.68350     -0.09308
-INBND_POINT(6)  =   92    2 T  !  -13.68529     -0.09308
-INBND_POINT(7)  =   78    2 F  !  -13.71035     -0.09308                   
-INBND_POINT(8)  =    2    2 T  !  -13.84460     -0.32757   
-INBND_POINT(9)  =    2  164 T  !  -13.84460      0.1969   
-INBND_POINT(10) =   71  164 T  !  -13.70140-11dx 0.1969    
-INBND_POINT(11) =   73  164 F  !  -13.69961-9dx  0.1969    
-INBND_POINT(12) =   82  164 T  !  -13.70319-1dx  0.1969    
-INBND_POINT(13) =  177   17 F  !  -13.53314     -0.06623 
-INBND_POINT(14) =  177   41 T  !  -13.53314     -0.02327
-INBND_POINT(15) =  177   87 F  !  -13.53314      0.05907
-INBND_POINT(16) =  177   93 T  !  -13.53314      0.06981
-INBND_POINT(17) =  177  123 F  !  -13.53314      0.12351
-INBND_POINT(18) =  177  162 T  !  -13.53314      0.19332
-/
-!INBND_POINT(4) =   82  288 T  !  -13.70140      0.18437   max -13.7025   
-!
+!!
+!! NUUP_600 S-W-N
+!!
+!&INBND_COUNT_NML
+!INBND_COUNT%N_POINT = 18
+!/
+!! INBND_POINT(1..12) are from the outer 600m grid
+!! INBND_POINT(13..18) are from the inner 600m or 200m grid(s)
+!&INBND_POINT_NML
+!INBND_POINT(1)  =  129    2 F  !  -13.61906     -0.09308
+!INBND_POINT(2)  =   97    2 T  !  -13.70856     -0.09308  
+!INBND_POINT(3)  =   95    2 F  !  -13.67992     -0.09308
+!INBND_POINT(4)  =   95    2 T  !  -13.67992     -0.09308
+!INBND_POINT(5)  =   93    2 F  !  -13.68350     -0.09308
+!INBND_POINT(6)  =   92    2 T  !  -13.68529     -0.09308
+!INBND_POINT(7)  =   78    2 F  !  -13.71035     -0.09308                   
+!INBND_POINT(8)  =    2    2 T  !  -13.84460     -0.32757   
+!INBND_POINT(9)  =    2  164 T  !  -13.84460      0.1969   
+!INBND_POINT(10) =   71  164 T  !  -13.70140-11dx 0.1969    
+!INBND_POINT(11) =   73  164 F  !  -13.69961-9dx  0.1969    
+!INBND_POINT(12) =   82  164 T  !  -13.70319-1dx  0.1969    
+!INBND_POINT(13) =  177   17 F  !  -13.53314     -0.06623 
+!INBND_POINT(14) =  177   41 T  !  -13.53314     -0.02327
+!INBND_POINT(15) =  177   87 F  !  -13.53314      0.05907
+!INBND_POINT(16) =  177   93 T  !  -13.53314      0.06981
+!INBND_POINT(17) =  177  123 F  !  -13.53314      0.12351
+!INBND_POINT(18) =  177  162 T  !  -13.53314      0.19332
+!/
+!!INBND_POINT(4) =   82  288 T  !  -13.70140      0.18437   max -13.7025   
+!!
 ! -------------------------------------------------------------------- !
 ! Define the output boundary points via OUTBND_COUNT_NML and
 !                                       OUTBND_LINE_NML namelist

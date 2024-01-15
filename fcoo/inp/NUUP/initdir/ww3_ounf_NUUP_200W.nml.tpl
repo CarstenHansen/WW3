@@ -73,7 +73,7 @@
 !     FILE%IYN           = 1000000000        ! Last Y-axis index
 ! -------------------------------------------------------------------- !
 &FILE_NML
-  FILE%PREFIX        = 'NUUP_200NW.'
+  FILE%PREFIX        = 'NUUP_200W.'
   FILE%NETCDF        = 3
 /
 

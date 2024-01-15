@@ -173,10 +173,10 @@
 &RECT_NML
   RECT%NX           =  97
   RECT%NY           =  123
-  RECT%SX           =  0.005370
-  RECT%SY           =  0.005370
+  RECT%SX           =  0.00537
+  RECT%SY           =  0.00537
   RECT%SF           =  1.
-  RECT%X0           =  -13.898300
+  RECT%X0           =  -13.89830
   RECT%Y0           =  -0.40275
   RECT%SF0          =  1.
 /
@@ -224,6 +224,15 @@
   DEPTH%FILENAME  =  'bathy_FCOO-NUUP_600W.dat'
   DEPTH%FORMAT    =  '(...)'
 /
+
+! -------------------------------------------------------------------- !
+! Define the point status map via MASK_NML namelist
+! -------------------------------------------------------------------- !
+&MASK_NML
+  MASK%FILENAME  =  'mapsta.NUUP_600W'
+  MASK%IDLA      =  1
+/
+
 
 ! -------------------------------------------------------------------- !
 ! Define the obstruction map via OBST_NML namelist
@@ -326,32 +335,34 @@
 !
 ! NUUP_600W S-W-N-E
 !
-&INBND_COUNT_NML
-INBND_COUNT%N_POINT = 18     
-/
+! &INBND_COUNT_NML
+! INBND_COUNT%N_POINT = 12    
+! /
 ! INBND_POINT(1..6) are from the outer 1800m grid
-! INBND_POINT(7..12) are from NUUP_600E grid
-! INBND_POINT(13..18) are from the inner 200m grid(s)
-&INBND_POINT_NML
-INBND_POINT(1) =   30    2 F  !  -13.74257     -0.39738   
-INBND_POINT(2) =   28    2 T  !  -13.74257-2dx -0.39738   
-INBND_POINT(3) =   26    2 F  !  -13.74257-4dx -0.39738   
-INBND_POINT(4) =    2    2 T  !  -13.89293     -0.39738   
-INBND_POINT(5) =    2  122 T  !  -13.89293      0.24702   
-INBND_POINT(6) =   37  122 T  !  -13.67276-5dx  0.24702   
-INBND_POINT(7) =   81  120 F
-INBND_POINT(8) =   81  108 T
-INBND_POINT(9) =   84  101 F
-INBND_POINT(10) =  84   93 T  ! 84   92 T
-INBND_POINT(11) =  84   67 F  ! 84   68 F
-INBND_POINT(12) =  84   63 T  ! 84   62 T
-INBND_POINT(13) =  53   59 F  !  -13.61906    -0.09129
-INBND_POINT(14) =  41   59 T  !  -13.68529    -0.09129
-INBND_POINT(15) =  36   59 F  !  -13.71035    -0.09129
-INBND_POINT(16) =  11   59 T  !  -13.84460    -0.09129  NUUP_200: dx200=0.00179
-INBND_POINT(17) =  11  112 T  !  -13.84460     0.19332  max -13.69961+dx200/2
-INBND_POINT(18) =  37  112 T  !  -13.70498     0.19332      = -13.696915
-/
+! INBND_POINT(7..12) are from the inner 200m grid(s)
+! &INBND_POINT_NML
+!  INBND_POINT(1)  =  30    2 F  !  -13.74257      -0.39738   
+!  INBND_POINT(2)  =  28    2 T  !  -13.74257-2dx  -0.39738   
+!  INBND_POINT(3)  =  26    2 F  !  -13.74257-4dx  -0.39738   
+!  INBND_POINT(4)  =   2    2 T  !  -13.89293      -0.39738   
+!  INBND_POINT(5)  =   2  122 T  !  -13.89293       0.24702   
+!  INBND_POINT(6)  =  37  122 T  !  -13.67276-5dx   0.24702   
+! ! INBND_POINT(7)  =  53   59 F  !  -13.61906      -0.09129
+! ! INBND_POINT(8)  =  41   59 T  !  -13.68529      -0.09129
+! ! INBND_POINT(9)  =  36   59 F  !  -13.71035      -0.09129
+! ! INBND_POINT(10) =  11   59 T  !  -13.84460      -0.09129  NUUP_200: dx200=0.00179
+! ! INBND_POINT(11) =  11  112 T  !  -13.84460       0.19332  max -13.69961+dx200/2
+! ! INBND_POINT(12) =  37  112 T  !  -13.70498       0.19332      = -13.696915
+! ! /
+! ! INBND_POINT(7..12) are from NUUP_600E grid
+!  INBND_POINT(7) =  81  120 F
+!  INBND_POINT(8) =  81  108 T
+!  INBND_POINT(9) =  84  101 F
+!  INBND_POINT(10) =  84   93 T  ! 84   92 T
+!  INBND_POINT(11) =  84   67 F  ! 84   68 F
+!  INBND_POINT(12) =  84   63 T  ! 84   62 T
+! /
+!
 ! ex -13.73183+-dx200 = -13.73362 - -13.73004
 ! X0=-13.898300;dx=0.005370
 ! $X0+($ix-1)*$dx=$xx => ix=($xx-$X0)/$dx+1

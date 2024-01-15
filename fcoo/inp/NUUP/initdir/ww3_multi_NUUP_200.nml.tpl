@@ -61,7 +61,7 @@
   ! MODEL(4)%FORCING%ICE_PARAM4    = 'H'
   MODEL(4)%RESOURCE%COMM_FRAC = 0.00,1.00
   MODEL(4)%RESOURCE%RANK_ID      = 3
-  MODEL(5)%NAME                  = 'NUUP_200NW'
+  MODEL(5)%NAME                  = 'NUUP_200W'
   MODEL(5)%FORCING%WINDS         = 'native'
   ! MODEL(5)%FORCING%ICE_CONC      = 'native'
   ! MODEL(5)%FORCING%ICE_PARAM1    = 'native'
@@ -75,6 +75,34 @@
   !     MODEL(I)%RESOURCE%RANK_ID      = I
   !     MODEL(I)%RESOURCE%GROUP_ID     = 1
 /
+  !
+  ! &TIMESTEPS_NML                    New:
+  ! 200:
+  !   TIMESTEPS%DTMAX        =   20.  15. 
+  !   TIMESTEPS%DTXY         =   5.   5.  
+  !   TIMESTEPS%DTKTH        =   10.  5. 
+  !   TIMESTEPS%DTMIN        =   5.   5.  
+  !                                       
+  ! 600:                                  
+  !   TIMESTEPS%DTMAX        =   60.  60. 
+  !   TIMESTEPS%DTXY         =   20.  15. 
+  !   TIMESTEPS%DTKTH        =   30.  15. 
+  !   TIMESTEPS%DTMIN        =   5.   5.  
+  !                                       
+  ! 1800:  No output!                         
+  !   TIMESTEPS%DTMAX        =   200. 180.
+  !   TIMESTEPS%DTXY         =   100. 60.
+  !   TIMESTEPS%DTKTH        =   100. 60.
+  !   TIMESTEPS%DTMIN        =   5.   5.  
+  !                                       
+  ! 5400:  No output!       
+  !   TIMESTEPS%DTMAX        =   600. 540.
+  !   TIMESTEPS%DTXY         =   150. 180.
+  !   TIMESTEPS%DTKTH        =   150. 180.
+  !   TIMESTEPS%DTMIN        =   5.   5.  
+  !     
+/
+
 
 ! -------------------------------------------------------------------- !
 ! Define the output types point parameters via OUTPUT_TYPE_NML namelist
@@ -96,7 +124,6 @@
   ALLDATE%RESTART        = '__SIMSTART__' '__HOTDELTA__' '__SIMSTOP__'
 /
 ! ALLDATE%PARTITION      = '20090525 000000' '3600' '20090526 000000'
-! ALLDATE%RESTART        = '20231022 230000' '21600' '20231023 050000'
 ! -------------------------------------------------------------------- !
 ! Define homogeneous input via HOMOG_COUNT_NML and HOMOG_INPUT_NML namelist
 ! -------------------------------------------------------------------- !
@@ -111,10 +138,11 @@
 
 &HOMOG_COUNT_NML
   HOMOG_COUNT%N_MOV                =  3
+/
+
 !  HOMOG_COUNT%N_IC2                =  1 ! Make this work in ww3_multi !
 !  HOMOG_COUNT%N_IC3                =  1
 !  HOMOG_COUNT%N_IC4                =  1
-/
 
 &HOMOG_INPUT_NML
   HOMOG_INPUT(1)%NAME        = 'IC2'
