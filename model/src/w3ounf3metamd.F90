@@ -330,7 +330,8 @@ CONTAINS
   !> @author Chris Bunney @date 09-Mar-2020
   !/ ------------------------------------------------------------------- /
   SUBROUTINE INIT_META(FLG2D,VEC)
-!/! W3_MFIT! C Hansen note: FLG2D is for the fb_xsmf
+    ! FLG2D is for the fb_xsmf branch.
+    ! See the CHA note on FLG2D in SUBROUTINE DEFAULT_META
     !/
     !/                  +-----------------------------------+
     !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -470,7 +471,8 @@ CONTAINS
 
     ! 3. Set the default values for the OUNF netCDF meta data.
     CALL DEFAULT_META(FLG2D)
-!/! W3_MFIT!  FLG2D is for the fb_xsmf branch
+    ! FLG2D is for the fb_xsmf branch only
+    ! See the CHA note on FLG2D in SUBROUTINE DEFAULT_META
 
     ! Set the default coordiante reference system (if applicable)
     CALL DEFAULT_CRS_META()
@@ -2621,7 +2623,13 @@ CONTAINS
   !> @author Chris Bunney @date 22-Mar-2021
   !/ ------------------------------------------------------------------- /
   SUBROUTINE DEFAULT_META(FLG2D)
-    !/! W3_MFIT!  FLG2D is for the fb_xsmf branch
+    ! CHA note: FLG2D is for the fb_xsmf branch, only.
+    ! A true value of FLG2D(ISVP,JSVP) lets the vector of the
+    ! wave pseudo-momentum (scaled by multiplication with 2 * ksc)
+    ! be written to netcdf (even if not the full Stokes profile is selected).
+    ! TODO, change this use of FLG2D: Declare a logical in the present module
+    ! to be USEd in ww3_ounf to indicate that the pseudo-momentum is
+    ! defined and should  be output to netcdf.wave
     !/
     !/                  +-----------------------------------+
     !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -2654,10 +2662,12 @@ CONTAINS
     USE W3IOGOMD, ONLY: W3FLDTOIJ
 #endif
 #ifdef W3_MFIT
-      USE W3ODATMD, ONLY: NOEXTR, NGRPP
+    USE W3ODATMD, ONLY: NOEXTR
 #endif
-    IMPLICIT NONE
     !/! MFIT:  NGRPP, FLG2D are for the fb_xsmf branch
+    USE W3ODATMD, ONLY: NGRPP
+    !
+    IMPLICIT NONE
     LOGICAL, INTENT(IN) :: FLG2D(NOGRP,NGRPP)
     TYPE(META_T), POINTER :: META(:)
     INTEGER :: IFJ
@@ -4281,7 +4291,6 @@ CONTAINS
 #ifdef W3_MFIT
     ! IFI=10, IFJ=3 (IXMF=10,JXMF=NOEXTR+1=3)
     ! ISP=1
-    ! IF ( FLG2D(IXMF,JXMF) ) THEN
     META => GROUP(IXMF)%FIELD(JXMF)%SUBFIELD(1)%META
     ! The seven subfields (ISP=1..7) are joined in the netCDF file
     META(1)%FSC    = 0.001
@@ -4345,7 +4354,6 @@ CONTAINS
     META(1)%FSC  = 1
     META(1)%vmin = -32766
     META(1)%vmax = 32766
-    ! END IF ! ( FLG2D(IXMF,JXMF) )
     NOGE(10) = NOGE(10)-1 ! Need NOGE(10)-1 for u1, u2 below
 #endif
     ! IFI=10, IFJ=1

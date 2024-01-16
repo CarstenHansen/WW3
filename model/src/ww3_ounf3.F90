@@ -607,6 +607,7 @@ PROGRAM W3OUNF3
   END DO
 #ifdef W3_MFIT
   ! Write USVP(1:3) to netCDF if not the Stokes profile is selected
+  ! See the CHA note on FLG2D in SUBROUTINE DEFAULT_META
   IF ( FLG2D(10,NOEXTR+1) .AND. .NOT. FLG2D(ISVP,JSVP) ) THEN
     SVP=.FALSE.
     FLG2D(ISVP,JSVP) = .TRUE.
@@ -690,7 +691,8 @@ PROGRAM W3OUNF3
   !
   ! 4.4 Initialise meta-data
   CALL INIT_META(FLG2D,VECTOR)
-!/MFIT! C Hansen note: FLG2D is for the fb_xsmf branch only
+  ! FLG2D is for the fb_xsmf branch only
+  ! See the CHA note on FLG2D in SUBROUTINE DEFAULT_META
 
   ! 4.5 Max number of sub-fields or partitions, and netCDF ID register
       
