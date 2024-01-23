@@ -147,6 +147,7 @@ regtests/build*
 */*.pdf
 */*/*.pdf
 */*/*/*.pdf
+!fcoo/inp/*/setup/*.nc
 *~
 model/bin/comp
 model/bin/link
