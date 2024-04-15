@@ -1,0 +1,27 @@
+#
+# gridID 1
+#
+gridtype  = lonlat
+gridsize  = 433152
+xsize     = 768
+ysize     = 564
+xname     = lon
+xlongname = "longitude"
+xunits    = "degrees_east"
+yname     = lat
+ylongname = "latitude"
+yunits    = "degrees_north"
+xfirst    = -33.73611
+xinc      = 0.08333333
+yfirst    = 41.29167
+yinc      = 0.05
+
+# Reference grid point for BAL3:
+#xref=9.51389279
+#yref=53.89166667
+
+# Check that the it matches to ~7 sign. digits, and correct:
+#echo "($yref-($yfirst))/$yinc+1" | bc -l
+#echo "($xref-($xfirst))/$xinc+1" | bc -l; nref=520.
+
+#echo $xfirst $(echo "$xref -($nxref-1)*$xinc" | bc -l)
