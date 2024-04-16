@@ -2156,13 +2156,13 @@ CONTAINS
          TAUOCX, TAUOCY, WNMEAN, QKK, SKEW, EMBIA1, EMBIA2
 #endif
 
-# ifdef W3_STVP
+#ifdef W3_STVP
     USE W3ADATMD, ONLY: USVP
-# endif
+#endif
 
-# ifdef W3_MFIT
+#ifdef W3_MFIT
     USE W3ADATMD, ONLY: XSMH
-# endif
+#endif
 
 #ifdef W3_MPI
     USE W3GDATMD, ONLY: NK
