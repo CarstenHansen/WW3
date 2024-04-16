@@ -678,6 +678,7 @@ MODULE W3GRIDMD
 #endif
   !
 #ifdef W3_SMC
+  REAL                    :: DVSMC
   REAL                    :: TRNMX, TRNMY
   INTEGER, ALLOCATABLE    :: NLvCelsk(:),  NLvUFcsk(:),  NLvVFcsk(:)
   INTEGER, ALLOCATABLE    :: IJKCelin(:,:),IJKUFcin(:,:),IJKVFcin(:,:)
@@ -3944,6 +3945,12 @@ CONTAINS
     IF (IDFM.EQ.2) WRITE (NDSO,973) TRIM(RFORM)
     IF (FROM.EQ.'NAME' .AND. NDSG.NE.NDSI) &
          WRITE (NDSO,974) TRIM(FNAME)
+
+#ifdef W3_SMC
+    !Li  Save the depth conversion factor for SMC grid use.  JGLi03Nov2023
+    DVSMC = VSC
+#endif
+
     !
     ! 7.e Read bottom depths
     !
@@ -5065,14 +5072,17 @@ CONTAINS
           CALL EXTCDE(65)
         END IF
 
-        !Li  Minimum DMIN depth is used as well for SMC.
-        ZB(ISEA)= - MAX( DMIN, FLOAT( IJKDep(ISEA) ) )
-        MAPFS(IY:IY+JS-1,IX:IX+IK-1)  = ISEA
-        MAPSTA(IY:IY+JS-1,IX:IX+IK-1)  = 1
-        MAPST2(IY:IY+JS-1,IX:IX+IK-1)  = 0
-        MAPSF(ISEA,1)  = IX
-        MAPSF(ISEA,2)  = IY
-        MAPSF(ISEA,3)  = IY + (IX    -1)*NY
+        !Li Allow land cell to be defined by ZLIM value and only reset
+        !Li MAPST* land values for sea points.   JGLi03Nov2023
+        ZB(ISEA) = DVSMC * FLOAT(IJKDep(ISEA))
+        IF( ZB(ISEA) .LT. ZLIM ) THEN
+          MAPSTA(IY:IY+JS-1,IX:IX+IK-1) = 1
+          MAPST2(IY:IY+JS-1,IX:IX+IK-1) = 0
+        ENDIF
+        MAPFS(IY:IY+JS-1,IX:IX+IK-1) = ISEA
+        MAPSF(ISEA,1) = IX
+        MAPSF(ISEA,2) = IY
+        MAPSF(ISEA,3) = IY + (IX-1) * NY
 
         !Li   New variable CLATS to hold cosine latitude at cell centre.
         !Li   Also added CLATIS and CTHG0S for version 4.08.
@@ -6320,14 +6330,14 @@ CONTAINS
 2923 FORMAT ( '             ',2F8.3,F6.1,2E12.4)
 2922 FORMAT ( '  &SNL3 NQDEF =',I3,', MSC =',F6.2,',  NSC =',   &
          F6.2,',  KDFD =',F6.2,',  KDFS =',F6.2,' /')
-3923 FORMAT ( '  &ANL3 QPARMS = ',2(F5.3,', '),F5.1,', ',E10.4, &
-         ', ',E10.4,' /')
-4923 FORMAT ( '  &ANL3 QPARMS = ',2(F5.3,', '),F5.1,', ',E10.4, &
-         ', ',E10.4,' ,')
-5923 FORMAT ( '                 ',2(F5.3,', '),F5.1,', ',E10.4, &
-         ', ',E10.4,' ,')
-6923 FORMAT ( '                 ',2(F5.3,', '),F5.1,', ',E10.4, &
-         ', ',E10.4,' /')
+3923 FORMAT ( '  &ANL3 QPARMS = ',2(F5.3,', '),F5.1,', ',E11.4, &
+         ', ',E11.4,' /')
+4923 FORMAT ( '  &ANL3 QPARMS = ',2(F5.3,', '),F5.1,', ',E11.4, &
+         ', ',E11.4,' ,')
+5923 FORMAT ( '                 ',2(F5.3,', '),F5.1,', ',E11.4, &
+         ', ',E11.4,' ,')
+6923 FORMAT ( '                 ',2(F5.3,', '),F5.1,', ',E11.4, &
+         ', ',E11.4,' /')
 #endif
     !
 #ifdef W3_NL4
@@ -6429,7 +6439,7 @@ CONTAINS
          '        SDSBRF1 = ',F5.2,', SDSBRFDF =',I2,', '/ &
          '        SDSBM0 = ',F5.2, ', SDSBM1 =',F5.2,      &
          ', SDSBM2 =',F5.2,', SDSBM3 =',F5.2,', SDSBM4 =', &
-         F5.2,', '/,                                       &
+         F7.2,', '/,                                       &
          '        SPMSS = ',F5.2, ', SDKOF =',F5.2,        &
          ', SDSMWD =',F5.2,', SDSFACMTF =',F5.1,', '/      &
          '        SDSMWPOW =',F3.1,', SDSNMTF =', F5.2,    &
@@ -6443,18 +6453,18 @@ CONTAINS
 925 FORMAT ( '  normalise by threshold spectral density    :  ',A/&
          '  normalise by spectral density              :  ',A/&
          '  coefficient and exponent  for                 '/  &
-         '   inherent breaking term a1, L as in (21)   : ',E9.3,I3/ &
-         '   cumulative breaking term a2, M as in (22) : ',E9.3,I3/ &
+         '   inherent breaking term a1, L as in (21)   : ',E10.3,I3/ &
+         '   cumulative breaking term a2, M as in (22) : ',E10.3,I3/ &
          ' ')
-2924 FORMAT ( '  &SDS6 SDSET = ',L,', SDSA1 = ',E9.3,              &
-         ', SDSA2 = ',E9.3,', SDSP1 = ',I2,', SDSP1 = ',      &
+2924 FORMAT ( '  &SDS6 SDSET = ',L,', SDSA1 = ',E10.3,              &
+         ', SDSA2 = ',E10.3,', SDSP1 = ',I2,', SDSP1 = ',      &
          I2,' /'                                              )
 
 937 FORMAT (/'  Swell dissipation ',A/                            &
          ' --------------------------------------------------')
 940 FORMAT ( '  subroutine W3SWL6 activated           : ',A/      &
-         '   coefficient b1 ',A,                ' : ',E9.3/   )
-2937 FORMAT ( '  &SWL6 SWLB1 = ',E9.3,', CSTB1 = ',L,' /')
+         '   coefficient b1 ',A,                ' : ',E10.3/   )
+2937 FORMAT ( '  &SWL6 SWLB1 = ',E10.3,', CSTB1 = ',L,' /')
 #endif
     !
 #ifdef W3_BT0
@@ -6539,7 +6549,7 @@ CONTAINS
 946 FORMAT  ('  Isotropic (linear function of ice concentration)'/&
          '        slope                      : ',E10.3/ &
          '        offset                     : ',E10.3)
-2946 FORMAT ( '  &SIS1 ISC1 =',E9.3,', ISC2 =',E9.3)
+2946 FORMAT ( '  &SIS1 ISC1 =',E10.3,', ISC2 =',E10.3)
 #endif
 #ifdef W3_IS2
 947 FORMAT  (/'  Ice scattering ',A,/ &
