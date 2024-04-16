@@ -2155,9 +2155,10 @@ CONTAINS
          PTM1, PT1, PT2, PEP, WBT, CX, CY,         &
          TAUOCX, TAUOCY, WNMEAN, QKK, SKEW, EMBIA1, EMBIA2
 #endif
-# ifdef W3_STVP
+
+#ifdef W3_STVP
     USE W3ADATMD, ONLY: USVP
-# endif
+#endif
 
 #ifdef W3_MPI
     USE W3GDATMD, ONLY: NK
