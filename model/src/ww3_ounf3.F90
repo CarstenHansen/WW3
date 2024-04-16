@@ -71,6 +71,7 @@ PROGRAM W3OUNF3
   !/    28-Feb-2022 : MFIT option: Stokes drift           ( version 7.XX )
   !/                  profile parametric fit
   !/    14-Feb-2023 : Added QKK output                    ( version 7.12 )
+  !/    03-Mar-2024 : Added SKEW & EMBIAS  output         ( version 7.xx )
   !/
   !/    Copyright 2009-2013 National Weather Service (NWS),
   !/       National Oceanic and Atmospheric Administration.  All rights
@@ -265,13 +266,16 @@ PROGRAM W3OUNF3
        CFLTHMAX, CFLXYMAX, CFLKMAX, TAUICE, PHICE,  &
        STMAXE, STMAXD, HMAXE, HCMAXE, HMAXD, HCMAXD,&
        P2SMS, EF, US3D, TH1M, STH1M, TH2M, STH2M,   &
-       WN, USSP, WBT, WNMEAN, QKK
+       WN, USSP, WBT, WNMEAN, QKK, SKEW, EMBIA1, EMBIA2
+
 #ifdef W3_STVP
   USE W3ADATMD, ONLY: USVP
 #endif
+
 #ifdef W3_MFIT
   USE W3ADATMD, ONLY: XSMH
 #endif
+  
   USE W3ODATMD, ONLY: NDSO, NDSE, SCREEN, NOGRP, NGRPP, IDOUT,     &
        UNDEF, FLOGRD, FNMPRE, NOSWLL, NOGE
   !
@@ -1110,7 +1114,7 @@ CONTAINS
     CHARACTER*30            :: STRSTARTDATE
     CHARACTER               :: FNAMENC*128
 
-    CHARACTER               :: WRITETO*50
+    CHARACTER               :: WRITETO*128
     CHARACTER, SAVE         :: OLDTIMEID*16 = '0000000000000000'
     CHARACTER, SAVE         :: TIMEID*16 = '0000000000000000'
     !
@@ -2258,6 +2262,18 @@ CONTAINS
             ! k bandwidth
           ELSE IF ( IFI .EQ. 8 .AND. IFJ .EQ. 6 ) THEN
             CALL S2GRID(QKK, X1)
+            !
+            ! surface elevation skewness lambda_3,0,0
+          ELSE IF ( IFI .EQ. 8 .AND. IFJ .EQ. 7 ) THEN
+            CALL S2GRID(SKEW, X1)
+            !
+            ! em bias param 1
+          ELSE IF ( IFI .EQ. 8 .AND. IFJ .EQ. 8 ) THEN
+            CALL S2GRID(EMBIA1, X1)
+            !
+            ! em bias param 2
+          ELSE IF ( IFI .EQ. 8 .AND. IFJ .EQ. 9 ) THEN
+            CALL S2GRID(EMBIA2, X1)
             !
             ! Dynamic time step
           ELSE IF ( IFI .EQ. 9 .AND. IFJ .EQ. 1 ) THEN
