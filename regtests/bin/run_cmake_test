@@ -43,7 +43,7 @@ errmsg ()
 
 # 1.b Usage function
 myname="`basename $0`"  #name of script
-optstr="b:C:dfg:hi:m:n:No:Op:q:r:s:t:STw:" #option string for getopt function
+optstr="b:C:dEfg:hi:m:n:No:Op:q:r:s:t:STw:" #option string for getopt function
 usage ()
 {
 
@@ -59,6 +59,7 @@ Options:
                    :   OASIS : OASIS3-mct ww3_shel coupled application
                    :   ESMF  : ESMF ww3_multi coupled application
   -d               : invoke main program using gdb (non-parallel)
+  -E               : execute tests only, if exes already exist in work_dir/exe
   -f               : force pre- and post-processing programs to be compiled
                    : non-MPI (i.e., with SHRD switch); default is all programs
                    : compiled with unmodified switch settings
@@ -124,6 +125,7 @@ set -- $args
 ARGS=$args
 
 # 2.b Process command-line options
+exe_only=''
 exit_p=none
 exec_p=none
 batchq=none
@@ -140,6 +142,7 @@ do
   -C) shift; coupl="$1" ;;
   -d) use_gdb=1 ;;
   -e) prompt=1 ;;
+  -E) exe_only=1 ;;
   -f) force_shrd=1 ;;
   -g) shift; grdstr="$1" ;;
   -h) help=1 ;;
@@ -254,11 +257,13 @@ then
 fi
 
 # 2.g Path to working directory
-if [ $wrkdir ]
-then
-  path_w="$path_t/$wrkdir"
+[[ "$wrkdir" ]] || wrkdir=work
+if [[ "$wrkdir" =~ ^/ ]]; then
+  # Absolute path
+  path_w=$wrkdir
 else
-  path_w="$path_t/work"
+  path_w="$path_t/$wrkdir"
+  echo "Working directory is a subdir of the regtest: path_w=$path_w"
 fi
 
 # 2.h Paths to source subdirectories
@@ -402,6 +407,23 @@ cd ../
 path_cmake="`pwd`"
 
 path_e=$path_w/exe
+
+if [[ "$exe_only" ]]; then
+
+  echo "   Use older WW3 build, exes assumed to be in path_e=$path_e"
+
+  if [[ ! -e "$path_e/ww3_shel" ]]; then
+    echo "Fatal: ww3_shel not found in \$path_e"
+    echo "Try ommit option -e"
+    exit 1
+    exe_only=''
+  fi
+ 
+
+fi
+
+if [[ ! "$exe_only" ]]; then
+
 mkdir -p $path_e
 
 ofile=$path_w/build.log
@@ -409,6 +431,7 @@ ofile=$path_w/build.log
 echo "   Building WW3, exes will be in $path_e"
 
 echo "Exe directory is $path_e" > $ofile
+
 path_build_root=${path_build_root:-$path_w/build}
 if [ $force_shrd ]
 then
@@ -545,6 +568,8 @@ then # Add time counter if -T
   printf "\n %8.2f sec compile time" $Maketime  >> time_count.txt
 fi
 
+fi # [[ ! "$exe_only" ]]
+
 # --------------------------------------------------------------------------- #
 # 3. Execute Test                                                             #
 # --------------------------------------------------------------------------- #
@@ -617,6 +642,7 @@ then
     then
       ifile="`ls ${path_i}/${fileconf}.nml 2>/dev/null`"
     else
+      echo "Identify input file ${fileconf}.inp in directory path_i=$path_i"
       ifile="`ls $path_i/${fileconf}.inp 2>/dev/null`"
     fi
 
