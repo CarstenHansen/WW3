@@ -1639,7 +1639,7 @@
 
         ! Check convergence
         if (abs(tni) > eps*sm) then
-          WRITE (NDSV, *) 'WARNING in w3xsmfmd function giGR: ', \
+          WRITE (NDSV, *) 'WARNING in w3xsmfmd function giGR: ', &
             'max number of terms (', nm, ') too small for q=', q, 'u=', u
 
           do n = nm,2*nm
