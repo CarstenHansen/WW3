@@ -4,7 +4,7 @@ $--------------------------------------------------------------------- $
 $ First output time (yyyymmdd hhmmss), increment of output (s), 
 $ and (max) number of output times.
 $
-    __SIMSTART__  3600  721
+    __SIMSTART__  __FIELDDELTA__  4470
 $  19850101 000000  3600.  1000
 $
 $ Fields requested --------------------------------------------------- $
