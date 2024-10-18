@@ -382,6 +382,20 @@ INBND_POINT(11) =     94 186 T  !
 !     OUTBND_LINE(I)%NP     = 0               ! number of points
 ! OR
 !     OUTBND_LINE(I)        = 0. 0. 0. 0. 0   ! included lines
+&OUTBND_COUNT_NML
+  OUTBND_COUNT%N_LINE   =  3
+/  
+&OUTBND_LINE_NML
+! nest1.ww3 to NUUP_hires grid (5400mX5400m)
+! The north pole of the rotated grid NUUP_5400 is specified in namelists.nml:
+!    &ROTB BPLAT(1) = 22.2959, BPLON(1) = 160.86456, /
+! The OUTBND_LINEs are specified in destination grid rotlon rotlat coordinates:
+  OUTBND_LINE(1)  =    -13.77658    -0.87531    -0.04833 0.00000   15
+  OUTBND_LINE(2)  =    -14.45320    -0.82698     0.00000 0.04833   38
+  OUTBND_LINE(3)  =    -14.40487     1.00956     0.04833 0.00000   23
+! nest2.ww3 etc. to other grids do not exist, yet.
+/
+! -------------------------------------------------------------------- !
 ! -------------------------------------------------------------------- !
 ! WAVEWATCH III - end of namelist                                      !
 ! -------------------------------------------------------------------- !

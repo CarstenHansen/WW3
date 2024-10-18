@@ -1099,6 +1099,9 @@
       ! The log of log_Um is linear in log_KZ:
       if ( present(A0) ) AM = A0 ! Best fit of PM, only, given AM=A0
       if ( present(P0) ) PM = P0 ! Best fit of log_AM, only, given PM=P0
+
+      ! Return if no depth
+      if ( numD == 0 ) return
       
       logAM0 = log(AM)
       loglog_ref(2:SPND) = logAM0 + PM * log_KZ(2:SPND)

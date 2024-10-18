@@ -9,5 +9,7 @@
        SDSSTRAIN =0., SDSSTRAIN2 = 0., FXFM3 = 40., FXPM3 = 20., SDSFACMTF = 400.,
        SDSCUM=0., SDSC5 =0. /
 &ROTD PLAT = 10.0, PLON = -125.0, UNROT = .FALSE. /
+! Boundary spectra to rotated grids: No. 1 in ww3_grid.nml: NUUP_hires, res 5400m
+&ROTB BPLAT(1) =  22.2959, BPLON(1) = 160.86456, /
 &PRO3 WDTHCG=2.0, WDTHTH=2.0 /
 END OF NAMELISTS
