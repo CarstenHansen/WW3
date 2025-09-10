@@ -66,6 +66,17 @@
         ]
     },
     {
+        "name": "scripmpi",
+        "num_switches": "upto1",
+        "description": "use MPI parallelism for SCRIP regridding",
+        "valid-options": [
+            {
+                "name": "SCRIPMPI",
+                "requires": ["SCRIP", "MPI"]
+            }
+        ]
+    },
+    {
         "name": "shared",
         "num_switches": "one",
         "description": "'shared / distributed memory",
@@ -708,6 +719,7 @@
         "valid-options": [
             {
                 "name": "OASACM",
+                "requires": ["OASIS"],
                 "build_files": ["w3agcmmd.F90"]
             }
         ]
@@ -719,6 +731,7 @@
         "valid-options": [
             {
                 "name": "OASOCM",
+                "requires": ["OASIS"],
                 "build_files": ["w3ogcmmd.F90"]
             }
         ]
@@ -730,6 +743,7 @@
         "valid-options": [
             {
                 "name": "OASICM",
+                "requires": ["OASIS"],
                 "build_files": ["w3igcmmd.F90"]
             }
         ]
@@ -740,7 +754,8 @@
         "description": "use of the coupler",
         "valid-options": [
             {
-                "name": "COU"
+                "name": "COU",
+                "requires": ["MPI"]
             }
         ]
     },
@@ -751,6 +766,7 @@
         "valid-options": [
             {
                 "name": "OASIS",
+		"requires": ["MPI"],
                 "build_files": ["w3oacpmd.F90"],
                 "conflicts": ["FLX1", "FLX2", "FLX3", "FLX4"]
 
