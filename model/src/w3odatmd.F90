@@ -442,7 +442,7 @@ MODULE W3ODATMD
     INTEGER               :: TOSNL5(2)
 #endif
     INTEGER               :: TOFRST(2), TONEXT(2,8), TOLAST(2,8), &
-         TBPI0(2), TBPIN(2), NDS(15), OFILES(7)
+         TBPI0(2), TBPIN(2), NDS(15), OFILES(8)
     REAL                  :: DTOUT(8)
     LOGICAL               :: FLOUT(8)
     TYPE(OTYPE1)          :: OUT1
@@ -695,6 +695,7 @@ CONTAINS
       OUTPTS(I)%TBPIN = (-1,0)
       !
       OUTPTS(I)%OUT1%IPASS1 = 0
+      OUTPTS(I)%OUT1%FLOGRR = .FALSE.
 #ifdef W3_MPI
       OUTPTS(I)%OUT1%NRQGO  = 0
       OUTPTS(I)%OUT1%NRQGO2 = 0
