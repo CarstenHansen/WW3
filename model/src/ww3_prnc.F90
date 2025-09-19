@@ -2079,31 +2079,44 @@ PROGRAM W3PRNC
           !
           CALL INTERP(MXM, MYM, XC, IX21, IX22, IY21, IY22,      &
                RD11, RD12, RD21, RD22, FILLVALUE, FA)
-        END IF
+          !
+          IF (NFCOMP.EQ.2) THEN
+#ifdef W3_O3
+            IF ( IAPROC .EQ. NAPOUT )    WRITE (NDSO,976) ' (2) '
+#endif
+            CALL INTERP(MXM, MYM, YC, JX21, JX22, JY21, JY22,  &
+                 XD11, XD12, XD21, XD22, FILLVALUE, FA)
+          END IF
+          !
+          ! ... Two-component fields
+          !
+        ELSE  !so if IFLD.GT.2
+          !
+          CALL INTERP(MXM, MYM, XC, IX21, IX22, IY21, IY22,      &
+               RD11, RD12, RD21, RD22, FILLVALUE, FX)
 
-        WHERE ( XC.NE.FILLVALUE .AND. YC.NE.FILLVALUE)
-          XTEMP = XC*XC + YC*YC
-        ELSEWHERE
-          XTEMP = FILLVALUE
-        ENDWHERE
-        CALL INTERP(MXM, MYM, XTEMP, IX21, IX22, IY21, IY22,   &
-             RD11, RD12, RD21, RD22, FILLVALUE, A3)
-        ! CHA at FCOO: For at test I had padded zeros to the wind field over land areas 
-        ! and experienced that A3 got a (small) negative value after interpolation
-        ! at a grid point. Then it failed in taking the SQRT below
-        ! I haven't reported back to the WW3 dev community
-        A3 = ABS(A3)
+          CALL INTERP(MXM, MYM, YC, IX21, IX22, IY21, IY22,      &
+               RD11, RD12, RD21, RD22, FILLVALUE, FY)
 
-        WHERE ( XTEMP.NE.FILLVALUE )
-          XTEMP =  SQRT(XTEMP)
-        ENDWHERE
-        CALL INTERP(MXM, MYM, XTEMP, IX21, IX22, IY21, IY22,   &
-             RD11, RD12, RD21, RD22, FILLVALUE, A2)
+          IF(FLSTAB) THEN
+            ! AC only populated if FLSTAB is true
+            CALL INTERP(MXM, MYM, AC, IX21, IX22, IY21, IY22,    &
+                 RD11, RD12, RD21, RD22, FILLVALUE, FA)
+          ENDIF
 
-        DO IY=1,NY
-          DO IX=1,NX
-            A1(IX,IY) = MAX ( 1.E-10 ,                        &
-                 SQRT( FX(IX,IY)**2 + FY(IX,IY)**2 ) )
+          WHERE ( XC.NE.FILLVALUE .AND. YC.NE.FILLVALUE)
+            XTEMP = XC*XC + YC*YC
+          ELSEWHERE
+            XTEMP = FILLVALUE
+          ENDWHERE
+          CALL INTERP(MXM, MYM, XTEMP, IX21, IX22, IY21, IY22,   &
+               RD11, RD12, RD21, RD22, FILLVALUE, A3)
+
+          WHERE ( XTEMP.NE.FILLVALUE )
+            XTEMP =  SQRT(XTEMP)
+          ENDWHERE
+          CALL INTERP(MXM, MYM, XTEMP, IX21, IX22, IY21, IY22,   &
+               RD11, RD12, RD21, RD22, FILLVALUE, A2)
 
           DO IY=1,NY
             DO IX=1,NX
