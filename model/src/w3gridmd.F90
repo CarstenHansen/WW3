@@ -7547,6 +7547,8 @@ CONTAINS
                 READ (NDS,NML=UNST,IOSTAT=J)
               CASE('OUTS')
                 READ (NDS,NML=OUTS,IOSTAT=J)
+              CASE('XSTP')
+                READ (NDS,NML=XSTP,IOSTAT=J)
               CASE('MISC')
                 READ (NDS,NML=MISC,IOSTAT=J)
               CASE DEFAULT
