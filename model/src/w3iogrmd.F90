@@ -316,7 +316,7 @@ CONTAINS
 #endif
     !
 #ifdef W3_MPI
-    INCLUDE "mpif.h"
+    use mpi_f08
 #endif
     !/
     !/ ------------------------------------------------------------------- /
@@ -807,6 +807,9 @@ CONTAINS
              B_JGS_DIFF_THR,                                  &
              B_JGS_NORM_THR,                                  &
              B_JGS_NLEVEL,                                    &
+#ifdef W3_TRNK
+             B_JGS_TRUNK_DIGITS,                              & 
+#endif
              B_JGS_SOURCE_NONLINEAR
 #ifdef W3_ASCII
         WRITE (NDSA,*)                                        &
@@ -841,6 +844,9 @@ CONTAINS
              B_JGS_DIFF_THR,                                  &
              B_JGS_NORM_THR,                                  &
              B_JGS_NLEVEL,                                    &
+#ifdef W3_TRNK
+             B_JGS_TRUNK_DIGITS,                              & 
+#endif
              B_JGS_SOURCE_NONLINEAR
 #endif
         !Init COUNTCON and IOBDP to zero, it needs to be set somewhere or
@@ -1010,6 +1016,9 @@ CONTAINS
              B_JGS_DIFF_THR,                                  &
              B_JGS_NORM_THR,                                  &
              B_JGS_NLEVEL,                                    &
+#ifdef W3_TRNK
+             B_JGS_TRUNK_DIGITS,                              & 
+#endif
              B_JGS_SOURCE_NONLINEAR
         IF (IERR.NE.0) CALL EXTIOF(NDSE,IERR,'W3IOGR','mod_def.'//FILEXT(:IEXT),51)
         IF (.NOT. GUGINIT) THEN
@@ -1659,10 +1668,13 @@ CONTAINS
            GQNQ_OM2, GQTHRSAT, GQTHRCOU, GQAMP
       IF (IERR.NE.0) CALL EXTIOF(NDSE,IERR,'W3IOGR','mod_def.'//FILEXT(:IEXT),51)
     END IF
-    IF ( FLTEST ) WRITE (NDST,9051) SNLC1, LAM,            &
-         KDCON, KDMN, SNLS1, SNLS2, SNLS3,                 &
-         IQTPE, NLTAIL, GQNF1, GQNT1, GQNQ_OM2,            &
-         GQTHRSAT, GQTHRCOU, GQAMP
+    IF ( FLTEST ) WRITE (NDST,*)                           &
+           'SNLC1, LAM, KDCON, KDMN, SNLS1, SNLS2, SNLS3,  &
+           IQTPE, NLTAIL, GQNF1, GQNT1,                    &
+           GQNQ_OM2, GQTHRSAT, GQTHRCOU, GQAMP:',          &
+           SNLC1, LAM, KDCON, KDMN, SNLS1, SNLS2, SNLS3,   &
+           IQTPE, NLTAIL, GQNF1, GQNT1,                    &
+           GQNQ_OM2, GQTHRSAT, GQTHRCOU, GQAMP
 #endif
     !
 #ifdef W3_NL2
