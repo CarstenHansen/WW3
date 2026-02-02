@@ -1,0 +1,17 @@
+#
+# gridID 1
+#
+gridtype  = lonlat
+gridsize  = 145320 # 59033 > (420*346)
+xsize     = 420 # 247 -> ($xsup-($xfirst))/0.08333333
+ysize     = 346 # 239 -> ($ysup-($yfirst))/0.05
+xname     = lon
+xlongname = "longitude"
+xunits    = "degrees_east"
+yname     = lat
+ylongname = "latitude"
+yunits    = "degrees_north"
+xfirst    = -4.902773 # 9.51389279 # xsup=30.09722530=9.51389279+0.08333333*247
+xinc      = 0.08333333
+yfirst    = 48.54167 # 53.89166667 # ysup=65.84166667=53.89166667+0.05*239
+yinc      = 0.05
