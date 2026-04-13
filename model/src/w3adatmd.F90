@@ -782,7 +782,6 @@ CONTAINS
     !/ ------------------------------------------------------------------- /
     USE W3GDATMD, ONLY: NGRIDS
     USE W3SERVMD, ONLY: EXTCDE
-    USE W3ODATMD, ONLY: IAPROC
 #ifdef W3_S
     USE W3SERVMD, ONLY: STRACE
 #endif
@@ -951,17 +950,15 @@ CONTAINS
     !
     !/ ------------------------------------------------------------------- /
     USE CONSTANTS, ONLY : LPDLIB
-    USE W3GDATMD, ONLY: NGRIDS, IGRID, W3SETG, NK, NX, NY, NSEA,    &
-         NSEAL, NSPEC, NTH, E3DF, P2MSF, US3DF,      &
-         USSPF, GTYPE, UNGTYPE
+    USE W3GDATMD, ONLY: NGRIDS, IGRID, W3SETG, NK, NX, NY, NSEA,        &
+         NSEAL, NSPEC, NTH, E3DF, P2MSF, US3DF, USSPF, GTYPE, UNGTYPE
+    USE W3ODATMD, ONLY: IAPROC, NAPROC, NOSWLL, NOEXTR, UNDEF
 #ifdef W3_STVP
     USE W3GDATMD, ONLY: SPND
     USE W3ODATMD, ONLY: NZO
 #endif
     ! To be used under switch MFIT. WADATS(IMOD)%XSMH(1,NOXSM=1) always exists
     USE W3ODATMD, ONLY: NOXSM
-    USE W3ODATMD, ONLY: IAPROC, NAPROC, NTPROC, NAPFLD,             &
-         NOSWLL, NOEXTR, UNDEF, FLOGRD, FLOGR2
     USE W3IDATMD, ONLY: FLCUR, FLWIND, FLTAUA, FLRHOA
     USE W3SERVMD, ONLY: EXTCDE
 #ifdef W3_S
@@ -978,7 +975,7 @@ CONTAINS
     !/ ------------------------------------------------------------------- /
     !/ Local parameters
     !/
-    INTEGER                 :: JGRID, NXXX, NSEAL_tmp
+    INTEGER                 :: JGRID, NXXX
     integer :: memunit
 #ifdef W3_S
     INTEGER, SAVE           :: IENT = 0
@@ -1606,9 +1603,8 @@ CONTAINS
     ! 10. Source code :
     !
     !/ ------------------------------------------------------------------- /
-    USE W3GDATMD, ONLY: NGRIDS, IGRID, W3SETG, NK, NX, NY, NSEA,    &
-         NSEAL, NSPEC, NTH, E3DF, P2MSF, US3DF,      &
-         USSPF, GTYPE, UNGTYPE
+    USE W3GDATMD, ONLY: NGRIDS, IGRID, W3SETG, NK, E3DF, P2MSF, UNGTYPE
+    USE W3ODATMD, ONLY: IAPROC, NAPROC, NOSWLL, NOEXTR, UNDEF, NOGRP, NGRPP
 #ifdef W3_STVP
     USE W3GDATMD, ONLY: SPND
     USE W3ODATMD, ONLY: NZO
@@ -1616,9 +1612,6 @@ CONTAINS
 #ifdef W3_MFIT
     USE W3ODATMD, ONLY: NOXSM
 #endif
-    USE W3ODATMD, ONLY: IAPROC, NAPROC, NTPROC, NAPFLD,             &
-         NOSWLL, NOEXTR, UNDEF, FLOGRD, FLOGR2,      &
-         NOGRP, NGRPP
     USE W3SERVMD, ONLY: EXTCDE
 #ifdef W3_S
     USE W3SERVMD, ONLY: STRACE
@@ -2594,9 +2587,7 @@ CONTAINS
     ! 10. Source code :
     !
     !/ ------------------------------------------------------------------- /
-    USE W3GDATMD, ONLY: NGRIDS, IGRID, NK, NX, NY, NSEA, NSEAL,     &
-         NSPEC, NTH, GTYPE, UNGTYPE
-    USE W3ODATMD, ONLY: NAPROC
+    USE W3GDATMD, ONLY: NGRIDS, UNGTYPE
     USE W3SERVMD, ONLY: EXTCDE
 #ifdef W3_S
     USE W3SERVMD, ONLY: STRACE
@@ -2810,7 +2801,7 @@ CONTAINS
     !/ ------------------------------------------------------------------- /
     !
     USE W3IDATMD, ONLY: INPUTS
-    USE W3GDATMD, ONLY: E3DF, P2MSF, US3DF, USSPF, GTYPE, UNGTYPE
+    USE W3GDATMD, ONLY: GTYPE, UNGTYPE
     !
     USE W3SERVMD, ONLY: EXTCDE
 #ifdef W3_S
@@ -3253,8 +3244,7 @@ CONTAINS
     !
     !/ ------------------------------------------------------------------- /
     !
-    USE W3IDATMD, ONLY: INPUTS
-    USE W3GDATMD, ONLY: E3DF, P2MSF, US3DF, USSPF, GTYPE, UNGTYPE
+    USE W3GDATMD, ONLY: UNGTYPE
     !
     USE W3SERVMD, ONLY: EXTCDE
 #ifdef W3_S
